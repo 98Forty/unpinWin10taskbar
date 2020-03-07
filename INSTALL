@@ -1,0 +1,10 @@
+
+Building XDECoin v3
+
+See doc/readme-qt.rst for instructions on building XDECoin QT,
+the intended-for-end-users, nice-graphical-interface, reference
+implementation of XDECoin.
+
+See doc/build-*.txt for instructions on building XDECoind,
+the intended-for-services, no-graphical-interface, reference
+implementation of XDECoin.
