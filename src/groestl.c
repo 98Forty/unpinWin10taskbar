@@ -1139,3 +1139,312 @@ static const sph_u64 T7[] = {
 	C64e(0xd254c55417c58686), C64e(0xf862d7622fd79a9a),
 	C64e(0x99ff55ffcc556666), C64e(0xb6a794a722941111),
 	C64e(0xc04acf4a0fcf8a8a), C64e(0xd9301030c910e9e9),
+	C64e(0x0e0a060a08060404), C64e(0x66988198e781fefe),
+	C64e(0xab0bf00b5bf0a0a0), C64e(0xb4cc44ccf0447878),
+	C64e(0xf0d5bad54aba2525), C64e(0x753ee33e96e34b4b),
+	C64e(0xac0ef30e5ff3a2a2), C64e(0x4419fe19bafe5d5d),
+	C64e(0xdb5bc05b1bc08080), C64e(0x80858a850a8a0505),
+	C64e(0xd3ecadec7ead3f3f), C64e(0xfedfbcdf42bc2121),
+	C64e(0xa8d848d8e0487070), C64e(0xfd0c040cf904f1f1),
+	C64e(0x197adf7ac6df6363), C64e(0x2f58c158eec17777),
+	C64e(0x309f759f4575afaf), C64e(0xe7a563a584634242),
+	C64e(0x7050305040302020), C64e(0xcb2e1a2ed11ae5e5),
+	C64e(0xef120e12e10efdfd), C64e(0x08b76db7656dbfbf),
+	C64e(0x55d44cd4194c8181), C64e(0x243c143c30141818),
+	C64e(0x795f355f4c352626), C64e(0xb2712f719d2fc3c3),
+	C64e(0x8638e13867e1bebe), C64e(0xc8fda2fd6aa23535),
+	C64e(0xc74fcc4f0bcc8888), C64e(0x654b394b5c392e2e),
+	C64e(0x6af957f93d579393), C64e(0x580df20daaf25555),
+	C64e(0x619d829de382fcfc), C64e(0xb3c947c9f4477a7a),
+	C64e(0x27efacef8bacc8c8), C64e(0x8832e7326fe7baba),
+	C64e(0x4f7d2b7d642b3232), C64e(0x42a495a4d795e6e6),
+	C64e(0x3bfba0fb9ba0c0c0), C64e(0xaab398b332981919),
+	C64e(0xf668d16827d19e9e), C64e(0x22817f815d7fa3a3),
+	C64e(0xeeaa66aa88664444), C64e(0xd6827e82a87e5454),
+	C64e(0xdde6abe676ab3b3b), C64e(0x959e839e16830b0b),
+	C64e(0xc945ca4503ca8c8c), C64e(0xbc7b297b9529c7c7),
+	C64e(0x056ed36ed6d36b6b), C64e(0x6c443c44503c2828),
+	C64e(0x2c8b798b5579a7a7), C64e(0x813de23d63e2bcbc),
+	C64e(0x31271d272c1d1616), C64e(0x379a769a4176adad),
+	C64e(0x964d3b4dad3bdbdb), C64e(0x9efa56fac8566464),
+	C64e(0xa6d24ed2e84e7474), C64e(0x36221e22281e1414),
+	C64e(0xe476db763fdb9292), C64e(0x121e0a1e180a0c0c),
+	C64e(0xfcb46cb4906c4848), C64e(0x8f37e4376be4b8b8),
+	C64e(0x78e75de7255d9f9f), C64e(0x0fb26eb2616ebdbd),
+	C64e(0x692aef2a86ef4343), C64e(0x35f1a6f193a6c4c4),
+	C64e(0xdae3a8e372a83939), C64e(0xc6f7a4f762a43131),
+	C64e(0x8a593759bd37d3d3), C64e(0x74868b86ff8bf2f2),
+	C64e(0x83563256b132d5d5), C64e(0x4ec543c50d438b8b),
+	C64e(0x85eb59ebdc596e6e), C64e(0x18c2b7c2afb7dada),
+	C64e(0x8e8f8c8f028c0101), C64e(0x1dac64ac7964b1b1),
+	C64e(0xf16dd26d23d29c9c), C64e(0x723be03b92e04949),
+	C64e(0x1fc7b4c7abb4d8d8), C64e(0xb915fa1543faacac),
+	C64e(0xfa090709fd07f3f3), C64e(0xa06f256f8525cfcf),
+	C64e(0x20eaafea8fafcaca), C64e(0x7d898e89f38ef4f4),
+	C64e(0x6720e9208ee94747), C64e(0x3828182820181010),
+	C64e(0x0b64d564ded56f6f), C64e(0x73838883fb88f0f0),
+	C64e(0xfbb16fb1946f4a4a), C64e(0xca967296b8725c5c),
+	C64e(0x546c246c70243838), C64e(0x5f08f108aef15757),
+	C64e(0x2152c752e6c77373), C64e(0x64f351f335519797),
+	C64e(0xae6523658d23cbcb), C64e(0x25847c84597ca1a1),
+	C64e(0x57bf9cbfcb9ce8e8), C64e(0x5d6321637c213e3e),
+	C64e(0xea7cdd7c37dd9696), C64e(0x1e7fdc7fc2dc6161),
+	C64e(0x9c9186911a860d0d), C64e(0x9b9485941e850f0f),
+	C64e(0x4bab90abdb90e0e0), C64e(0xbac642c6f8427c7c),
+	C64e(0x2657c457e2c47171), C64e(0x29e5aae583aacccc),
+	C64e(0xe373d8733bd89090), C64e(0x090f050f0c050606),
+	C64e(0xf4030103f501f7f7), C64e(0x2a36123638121c1c),
+	C64e(0x3cfea3fe9fa3c2c2), C64e(0x8be15fe1d45f6a6a),
+	C64e(0xbe10f91047f9aeae), C64e(0x026bd06bd2d06969),
+	C64e(0xbfa891a82e911717), C64e(0x71e858e829589999),
+	C64e(0x5369276974273a3a), C64e(0xf7d0b9d04eb92727),
+	C64e(0x91483848a938d9d9), C64e(0xde351335cd13ebeb),
+	C64e(0xe5ceb3ce56b32b2b), C64e(0x7755335544332222),
+	C64e(0x04d6bbd6bfbbd2d2), C64e(0x399070904970a9a9),
+	C64e(0x878089800e890707), C64e(0xc1f2a7f266a73333),
+	C64e(0xecc1b6c15ab62d2d), C64e(0x5a66226678223c3c),
+	C64e(0xb8ad92ad2a921515), C64e(0xa96020608920c9c9),
+	C64e(0x5cdb49db15498787), C64e(0xb01aff1a4fffaaaa),
+	C64e(0xd8887888a0785050), C64e(0x2b8e7a8e517aa5a5),
+	C64e(0x898a8f8a068f0303), C64e(0x4a13f813b2f85959),
+	C64e(0x929b809b12800909), C64e(0x2339173934171a1a),
+	C64e(0x1075da75cada6565), C64e(0x84533153b531d7d7),
+	C64e(0xd551c65113c68484), C64e(0x03d3b8d3bbb8d0d0),
+	C64e(0xdc5ec35e1fc38282), C64e(0xe2cbb0cb52b02929),
+	C64e(0xc3997799b4775a5a), C64e(0x2d3311333c111e1e),
+	C64e(0x3d46cb46f6cb7b7b), C64e(0xb71ffc1f4bfca8a8),
+	C64e(0x0c61d661dad66d6d), C64e(0x624e3a4e583a2c2c)
+};
+
+#endif
+
+#define DECL_STATE_SMALL \
+	sph_u64 H[8];
+
+#define READ_STATE_SMALL(sc)   do { \
+		memcpy(H, (sc)->state.wide, sizeof H); \
+	} while (0)
+
+#define WRITE_STATE_SMALL(sc)   do { \
+		memcpy((sc)->state.wide, H, sizeof H); \
+	} while (0)
+
+#if SPH_SMALL_FOOTPRINT_GROESTL
+
+#define RSTT(d, a, b0, b1, b2, b3, b4, b5, b6, b7)   do { \
+		t[d] = T0[B64_0(a[b0])] \
+			^ R64(T0[B64_1(a[b1])],  8) \
+			^ R64(T0[B64_2(a[b2])], 16) \
+			^ R64(T0[B64_3(a[b3])], 24) \
+			^ T4[B64_4(a[b4])] \
+			^ R64(T4[B64_5(a[b5])],  8) \
+			^ R64(T4[B64_6(a[b6])], 16) \
+			^ R64(T4[B64_7(a[b7])], 24); \
+	} while (0)
+
+#else
+
+#define RSTT(d, a, b0, b1, b2, b3, b4, b5, b6, b7)   do { \
+		t[d] = T0[B64_0(a[b0])] \
+			^ T1[B64_1(a[b1])] \
+			^ T2[B64_2(a[b2])] \
+			^ T3[B64_3(a[b3])] \
+			^ T4[B64_4(a[b4])] \
+			^ T5[B64_5(a[b5])] \
+			^ T6[B64_6(a[b6])] \
+			^ T7[B64_7(a[b7])]; \
+	} while (0)
+
+#endif
+
+#define ROUND_SMALL_P(a, r)   do { \
+		sph_u64 t[8]; \
+		a[0] ^= PC64(0x00, r); \
+		a[1] ^= PC64(0x10, r); \
+		a[2] ^= PC64(0x20, r); \
+		a[3] ^= PC64(0x30, r); \
+		a[4] ^= PC64(0x40, r); \
+		a[5] ^= PC64(0x50, r); \
+		a[6] ^= PC64(0x60, r); \
+		a[7] ^= PC64(0x70, r); \
+		RSTT(0, a, 0, 1, 2, 3, 4, 5, 6, 7); \
+		RSTT(1, a, 1, 2, 3, 4, 5, 6, 7, 0); \
+		RSTT(2, a, 2, 3, 4, 5, 6, 7, 0, 1); \
+		RSTT(3, a, 3, 4, 5, 6, 7, 0, 1, 2); \
+		RSTT(4, a, 4, 5, 6, 7, 0, 1, 2, 3); \
+		RSTT(5, a, 5, 6, 7, 0, 1, 2, 3, 4); \
+		RSTT(6, a, 6, 7, 0, 1, 2, 3, 4, 5); \
+		RSTT(7, a, 7, 0, 1, 2, 3, 4, 5, 6); \
+		a[0] = t[0]; \
+		a[1] = t[1]; \
+		a[2] = t[2]; \
+		a[3] = t[3]; \
+		a[4] = t[4]; \
+		a[5] = t[5]; \
+		a[6] = t[6]; \
+		a[7] = t[7]; \
+	} while (0)
+
+#define ROUND_SMALL_Q(a, r)   do { \
+		sph_u64 t[8]; \
+		a[0] ^= QC64(0x00, r); \
+		a[1] ^= QC64(0x10, r); \
+		a[2] ^= QC64(0x20, r); \
+		a[3] ^= QC64(0x30, r); \
+		a[4] ^= QC64(0x40, r); \
+		a[5] ^= QC64(0x50, r); \
+		a[6] ^= QC64(0x60, r); \
+		a[7] ^= QC64(0x70, r); \
+		RSTT(0, a, 1, 3, 5, 7, 0, 2, 4, 6); \
+		RSTT(1, a, 2, 4, 6, 0, 1, 3, 5, 7); \
+		RSTT(2, a, 3, 5, 7, 1, 2, 4, 6, 0); \
+		RSTT(3, a, 4, 6, 0, 2, 3, 5, 7, 1); \
+		RSTT(4, a, 5, 7, 1, 3, 4, 6, 0, 2); \
+		RSTT(5, a, 6, 0, 2, 4, 5, 7, 1, 3); \
+		RSTT(6, a, 7, 1, 3, 5, 6, 0, 2, 4); \
+		RSTT(7, a, 0, 2, 4, 6, 7, 1, 3, 5); \
+		a[0] = t[0]; \
+		a[1] = t[1]; \
+		a[2] = t[2]; \
+		a[3] = t[3]; \
+		a[4] = t[4]; \
+		a[5] = t[5]; \
+		a[6] = t[6]; \
+		a[7] = t[7]; \
+	} while (0)
+
+#if SPH_SMALL_FOOTPRINT_GROESTL
+
+#define PERM_SMALL_P(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r ++) \
+			ROUND_SMALL_P(a, r); \
+	} while (0)
+
+#define PERM_SMALL_Q(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r ++) \
+			ROUND_SMALL_Q(a, r); \
+	} while (0)
+
+#else
+
+/*
+ * Apparently, unrolling more than that confuses GCC, resulting in
+ * lower performance, even though L1 cache would be no problem.
+ */
+#define PERM_SMALL_P(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r += 2) { \
+			ROUND_SMALL_P(a, r + 0); \
+			ROUND_SMALL_P(a, r + 1); \
+		} \
+	} while (0)
+
+#define PERM_SMALL_Q(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r += 2) { \
+			ROUND_SMALL_Q(a, r + 0); \
+			ROUND_SMALL_Q(a, r + 1); \
+		} \
+	} while (0)
+
+#endif
+
+#define COMPRESS_SMALL   do { \
+		sph_u64 g[8], m[8]; \
+		size_t u; \
+		for (u = 0; u < 8; u ++) { \
+			m[u] = dec64e_aligned(buf + (u << 3)); \
+			g[u] = m[u] ^ H[u]; \
+		} \
+		PERM_SMALL_P(g); \
+		PERM_SMALL_Q(m); \
+		for (u = 0; u < 8; u ++) \
+			H[u] ^= g[u] ^ m[u]; \
+	} while (0)
+
+#define FINAL_SMALL   do { \
+		sph_u64 x[8]; \
+		size_t u; \
+		memcpy(x, H, sizeof x); \
+		PERM_SMALL_P(x); \
+		for (u = 0; u < 8; u ++) \
+			H[u] ^= x[u]; \
+	} while (0)
+
+#define DECL_STATE_BIG \
+	sph_u64 H[16];
+
+#define READ_STATE_BIG(sc)   do { \
+		memcpy(H, (sc)->state.wide, sizeof H); \
+	} while (0)
+
+#define WRITE_STATE_BIG(sc)   do { \
+		memcpy((sc)->state.wide, H, sizeof H); \
+	} while (0)
+
+#if SPH_SMALL_FOOTPRINT_GROESTL
+
+#define RBTT(d, a, b0, b1, b2, b3, b4, b5, b6, b7)   do { \
+		t[d] = T0[B64_0(a[b0])] \
+			^ R64(T0[B64_1(a[b1])],  8) \
+			^ R64(T0[B64_2(a[b2])], 16) \
+			^ R64(T0[B64_3(a[b3])], 24) \
+			^ T4[B64_4(a[b4])] \
+			^ R64(T4[B64_5(a[b5])],  8) \
+			^ R64(T4[B64_6(a[b6])], 16) \
+			^ R64(T4[B64_7(a[b7])], 24); \
+	} while (0)
+
+#else
+
+#define RBTT(d, a, b0, b1, b2, b3, b4, b5, b6, b7)   do { \
+		t[d] = T0[B64_0(a[b0])] \
+			^ T1[B64_1(a[b1])] \
+			^ T2[B64_2(a[b2])] \
+			^ T3[B64_3(a[b3])] \
+			^ T4[B64_4(a[b4])] \
+			^ T5[B64_5(a[b5])] \
+			^ T6[B64_6(a[b6])] \
+			^ T7[B64_7(a[b7])]; \
+	} while (0)
+
+#endif
+
+#if SPH_SMALL_FOOTPRINT_GROESTL
+
+#define ROUND_BIG_P(a, r)   do { \
+		sph_u64 t[16]; \
+		size_t u; \
+		a[0x0] ^= PC64(0x00, r); \
+		a[0x1] ^= PC64(0x10, r); \
+		a[0x2] ^= PC64(0x20, r); \
+		a[0x3] ^= PC64(0x30, r); \
+		a[0x4] ^= PC64(0x40, r); \
+		a[0x5] ^= PC64(0x50, r); \
+		a[0x6] ^= PC64(0x60, r); \
+		a[0x7] ^= PC64(0x70, r); \
+		a[0x8] ^= PC64(0x80, r); \
+		a[0x9] ^= PC64(0x90, r); \
+		a[0xA] ^= PC64(0xA0, r); \
+		a[0xB] ^= PC64(0xB0, r); \
+		a[0xC] ^= PC64(0xC0, r); \
+		a[0xD] ^= PC64(0xD0, r); \
+		a[0xE] ^= PC64(0xE0, r); \
+		a[0xF] ^= PC64(0xF0, r); \
+		for (u = 0; u < 16; u += 4) { \
+			RBTT(u + 0, a, u + 0, (u + 1) & 0xF, \
+				(u + 2) & 0xF, (u + 3) & 0xF, (u + 4) & 0xF, \
+				(u + 5) & 0xF, (u + 6) & 0xF, (u + 11) & 0xF); \
+			RBTT(u + 1, a, u + 1, (u + 2) & 0xF, \
+				(u + 3) & 0xF, (u + 4) & 0xF, (u + 5) & 0xF, \
+				(u + 6) & 0xF, (u + 7) & 0xF, (u + 12) & 0xF); \
+			RBTT(u + 2, a, u + 2, (u + 3) & 0xF, \
+				(u + 4) & 0xF, (u + 5) & 0xF, (u + 6) & 0xF, \
+				(u + 7) & 0xF, (u + 8) & 0xF, (u + 13) & 0xF); \
+			RBTT(u + 3, a, u + 3, (u + 4) & 0xF, \
+				(u + 5) & 0xF, (u + 6) & 0xF, (u + 7) & 0xF, \
+				(u + 8) & 0xF, (u + 9) & 0xF, (u + 14) & 0xF); \
+		} \
+		memcpy(a, t, sizeof t)
