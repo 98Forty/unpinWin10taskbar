@@ -2132,4 +2132,253 @@ static const sph_u32 T3up[] = {
 	C32e(0x068f0303), C32e(0xb2f85959), C32e(0x12800909), C32e(0x34171a1a),
 	C32e(0xcada6565), C32e(0xb531d7d7), C32e(0x13c68484), C32e(0xbbb8d0d0),
 	C32e(0x1fc38282), C32e(0x52b02929), C32e(0xb4775a5a), C32e(0x3c111e1e),
-	C32e(0xf6cb7b7b), C32e(0x4bfca8a8
+	C32e(0xf6cb7b7b), C32e(0x4bfca8a8), C32e(0xdad66d6d), C32e(0x583a2c2c)
+};
+
+static const sph_u32 T3dn[] = {
+	C32e(0x32f4a5f4), C32e(0x6f978497), C32e(0x5eb099b0), C32e(0x7a8c8d8c),
+	C32e(0xe8170d17), C32e(0x0adcbddc), C32e(0x16c8b1c8), C32e(0x6dfc54fc),
+	C32e(0x90f050f0), C32e(0x07050305), C32e(0x2ee0a9e0), C32e(0xd1877d87),
+	C32e(0xcc2b192b), C32e(0x13a662a6), C32e(0x7c31e631), C32e(0x59b59ab5),
+	C32e(0x40cf45cf), C32e(0xa3bc9dbc), C32e(0x49c040c0), C32e(0x68928792),
+	C32e(0xd03f153f), C32e(0x9426eb26), C32e(0xce40c940), C32e(0xe61d0b1d),
+	C32e(0x6e2fec2f), C32e(0x1aa967a9), C32e(0x431cfd1c), C32e(0x6025ea25),
+	C32e(0xf9dabfda), C32e(0x5102f702), C32e(0x45a196a1), C32e(0x76ed5bed),
+	C32e(0x285dc25d), C32e(0xc5241c24), C32e(0xd4e9aee9), C32e(0xf2be6abe),
+	C32e(0x82ee5aee), C32e(0xbdc341c3), C32e(0xf3060206), C32e(0x52d14fd1),
+	C32e(0x8ce45ce4), C32e(0x5607f407), C32e(0x8d5c345c), C32e(0xe1180818),
+	C32e(0x4cae93ae), C32e(0x3e957395), C32e(0x97f553f5), C32e(0x6b413f41),
+	C32e(0x1c140c14), C32e(0x63f652f6), C32e(0xe9af65af), C32e(0x7fe25ee2),
+	C32e(0x48782878), C32e(0xcff8a1f8), C32e(0x1b110f11), C32e(0xebc4b5c4),
+	C32e(0x151b091b), C32e(0x7e5a365a), C32e(0xadb69bb6), C32e(0x98473d47),
+	C32e(0xa76a266a), C32e(0xf5bb69bb), C32e(0x334ccd4c), C32e(0x50ba9fba),
+	C32e(0x3f2d1b2d), C32e(0xa4b99eb9), C32e(0xc49c749c), C32e(0x46722e72),
+	C32e(0x41772d77), C32e(0x11cdb2cd), C32e(0x9d29ee29), C32e(0x4d16fb16),
+	C32e(0xa501f601), C32e(0xa1d74dd7), C32e(0x14a361a3), C32e(0x3449ce49),
+	C32e(0xdf8d7b8d), C32e(0x9f423e42), C32e(0xcd937193), C32e(0xb1a297a2),
+	C32e(0xa204f504), C32e(0x01b868b8), C32e(0x00000000), C32e(0xb5742c74),
+	C32e(0xe0a060a0), C32e(0xc2211f21), C32e(0x3a43c843), C32e(0x9a2ced2c),
+	C32e(0x0dd9bed9), C32e(0x47ca46ca), C32e(0x1770d970), C32e(0xafdd4bdd),
+	C32e(0xed79de79), C32e(0xff67d467), C32e(0x9323e823), C32e(0x5bde4ade),
+	C32e(0x06bd6bbd), C32e(0xbb7e2a7e), C32e(0x7b34e534), C32e(0xd73a163a),
+	C32e(0xd254c554), C32e(0xf862d762), C32e(0x99ff55ff), C32e(0xb6a794a7),
+	C32e(0xc04acf4a), C32e(0xd9301030), C32e(0x0e0a060a), C32e(0x66988198),
+	C32e(0xab0bf00b), C32e(0xb4cc44cc), C32e(0xf0d5bad5), C32e(0x753ee33e),
+	C32e(0xac0ef30e), C32e(0x4419fe19), C32e(0xdb5bc05b), C32e(0x80858a85),
+	C32e(0xd3ecadec), C32e(0xfedfbcdf), C32e(0xa8d848d8), C32e(0xfd0c040c),
+	C32e(0x197adf7a), C32e(0x2f58c158), C32e(0x309f759f), C32e(0xe7a563a5),
+	C32e(0x70503050), C32e(0xcb2e1a2e), C32e(0xef120e12), C32e(0x08b76db7),
+	C32e(0x55d44cd4), C32e(0x243c143c), C32e(0x795f355f), C32e(0xb2712f71),
+	C32e(0x8638e138), C32e(0xc8fda2fd), C32e(0xc74fcc4f), C32e(0x654b394b),
+	C32e(0x6af957f9), C32e(0x580df20d), C32e(0x619d829d), C32e(0xb3c947c9),
+	C32e(0x27efacef), C32e(0x8832e732), C32e(0x4f7d2b7d), C32e(0x42a495a4),
+	C32e(0x3bfba0fb), C32e(0xaab398b3), C32e(0xf668d168), C32e(0x22817f81),
+	C32e(0xeeaa66aa), C32e(0xd6827e82), C32e(0xdde6abe6), C32e(0x959e839e),
+	C32e(0xc945ca45), C32e(0xbc7b297b), C32e(0x056ed36e), C32e(0x6c443c44),
+	C32e(0x2c8b798b), C32e(0x813de23d), C32e(0x31271d27), C32e(0x379a769a),
+	C32e(0x964d3b4d), C32e(0x9efa56fa), C32e(0xa6d24ed2), C32e(0x36221e22),
+	C32e(0xe476db76), C32e(0x121e0a1e), C32e(0xfcb46cb4), C32e(0x8f37e437),
+	C32e(0x78e75de7), C32e(0x0fb26eb2), C32e(0x692aef2a), C32e(0x35f1a6f1),
+	C32e(0xdae3a8e3), C32e(0xc6f7a4f7), C32e(0x8a593759), C32e(0x74868b86),
+	C32e(0x83563256), C32e(0x4ec543c5), C32e(0x85eb59eb), C32e(0x18c2b7c2),
+	C32e(0x8e8f8c8f), C32e(0x1dac64ac), C32e(0xf16dd26d), C32e(0x723be03b),
+	C32e(0x1fc7b4c7), C32e(0xb915fa15), C32e(0xfa090709), C32e(0xa06f256f),
+	C32e(0x20eaafea), C32e(0x7d898e89), C32e(0x6720e920), C32e(0x38281828),
+	C32e(0x0b64d564), C32e(0x73838883), C32e(0xfbb16fb1), C32e(0xca967296),
+	C32e(0x546c246c), C32e(0x5f08f108), C32e(0x2152c752), C32e(0x64f351f3),
+	C32e(0xae652365), C32e(0x25847c84), C32e(0x57bf9cbf), C32e(0x5d632163),
+	C32e(0xea7cdd7c), C32e(0x1e7fdc7f), C32e(0x9c918691), C32e(0x9b948594),
+	C32e(0x4bab90ab), C32e(0xbac642c6), C32e(0x2657c457), C32e(0x29e5aae5),
+	C32e(0xe373d873), C32e(0x090f050f), C32e(0xf4030103), C32e(0x2a361236),
+	C32e(0x3cfea3fe), C32e(0x8be15fe1), C32e(0xbe10f910), C32e(0x026bd06b),
+	C32e(0xbfa891a8), C32e(0x71e858e8), C32e(0x53692769), C32e(0xf7d0b9d0),
+	C32e(0x91483848), C32e(0xde351335), C32e(0xe5ceb3ce), C32e(0x77553355),
+	C32e(0x04d6bbd6), C32e(0x39907090), C32e(0x87808980), C32e(0xc1f2a7f2),
+	C32e(0xecc1b6c1), C32e(0x5a662266), C32e(0xb8ad92ad), C32e(0xa9602060),
+	C32e(0x5cdb49db), C32e(0xb01aff1a), C32e(0xd8887888), C32e(0x2b8e7a8e),
+	C32e(0x898a8f8a), C32e(0x4a13f813), C32e(0x929b809b), C32e(0x23391739),
+	C32e(0x1075da75), C32e(0x84533153), C32e(0xd551c651), C32e(0x03d3b8d3),
+	C32e(0xdc5ec35e), C32e(0xe2cbb0cb), C32e(0xc3997799), C32e(0x2d331133),
+	C32e(0x3d46cb46), C32e(0xb71ffc1f), C32e(0x0c61d661), C32e(0x624e3a4e)
+};
+
+#define DECL_STATE_SMALL \
+	sph_u32 H[16];
+
+#define READ_STATE_SMALL(sc)   do { \
+		memcpy(H, (sc)->state.narrow, sizeof H); \
+	} while (0)
+
+#define WRITE_STATE_SMALL(sc)   do { \
+		memcpy((sc)->state.narrow, H, sizeof H); \
+	} while (0)
+
+#define XCAT(x, y)    XCAT_(x, y)
+#define XCAT_(x, y)   x ## y
+
+#define RSTT(d0, d1, a, b0, b1, b2, b3, b4, b5, b6, b7)   do { \
+		t[d0] = T0up[B32_0(a[b0])] \
+			^ T1up[B32_1(a[b1])] \
+			^ T2up[B32_2(a[b2])] \
+			^ T3up[B32_3(a[b3])] \
+			^ T0dn[B32_0(a[b4])] \
+			^ T1dn[B32_1(a[b5])] \
+			^ T2dn[B32_2(a[b6])] \
+			^ T3dn[B32_3(a[b7])]; \
+		t[d1] = T0dn[B32_0(a[b0])] \
+			^ T1dn[B32_1(a[b1])] \
+			^ T2dn[B32_2(a[b2])] \
+			^ T3dn[B32_3(a[b3])] \
+			^ T0up[B32_0(a[b4])] \
+			^ T1up[B32_1(a[b5])] \
+			^ T2up[B32_2(a[b6])] \
+			^ T3up[B32_3(a[b7])]; \
+	} while (0)
+
+#define ROUND_SMALL_P(a, r)   do { \
+		sph_u32 t[16]; \
+		a[0x0] ^= PC32up(0x00, r); \
+		a[0x1] ^= PC32dn(0x00, r); \
+		a[0x2] ^= PC32up(0x10, r); \
+		a[0x3] ^= PC32dn(0x10, r); \
+		a[0x4] ^= PC32up(0x20, r); \
+		a[0x5] ^= PC32dn(0x20, r); \
+		a[0x6] ^= PC32up(0x30, r); \
+		a[0x7] ^= PC32dn(0x30, r); \
+		a[0x8] ^= PC32up(0x40, r); \
+		a[0x9] ^= PC32dn(0x40, r); \
+		a[0xA] ^= PC32up(0x50, r); \
+		a[0xB] ^= PC32dn(0x50, r); \
+		a[0xC] ^= PC32up(0x60, r); \
+		a[0xD] ^= PC32dn(0x60, r); \
+		a[0xE] ^= PC32up(0x70, r); \
+		a[0xF] ^= PC32dn(0x70, r); \
+		RSTT(0x0, 0x1, a, 0x0, 0x2, 0x4, 0x6, 0x9, 0xB, 0xD, 0xF); \
+		RSTT(0x2, 0x3, a, 0x2, 0x4, 0x6, 0x8, 0xB, 0xD, 0xF, 0x1); \
+		RSTT(0x4, 0x5, a, 0x4, 0x6, 0x8, 0xA, 0xD, 0xF, 0x1, 0x3); \
+		RSTT(0x6, 0x7, a, 0x6, 0x8, 0xA, 0xC, 0xF, 0x1, 0x3, 0x5); \
+		RSTT(0x8, 0x9, a, 0x8, 0xA, 0xC, 0xE, 0x1, 0x3, 0x5, 0x7); \
+		RSTT(0xA, 0xB, a, 0xA, 0xC, 0xE, 0x0, 0x3, 0x5, 0x7, 0x9); \
+		RSTT(0xC, 0xD, a, 0xC, 0xE, 0x0, 0x2, 0x5, 0x7, 0x9, 0xB); \
+		RSTT(0xE, 0xF, a, 0xE, 0x0, 0x2, 0x4, 0x7, 0x9, 0xB, 0xD); \
+		memcpy(a, t, sizeof t); \
+	} while (0)
+
+#define ROUND_SMALL_Q(a, r)   do { \
+		sph_u32 t[16]; \
+		a[0x0] ^= QC32up(0x00, r); \
+		a[0x1] ^= QC32dn(0x00, r); \
+		a[0x2] ^= QC32up(0x10, r); \
+		a[0x3] ^= QC32dn(0x10, r); \
+		a[0x4] ^= QC32up(0x20, r); \
+		a[0x5] ^= QC32dn(0x20, r); \
+		a[0x6] ^= QC32up(0x30, r); \
+		a[0x7] ^= QC32dn(0x30, r); \
+		a[0x8] ^= QC32up(0x40, r); \
+		a[0x9] ^= QC32dn(0x40, r); \
+		a[0xA] ^= QC32up(0x50, r); \
+		a[0xB] ^= QC32dn(0x50, r); \
+		a[0xC] ^= QC32up(0x60, r); \
+		a[0xD] ^= QC32dn(0x60, r); \
+		a[0xE] ^= QC32up(0x70, r); \
+		a[0xF] ^= QC32dn(0x70, r); \
+		RSTT(0x0, 0x1, a, 0x2, 0x6, 0xA, 0xE, 0x1, 0x5, 0x9, 0xD); \
+		RSTT(0x2, 0x3, a, 0x4, 0x8, 0xC, 0x0, 0x3, 0x7, 0xB, 0xF); \
+		RSTT(0x4, 0x5, a, 0x6, 0xA, 0xE, 0x2, 0x5, 0x9, 0xD, 0x1); \
+		RSTT(0x6, 0x7, a, 0x8, 0xC, 0x0, 0x4, 0x7, 0xB, 0xF, 0x3); \
+		RSTT(0x8, 0x9, a, 0xA, 0xE, 0x2, 0x6, 0x9, 0xD, 0x1, 0x5); \
+		RSTT(0xA, 0xB, a, 0xC, 0x0, 0x4, 0x8, 0xB, 0xF, 0x3, 0x7); \
+		RSTT(0xC, 0xD, a, 0xE, 0x2, 0x6, 0xA, 0xD, 0x1, 0x5, 0x9); \
+		RSTT(0xE, 0xF, a, 0x0, 0x4, 0x8, 0xC, 0xF, 0x3, 0x7, 0xB); \
+		memcpy(a, t, sizeof t); \
+	} while (0)
+
+#if SPH_SMALL_FOOTPRINT_GROESTL
+
+#define PERM_SMALL_P(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r ++) \
+			ROUND_SMALL_P(a, r); \
+	} while (0)
+
+#define PERM_SMALL_Q(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r ++) \
+			ROUND_SMALL_Q(a, r); \
+	} while (0)
+
+#else
+
+#define PERM_SMALL_P(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r += 2) { \
+			ROUND_SMALL_P(a, r + 0); \
+			ROUND_SMALL_P(a, r + 1); \
+		} \
+	} while (0)
+
+#define PERM_SMALL_Q(a)   do { \
+		int r; \
+		for (r = 0; r < 10; r += 2) { \
+			ROUND_SMALL_Q(a, r + 0); \
+			ROUND_SMALL_Q(a, r + 1); \
+		} \
+	} while (0)
+
+#endif
+
+#define COMPRESS_SMALL   do { \
+		sph_u32 g[16], m[16]; \
+		size_t u; \
+		for (u = 0; u < 16; u ++) { \
+			m[u] = dec32e_aligned(buf + (u << 2)); \
+			g[u] = m[u] ^ H[u]; \
+		} \
+		PERM_SMALL_P(g); \
+		PERM_SMALL_Q(m); \
+		for (u = 0; u < 16; u ++) \
+			H[u] ^= g[u] ^ m[u]; \
+	} while (0)
+
+#define FINAL_SMALL   do { \
+		sph_u32 x[16]; \
+		size_t u; \
+		memcpy(x, H, sizeof x); \
+		PERM_SMALL_P(x); \
+		for (u = 0; u < 16; u ++) \
+			H[u] ^= x[u]; \
+	} while (0)
+
+#define DECL_STATE_BIG \
+	sph_u32 H[32];
+
+#define READ_STATE_BIG(sc)   do { \
+		memcpy(H, (sc)->state.narrow, sizeof H); \
+	} while (0)
+
+#define WRITE_STATE_BIG(sc)   do { \
+		memcpy((sc)->state.narrow, H, sizeof H); \
+	} while (0)
+
+#if SPH_SMALL_FOOTPRINT_GROESTL
+
+#define RBTT(d0, d1, a, b0, b1, b2, b3, b4, b5, b6, b7)   do { \
+		sph_u32 fu2 = T0up[B32_2(a[b2])]; \
+		sph_u32 fd2 = T0dn[B32_2(a[b2])]; \
+		sph_u32 fu3 = T1up[B32_3(a[b3])]; \
+		sph_u32 fd3 = T1dn[B32_3(a[b3])]; \
+		sph_u32 fu6 = T0up[B32_2(a[b6])]; \
+		sph_u32 fd6 = T0dn[B32_2(a[b6])]; \
+		sph_u32 fu7 = T1up[B32_3(a[b7])]; \
+		sph_u32 fd7 = T1dn[B32_3(a[b7])]; \
+		t[d0] = T0up[B32_0(a[b0])] \
+			^ T1up[B32_1(a[b1])] \
+			^ R32u(fu2, fd2) \
+			^ R32u(fu3, fd3) \
+			^ T0dn[B32_0(a[b4])] \
+			^ T1dn[B32_1(a[b5])] \
+			^ R32d(fu6, fd6) \
+			^ R32d(fu7, fd7); \
+		t[d1] = T0dn[B32_0(a[b0])] \
+			^ T1dn[B32_1(a[b1])] \
+			^ R32d
