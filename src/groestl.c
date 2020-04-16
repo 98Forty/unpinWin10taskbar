@@ -2687,4 +2687,437 @@ static const sph_u32 T3dn[] = {
 #define PERM_BIG_Q(a)   do { \
 		int r; \
 		for (r = 0; r < 14; r ++) \
-			ROUND_BIG_Q(a,
+			ROUND_BIG_Q(a, r); \
+	} while (0)
+
+#else
+
+#define PERM_BIG_P(a)   do { \
+		int r; \
+		for (r = 0; r < 14; r += 2) { \
+			ROUND_BIG_P(a, r + 0); \
+			ROUND_BIG_P(a, r + 1); \
+		} \
+	} while (0)
+
+#define PERM_BIG_Q(a)   do { \
+		int r; \
+		for (r = 0; r < 14; r += 2) { \
+			ROUND_BIG_Q(a, r + 0); \
+			ROUND_BIG_Q(a, r + 1); \
+		} \
+	} while (0)
+
+#endif
+
+#define COMPRESS_BIG   do { \
+		sph_u32 g[32], m[32]; \
+		size_t u; \
+		for (u = 0; u < 32; u ++) { \
+			m[u] = dec32e_aligned(buf + (u << 2)); \
+			g[u] = m[u] ^ H[u]; \
+		} \
+		PERM_BIG_P(g); \
+		PERM_BIG_Q(m); \
+		for (u = 0; u < 32; u ++) \
+			H[u] ^= g[u] ^ m[u]; \
+	} while (0)
+
+#define FINAL_BIG   do { \
+		sph_u32 x[32]; \
+		size_t u; \
+		memcpy(x, H, sizeof x); \
+		PERM_BIG_P(x); \
+		for (u = 0; u < 32; u ++) \
+			H[u] ^= x[u]; \
+	} while (0)
+
+#endif
+
+static void
+groestl_small_init(sph_groestl_small_context *sc, unsigned out_size)
+{
+	size_t u;
+
+	sc->ptr = 0;
+#if SPH_GROESTL_64
+	for (u = 0; u < 7; u ++)
+		sc->state.wide[u] = 0;
+#if USE_LE
+	sc->state.wide[7] = ((sph_u64)(out_size & 0xFF) << 56)
+		| ((sph_u64)(out_size & 0xFF00) << 40);
+#else
+	sc->state.wide[7] = (sph_u64)out_size;
+#endif
+#else
+	for (u = 0; u < 15; u ++)
+		sc->state.narrow[u] = 0;
+#if USE_LE
+	sc->state.narrow[15] = ((sph_u32)(out_size & 0xFF) << 24)
+		| ((sph_u32)(out_size & 0xFF00) << 8);
+#else
+	sc->state.narrow[15] = (sph_u32)out_size;
+#endif
+#endif
+#if SPH_64
+	sc->count = 0;
+#else
+	sc->count_high = 0;
+	sc->count_low = 0;
+#endif
+}
+
+static void
+groestl_small_core(sph_groestl_small_context *sc, const void *data, size_t len)
+{
+	unsigned char *buf;
+	size_t ptr;
+	DECL_STATE_SMALL
+
+	buf = sc->buf;
+	ptr = sc->ptr;
+	if (len < (sizeof sc->buf) - ptr) {
+		memcpy(buf + ptr, data, len);
+		ptr += len;
+		sc->ptr = ptr;
+		return;
+	}
+
+	READ_STATE_SMALL(sc);
+	while (len > 0) {
+		size_t clen;
+
+		clen = (sizeof sc->buf) - ptr;
+		if (clen > len)
+			clen = len;
+		memcpy(buf + ptr, data, clen);
+		ptr += clen;
+		data = (const unsigned char *)data + clen;
+		len -= clen;
+		if (ptr == sizeof sc->buf) {
+			COMPRESS_SMALL;
+#if SPH_64
+			sc->count ++;
+#else
+			if ((sc->count_low = SPH_T32(sc->count_low + 1)) == 0)
+				sc->count_high = SPH_T32(sc->count_high + 1);
+#endif
+			ptr = 0;
+		}
+	}
+	WRITE_STATE_SMALL(sc);
+	sc->ptr = ptr;
+}
+
+static void
+groestl_small_close(sph_groestl_small_context *sc,
+	unsigned ub, unsigned n, void *dst, size_t out_len)
+{
+	unsigned char *buf;
+	unsigned char pad[72];
+	size_t u, ptr, pad_len;
+#if SPH_64
+	sph_u64 count;
+#else
+	sph_u32 count_high, count_low;
+#endif
+	unsigned z;
+	DECL_STATE_SMALL
+
+	buf = sc->buf;
+	ptr = sc->ptr;
+	z = 0x80 >> n;
+	pad[0] = ((ub & -z) | z) & 0xFF;
+	if (ptr < 56) {
+		pad_len = 64 - ptr;
+#if SPH_64
+		count = SPH_T64(sc->count + 1);
+#else
+		count_low = SPH_T32(sc->count_low + 1);
+		count_high = SPH_T32(sc->count_high);
+		if (count_low == 0)
+			count_high = SPH_T32(count_high + 1);
+#endif
+	} else {
+		pad_len = 128 - ptr;
+#if SPH_64
+		count = SPH_T64(sc->count + 2);
+#else
+		count_low = SPH_T32(sc->count_low + 2);
+		count_high = SPH_T32(sc->count_high);
+		if (count_low <= 1)
+			count_high = SPH_T32(count_high + 1);
+#endif
+	}
+	memset(pad + 1, 0, pad_len - 9);
+#if SPH_64
+	sph_enc64be(pad + pad_len - 8, count);
+#else
+	sph_enc64be(pad + pad_len - 8, count_high);
+	sph_enc64be(pad + pad_len - 4, count_low);
+#endif
+	groestl_small_core(sc, pad, pad_len);
+	READ_STATE_SMALL(sc);
+	FINAL_SMALL;
+#if SPH_GROESTL_64
+	for (u = 0; u < 4; u ++)
+		enc64e(pad + (u << 3), H[u + 4]);
+#else
+	for (u = 0; u < 8; u ++)
+		enc32e(pad + (u << 2), H[u + 8]);
+#endif
+	memcpy(dst, pad + 32 - out_len, out_len);
+	groestl_small_init(sc, (unsigned)out_len << 3);
+}
+
+static void
+groestl_big_init(sph_groestl_big_context *sc, unsigned out_size)
+{
+	size_t u;
+
+	sc->ptr = 0;
+#if SPH_GROESTL_64
+	for (u = 0; u < 15; u ++)
+		sc->state.wide[u] = 0;
+#if USE_LE
+	sc->state.wide[15] = ((sph_u64)(out_size & 0xFF) << 56)
+		| ((sph_u64)(out_size & 0xFF00) << 40);
+#else
+	sc->state.wide[15] = (sph_u64)out_size;
+#endif
+#else
+	for (u = 0; u < 31; u ++)
+		sc->state.narrow[u] = 0;
+#if USE_LE
+	sc->state.narrow[31] = ((sph_u32)(out_size & 0xFF) << 24)
+		| ((sph_u32)(out_size & 0xFF00) << 8);
+#else
+	sc->state.narrow[31] = (sph_u32)out_size;
+#endif
+#endif
+#if SPH_64
+	sc->count = 0;
+#else
+	sc->count_high = 0;
+	sc->count_low = 0;
+#endif
+}
+
+static void
+groestl_big_core(sph_groestl_big_context *sc, const void *data, size_t len)
+{
+	unsigned char *buf;
+	size_t ptr;
+	DECL_STATE_BIG
+
+	buf = sc->buf;
+	ptr = sc->ptr;
+	if (len < (sizeof sc->buf) - ptr) {
+		memcpy(buf + ptr, data, len);
+		ptr += len;
+		sc->ptr = ptr;
+		return;
+	}
+
+	READ_STATE_BIG(sc);
+	while (len > 0) {
+		size_t clen;
+
+		clen = (sizeof sc->buf) - ptr;
+		if (clen > len)
+			clen = len;
+		memcpy(buf + ptr, data, clen);
+		ptr += clen;
+		data = (const unsigned char *)data + clen;
+		len -= clen;
+		if (ptr == sizeof sc->buf) {
+			COMPRESS_BIG;
+#if SPH_64
+			sc->count ++;
+#else
+			if ((sc->count_low = SPH_T32(sc->count_low + 1)) == 0)
+				sc->count_high = SPH_T32(sc->count_high + 1);
+#endif
+			ptr = 0;
+		}
+	}
+	WRITE_STATE_BIG(sc);
+	sc->ptr = ptr;
+}
+
+static void
+groestl_big_close(sph_groestl_big_context *sc,
+	unsigned ub, unsigned n, void *dst, size_t out_len)
+{
+	unsigned char *buf;
+	unsigned char pad[136];
+	size_t ptr, pad_len, u;
+#if SPH_64
+	sph_u64 count;
+#else
+	sph_u32 count_high, count_low;
+#endif
+	unsigned z;
+	DECL_STATE_BIG
+
+	buf = sc->buf;
+	ptr = sc->ptr;
+	z = 0x80 >> n;
+	pad[0] = ((ub & -z) | z) & 0xFF;
+	if (ptr < 120) {
+		pad_len = 128 - ptr;
+#if SPH_64
+		count = SPH_T64(sc->count + 1);
+#else
+		count_low = SPH_T32(sc->count_low + 1);
+		count_high = SPH_T32(sc->count_high);
+		if (count_low == 0)
+			count_high = SPH_T32(count_high + 1);
+#endif
+	} else {
+		pad_len = 256 - ptr;
+#if SPH_64
+		count = SPH_T64(sc->count + 2);
+#else
+		count_low = SPH_T32(sc->count_low + 2);
+		count_high = SPH_T32(sc->count_high);
+		if (count_low <= 1)
+			count_high = SPH_T32(count_high + 1);
+#endif
+	}
+	memset(pad + 1, 0, pad_len - 9);
+#if SPH_64
+	sph_enc64be(pad + pad_len - 8, count);
+#else
+	sph_enc64be(pad + pad_len - 8, count_high);
+	sph_enc64be(pad + pad_len - 4, count_low);
+#endif
+	groestl_big_core(sc, pad, pad_len);
+	READ_STATE_BIG(sc);
+	FINAL_BIG;
+#if SPH_GROESTL_64
+	for (u = 0; u < 8; u ++)
+		enc64e(pad + (u << 3), H[u + 8]);
+#else
+	for (u = 0; u < 16; u ++)
+		enc32e(pad + (u << 2), H[u + 16]);
+#endif
+	memcpy(dst, pad + 64 - out_len, out_len);
+	groestl_big_init(sc, (unsigned)out_len << 3);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl224_init(void *cc)
+{
+	groestl_small_init(cc, 224);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl224(void *cc, const void *data, size_t len)
+{
+	groestl_small_core(cc, data, len);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl224_close(void *cc, void *dst)
+{
+	groestl_small_close(cc, 0, 0, dst, 28);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl224_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
+{
+	groestl_small_close(cc, ub, n, dst, 28);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl256_init(void *cc)
+{
+	groestl_small_init(cc, 256);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl256(void *cc, const void *data, size_t len)
+{
+	groestl_small_core(cc, data, len);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl256_close(void *cc, void *dst)
+{
+	groestl_small_close(cc, 0, 0, dst, 32);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl256_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
+{
+	groestl_small_close(cc, ub, n, dst, 32);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl384_init(void *cc)
+{
+	groestl_big_init(cc, 384);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl384(void *cc, const void *data, size_t len)
+{
+	groestl_big_core(cc, data, len);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl384_close(void *cc, void *dst)
+{
+	groestl_big_close(cc, 0, 0, dst, 48);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl384_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
+{
+	groestl_big_close(cc, ub, n, dst, 48);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl512_init(void *cc)
+{
+	groestl_big_init(cc, 512);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl512(void *cc, const void *data, size_t len)
+{
+	groestl_big_core(cc, data, len);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl512_close(void *cc, void *dst)
+{
+	groestl_big_close(cc, 0, 0, dst, 64);
+}
+
+/* see sph_groestl.h */
+void
+sph_groestl512_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
+{
+	groestl_big_close(cc, ub, n, dst, 64);
+}
+
+#ifdef __cplusplus
+}
+#endif
