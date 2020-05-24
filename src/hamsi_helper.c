@@ -4715,4 +4715,212 @@ static const sph_u32 T256_21[128][8] = {
 	  SPH_C32(0x8316b4b8), SPH_C32(0x3ceafe75) },
 	{ SPH_C32(0x1eda0038), SPH_C32(0xc55b3153), SPH_C32(0x5fbce3c6),
 	  SPH_C32(0xec098f1f), SPH_C32(0xa1930014), SPH_C32(0xf7bafa70),
-	  SPH_C32(0x1ed304e8), SPH_C3
+	  SPH_C32(0x1ed304e8), SPH_C32(0x93a0d7af) },
+	{ SPH_C32(0xced2003c), SPH_C32(0x492dbe24), SPH_C32(0xc2795396),
+	  SPH_C32(0x4343a6c5), SPH_C32(0xca3a0014), SPH_C32(0xb75103da),
+	  SPH_C32(0x86e118d5), SPH_C32(0xe50c109c) },
+	{ SPH_C32(0xcac10030), SPH_C32(0x17a7c2c0), SPH_C32(0xa797ef84),
+	  SPH_C32(0x7af42842), SPH_C32(0xb29c0018), SPH_C32(0x1b5eb5d0),
+	  SPH_C32(0xe5573b84), SPH_C32(0xf2ef1177) },
+	{ SPH_C32(0x1ac90034), SPH_C32(0x9bd14db7), SPH_C32(0x3a525fd4),
+	  SPH_C32(0xd5be0198), SPH_C32(0xd9350018), SPH_C32(0x5bb54c7a),
+	  SPH_C32(0x7d6527b9), SPH_C32(0x8443d644) },
+	{ SPH_C32(0xa1680030), SPH_C32(0x574c3b6a), SPH_C32(0x3fa5f3b9),
+	  SPH_C32(0x0c58ef71), SPH_C32(0x093d001c), SPH_C32(0xd7c3c30d),
+	  SPH_C32(0xe0a097e9), SPH_C32(0x2b09ff9e) },
+	{ SPH_C32(0x71600034), SPH_C32(0xdb3ab41d), SPH_C32(0xa26043e9),
+	  SPH_C32(0xa312c6ab), SPH_C32(0x6294001c), SPH_C32(0x97283aa7),
+	  SPH_C32(0x78928bd4), SPH_C32(0x5da538ad) },
+	{ SPH_C32(0x626f0038), SPH_C32(0x37defbbd), SPH_C32(0x59e47c85),
+	  SPH_C32(0xc25d0073), SPH_C32(0xa5800018), SPH_C32(0xa9308694),
+	  SPH_C32(0x7b3db8fa), SPH_C32(0xaa175928) },
+	{ SPH_C32(0xb267003c), SPH_C32(0xbba874ca), SPH_C32(0xc421ccd5),
+	  SPH_C32(0x6d1729a9), SPH_C32(0xce290018), SPH_C32(0xe9db7f3e),
+	  SPH_C32(0xe30fa4c7), SPH_C32(0xdcbb9e1b) },
+	{ SPH_C32(0x09c60038), SPH_C32(0x77350217), SPH_C32(0xc1d660b8),
+	  SPH_C32(0xb4f1c740), SPH_C32(0x1e21001c), SPH_C32(0x65adf049),
+	  SPH_C32(0x7eca1497), SPH_C32(0x73f1b7c1) },
+	{ SPH_C32(0xd9ce003c), SPH_C32(0xfb438d60), SPH_C32(0x5c13d0e8),
+	  SPH_C32(0x1bbbee9a), SPH_C32(0x7588001c), SPH_C32(0x254609e3),
+	  SPH_C32(0xe6f808aa), SPH_C32(0x055d70f2) }
+};
+
+static const sph_u32 T256_28[16][8] = {
+	{ SPH_C32(0x00000000), SPH_C32(0x00000000), SPH_C32(0x00000000),
+	  SPH_C32(0x00000000), SPH_C32(0x00000000), SPH_C32(0x00000000),
+	  SPH_C32(0x00000000), SPH_C32(0x00000000) },
+	{ SPH_C32(0xc04e0001), SPH_C32(0x33b9c010), SPH_C32(0xae0ebb05),
+	  SPH_C32(0xb5a4c63b), SPH_C32(0xc8f10000), SPH_C32(0x0b2de782),
+	  SPH_C32(0x6bf648a4), SPH_C32(0x539cbdbf) },
+	{ SPH_C32(0xc8f10000), SPH_C32(0x0b2de782), SPH_C32(0x6bf648a4),
+	  SPH_C32(0x539cbdbf), SPH_C32(0x08bf0001), SPH_C32(0x38942792),
+	  SPH_C32(0xc5f8f3a1), SPH_C32(0xe6387b84) },
+	{ SPH_C32(0x08bf0001), SPH_C32(0x38942792), SPH_C32(0xc5f8f3a1),
+	  SPH_C32(0xe6387b84), SPH_C32(0xc04e0001), SPH_C32(0x33b9c010),
+	  SPH_C32(0xae0ebb05), SPH_C32(0xb5a4c63b) },
+	{ SPH_C32(0x88230002), SPH_C32(0x5fe7a7b3), SPH_C32(0x99e585aa),
+	  SPH_C32(0x8d75f7f1), SPH_C32(0x51ac0000), SPH_C32(0x25e30f14),
+	  SPH_C32(0x79e22a4c), SPH_C32(0x1298bd46) },
+	{ SPH_C32(0x486d0003), SPH_C32(0x6c5e67a3), SPH_C32(0x37eb3eaf),
+	  SPH_C32(0x38d131ca), SPH_C32(0x995d0000), SPH_C32(0x2ecee896),
+	  SPH_C32(0x121462e8), SPH_C32(0x410400f9) },
+	{ SPH_C32(0x40d20002), SPH_C32(0x54ca4031), SPH_C32(0xf213cd0e),
+	  SPH_C32(0xdee94a4e), SPH_C32(0x59130001), SPH_C32(0x1d772886),
+	  SPH_C32(0xbc1ad9ed), SPH_C32(0xf4a0c6c2) },
+	{ SPH_C32(0x809c0003), SPH_C32(0x67738021), SPH_C32(0x5c1d760b),
+	  SPH_C32(0x6b4d8c75), SPH_C32(0x91e20001), SPH_C32(0x165acf04),
+	  SPH_C32(0xd7ec9149), SPH_C32(0xa73c7b7d) },
+	{ SPH_C32(0x51ac0000), SPH_C32(0x25e30f14), SPH_C32(0x79e22a4c),
+	  SPH_C32(0x1298bd46), SPH_C32(0xd98f0002), SPH_C32(0x7a04a8a7),
+	  SPH_C32(0xe007afe6), SPH_C32(0x9fed4ab7) },
+	{ SPH_C32(0x91e20001), SPH_C32(0x165acf04), SPH_C32(0xd7ec9149),
+	  SPH_C32(0xa73c7b7d), SPH_C32(0x117e0002), SPH_C32(0x71294f25),
+	  SPH_C32(0x8bf1e742), SPH_C32(0xcc71f708) },
+	{ SPH_C32(0x995d0000), SPH_C32(0x2ecee896), SPH_C32(0x121462e8),
+	  SPH_C32(0x410400f9), SPH_C32(0xd1300003), SPH_C32(0x42908f35),
+	  SPH_C32(0x25ff5c47), SPH_C32(0x79d53133) },
+	{ SPH_C32(0x59130001), SPH_C32(0x1d772886), SPH_C32(0xbc1ad9ed),
+	  SPH_C32(0xf4a0c6c2), SPH_C32(0x19c10003), SPH_C32(0x49bd68b7),
+	  SPH_C32(0x4e0914e3), SPH_C32(0x2a498c8c) },
+	{ SPH_C32(0xd98f0002), SPH_C32(0x7a04a8a7), SPH_C32(0xe007afe6),
+	  SPH_C32(0x9fed4ab7), SPH_C32(0x88230002), SPH_C32(0x5fe7a7b3),
+	  SPH_C32(0x99e585aa), SPH_C32(0x8d75f7f1) },
+	{ SPH_C32(0x19c10003), SPH_C32(0x49bd68b7), SPH_C32(0x4e0914e3),
+	  SPH_C32(0x2a498c8c), SPH_C32(0x40d20002), SPH_C32(0x54ca4031),
+	  SPH_C32(0xf213cd0e), SPH_C32(0xdee94a4e) },
+	{ SPH_C32(0x117e0002), SPH_C32(0x71294f25), SPH_C32(0x8bf1e742),
+	  SPH_C32(0xcc71f708), SPH_C32(0x809c0003), SPH_C32(0x67738021),
+	  SPH_C32(0x5c1d760b), SPH_C32(0x6b4d8c75) },
+	{ SPH_C32(0xd1300003), SPH_C32(0x42908f35), SPH_C32(0x25ff5c47),
+	  SPH_C32(0x79d53133), SPH_C32(0x486d0003), SPH_C32(0x6c5e67a3),
+	  SPH_C32(0x37eb3eaf), SPH_C32(0x38d131ca) }
+};
+
+#define INPUT_SMALL   do { \
+		unsigned acc = buf[0]; \
+		const sph_u32 *rp; \
+		rp = &T256_0[acc >> 1][0]; \
+		m0 = rp[0]; \
+		m1 = rp[1]; \
+		m2 = rp[2]; \
+		m3 = rp[3]; \
+		m4 = rp[4]; \
+		m5 = rp[5]; \
+		m6 = rp[6]; \
+		m7 = rp[7]; \
+		acc = (acc << 8) | buf[1]; \
+		rp = &T256_7[(acc >> 2) & 0x7f][0]; \
+		m0 ^= rp[0]; \
+		m1 ^= rp[1]; \
+		m2 ^= rp[2]; \
+		m3 ^= rp[3]; \
+		m4 ^= rp[4]; \
+		m5 ^= rp[5]; \
+		m6 ^= rp[6]; \
+		m7 ^= rp[7]; \
+		acc = (acc << 8) | buf[2]; \
+		rp = &T256_14[(acc >> 3) & 0x7f][0]; \
+		m0 ^= rp[0]; \
+		m1 ^= rp[1]; \
+		m2 ^= rp[2]; \
+		m3 ^= rp[3]; \
+		m4 ^= rp[4]; \
+		m5 ^= rp[5]; \
+		m6 ^= rp[6]; \
+		m7 ^= rp[7]; \
+		acc = (acc << 8) | buf[3]; \
+		rp = &T256_21[(acc >> 4) & 0x7f][0]; \
+		m0 ^= rp[0]; \
+		m1 ^= rp[1]; \
+		m2 ^= rp[2]; \
+		m3 ^= rp[3]; \
+		m4 ^= rp[4]; \
+		m5 ^= rp[5]; \
+		m6 ^= rp[6]; \
+		m7 ^= rp[7]; \
+		rp = &T256_28[acc & 0x0f][0]; \
+		m0 ^= rp[0]; \
+		m1 ^= rp[1]; \
+		m2 ^= rp[2]; \
+		m3 ^= rp[3]; \
+		m4 ^= rp[4]; \
+		m5 ^= rp[5]; \
+		m6 ^= rp[6]; \
+		m7 ^= rp[7]; \
+	} while (0)
+
+#endif
+
+#if SPH_HAMSI_EXPAND_SMALL == 8
+
+static const sph_u32 T256_0[256][8] = {
+	{ SPH_C32(0x00000000), SPH_C32(0x00000000), SPH_C32(0x00000000),
+	  SPH_C32(0x00000000), SPH_C32(0x00000000), SPH_C32(0x00000000),
+	  SPH_C32(0x00000000), SPH_C32(0x00000000) },
+	{ SPH_C32(0x74951000), SPH_C32(0x5a2b467e), SPH_C32(0x88fd1d2b),
+	  SPH_C32(0x1ee68292), SPH_C32(0xcba90000), SPH_C32(0x90273769),
+	  SPH_C32(0xbbdcf407), SPH_C32(0xd0f4af61) },
+	{ SPH_C32(0xcba90000), SPH_C32(0x90273769), SPH_C32(0xbbdcf407),
+	  SPH_C32(0xd0f4af61), SPH_C32(0xbf3c1000), SPH_C32(0xca0c7117),
+	  SPH_C32(0x3321e92c), SPH_C32(0xce122df3) },
+	{ SPH_C32(0xbf3c1000), SPH_C32(0xca0c7117), SPH_C32(0x3321e92c),
+	  SPH_C32(0xce122df3), SPH_C32(0x74951000), SPH_C32(0x5a2b467e),
+	  SPH_C32(0x88fd1d2b), SPH_C32(0x1ee68292) },
+	{ SPH_C32(0xe92a2000), SPH_C32(0xb4578cfc), SPH_C32(0x11fa3a57),
+	  SPH_C32(0x3dc90524), SPH_C32(0x97530000), SPH_C32(0x204f6ed3),
+	  SPH_C32(0x77b9e80f), SPH_C32(0xa1ec5ec1) },
+	{ SPH_C32(0x9dbf3000), SPH_C32(0xee7cca82), SPH_C32(0x9907277c),
+	  SPH_C32(0x232f87b6), SPH_C32(0x5cfa0000), SPH_C32(0xb06859ba),
+	  SPH_C32(0xcc651c08), SPH_C32(0x7118f1a0) },
+	{ SPH_C32(0x22832000), SPH_C32(0x2470bb95), SPH_C32(0xaa26ce50),
+	  SPH_C32(0xed3daa45), SPH_C32(0x286f1000), SPH_C32(0xea431fc4),
+	  SPH_C32(0x44980123), SPH_C32(0x6ffe7332) },
+	{ SPH_C32(0x56163000), SPH_C32(0x7e5bfdeb), SPH_C32(0x22dbd37b),
+	  SPH_C32(0xf3db28d7), SPH_C32(0xe3c61000), SPH_C32(0x7a6428ad),
+	  SPH_C32(0xff44f524), SPH_C32(0xbf0adc53) },
+	{ SPH_C32(0x97530000), SPH_C32(0x204f6ed3), SPH_C32(0x77b9e80f),
+	  SPH_C32(0xa1ec5ec1), SPH_C32(0x7e792000), SPH_C32(0x9418e22f),
+	  SPH_C32(0x6643d258), SPH_C32(0x9c255be5) },
+	{ SPH_C32(0xe3c61000), SPH_C32(0x7a6428ad), SPH_C32(0xff44f524),
+	  SPH_C32(0xbf0adc53), SPH_C32(0xb5d02000), SPH_C32(0x043fd546),
+	  SPH_C32(0xdd9f265f), SPH_C32(0x4cd1f484) },
+	{ SPH_C32(0x5cfa0000), SPH_C32(0xb06859ba), SPH_C32(0xcc651c08),
+	  SPH_C32(0x7118f1a0), SPH_C32(0xc1453000), SPH_C32(0x5e149338),
+	  SPH_C32(0x55623b74), SPH_C32(0x52377616) },
+	{ SPH_C32(0x286f1000), SPH_C32(0xea431fc4), SPH_C32(0x44980123),
+	  SPH_C32(0x6ffe7332), SPH_C32(0x0aec3000), SPH_C32(0xce33a451),
+	  SPH_C32(0xeebecf73), SPH_C32(0x82c3d977) },
+	{ SPH_C32(0x7e792000), SPH_C32(0x9418e22f), SPH_C32(0x6643d258),
+	  SPH_C32(0x9c255be5), SPH_C32(0xe92a2000), SPH_C32(0xb4578cfc),
+	  SPH_C32(0x11fa3a57), SPH_C32(0x3dc90524) },
+	{ SPH_C32(0x0aec3000), SPH_C32(0xce33a451), SPH_C32(0xeebecf73),
+	  SPH_C32(0x82c3d977), SPH_C32(0x22832000), SPH_C32(0x2470bb95),
+	  SPH_C32(0xaa26ce50), SPH_C32(0xed3daa45) },
+	{ SPH_C32(0xb5d02000), SPH_C32(0x043fd546), SPH_C32(0xdd9f265f),
+	  SPH_C32(0x4cd1f484), SPH_C32(0x56163000), SPH_C32(0x7e5bfdeb),
+	  SPH_C32(0x22dbd37b), SPH_C32(0xf3db28d7) },
+	{ SPH_C32(0xc1453000), SPH_C32(0x5e149338), SPH_C32(0x55623b74),
+	  SPH_C32(0x52377616), SPH_C32(0x9dbf3000), SPH_C32(0xee7cca82),
+	  SPH_C32(0x9907277c), SPH_C32(0x232f87b6) },
+	{ SPH_C32(0x121b4000), SPH_C32(0x5b17d9e8), SPH_C32(0x8dfacfab),
+	  SPH_C32(0xce36cc72), SPH_C32(0xe6570000), SPH_C32(0x4bb33a25),
+	  SPH_C32(0x848598ba), SPH_C32(0x1041003e) },
+	{ SPH_C32(0x668e5000), SPH_C32(0x013c9f96), SPH_C32(0x0507d280),
+	  SPH_C32(0xd0d04ee0), SPH_C32(0x2dfe0000), SPH_C32(0xdb940d4c),
+	  SPH_C32(0x3f596cbd), SPH_C32(0xc0b5af5f) },
+	{ SPH_C32(0xd9b24000), SPH_C32(0xcb30ee81), SPH_C32(0x36263bac),
+	  SPH_C32(0x1ec26313), SPH_C32(0x596b1000), SPH_C32(0x81bf4b32),
+	  SPH_C32(0xb7a47196), SPH_C32(0xde532dcd) },
+	{ SPH_C32(0xad275000), SPH_C32(0x911ba8ff), SPH_C32(0xbedb2687),
+	  SPH_C32(0x0024e181), SPH_C32(0x92c21000), SPH_C32(0x11987c5b),
+	  SPH_C32(0x0c788591), SPH_C32(0x0ea782ac) },
+	{ SPH_C32(0xfb316000), SPH_C32(0xef405514), SPH_C32(0x9c00f5fc),
+	  SPH_C32(0xf3ffc956), SPH_C32(0x71040000), SPH_C32(0x6bfc54f6),
+	  SPH_C32(0xf33c70b5), SPH_C32(0xb1ad5eff) },
+	{ SPH_C32(0x8fa47000), SPH_C32(0xb56b136a), SPH_C32(0x14fde8d7),
+	  SPH_C32(0xed194bc4), SPH_C32(0xbaad0000), SPH_C32(0xfbdb639f),
+	  SPH_C32(0x48e084b2), SPH_C32(0x6159f19e) },
+	{ SPH_C32(0x30986000), SPH_C32(0x7f67627d), SPH_C32(0x27dc01fb),
+	  SPH_C32(0x230b6637), SPH_C32(0xce381000), SPH_C32(0xa1f025e1),
+	  SPH_C32(0xc01d9999), SPH_C32(0x7fbf730c) },
+	{ SPH_C32(0x440d7000), SPH_C32(0x
