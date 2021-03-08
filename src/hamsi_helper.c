@@ -39621,4 +39621,28 @@ static const sph_u32 T512_56[256][16] = {
 		mD ^= rp[13]; \
 		mE ^= rp[14]; \
 		mF ^= rp[15]; \
-		acc = buf
+		acc = buf[7]; \
+		rp = &T512_56[acc][0]; \
+		m0 ^= rp[0]; \
+		m1 ^= rp[1]; \
+		m2 ^= rp[2]; \
+		m3 ^= rp[3]; \
+		m4 ^= rp[4]; \
+		m5 ^= rp[5]; \
+		m6 ^= rp[6]; \
+		m7 ^= rp[7]; \
+		m8 ^= rp[8]; \
+		m9 ^= rp[9]; \
+		mA ^= rp[10]; \
+		mB ^= rp[11]; \
+		mC ^= rp[12]; \
+		mD ^= rp[13]; \
+		mE ^= rp[14]; \
+		mF ^= rp[15]; \
+	} while (0)
+
+#endif
+
+#ifdef __cplusplus
+}
+#endif
