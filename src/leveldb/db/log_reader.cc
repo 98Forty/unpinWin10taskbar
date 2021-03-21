@@ -236,4 +236,31 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
     if (checksum_) {
       uint32_t expected_crc = crc32c::Unmask(DecodeFixed32(header));
       uint32_t actual_crc = crc32c::Value(header + 6, 1 + length);
-      if (actual_crc != 
+      if (actual_crc != expected_crc) {
+        // Drop the rest of the buffer since "length" itself may have
+        // been corrupted and if we trust it, we could find some
+        // fragment of a real log record that just happens to look
+        // like a valid log record.
+        size_t drop_size = buffer_.size();
+        buffer_.clear();
+        ReportCorruption(drop_size, "checksum mismatch");
+        return kBadRecord;
+      }
+    }
+
+    buffer_.remove_prefix(kHeaderSize + length);
+
+    // Skip physical record that started before initial_offset_
+    if (end_of_buffer_offset_ - buffer_.size() - kHeaderSize - length <
+        initial_offset_) {
+      result->clear();
+      return kBadRecord;
+    }
+
+    *result = Slice(header + kHeaderSize, length);
+    return type;
+  }
+}
+
+}  // namespace log
+}  // namespace leveldb
