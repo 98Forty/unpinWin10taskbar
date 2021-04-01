@@ -140,4 +140,85 @@ class AtomicPointer {
     rep_.store(v, std::memory_order_release);
   }
   inline void* NoBarrier_Load() const {
-    retu
+    return rep_.load(std::memory_order_relaxed);
+  }
+  inline void NoBarrier_Store(void* v) {
+    rep_.store(v, std::memory_order_relaxed);
+  }
+};
+
+// Atomic pointer based on sparc memory barriers
+#elif defined(__sparcv9) && defined(__GNUC__)
+class AtomicPointer {
+ private:
+  void* rep_;
+ public:
+  AtomicPointer() { }
+  explicit AtomicPointer(void* v) : rep_(v) { }
+  inline void* Acquire_Load() const {
+    void* val;
+    __asm__ __volatile__ (
+        "ldx [%[rep_]], %[val] \n\t"
+         "membar #LoadLoad|#LoadStore \n\t"
+        : [val] "=r" (val)
+        : [rep_] "r" (&rep_)
+        : "memory");
+    return val;
+  }
+  inline void Release_Store(void* v) {
+    __asm__ __volatile__ (
+        "membar #LoadStore|#StoreStore \n\t"
+        "stx %[v], [%[rep_]] \n\t"
+        :
+        : [rep_] "r" (&rep_), [v] "r" (v)
+        : "memory");
+  }
+  inline void* NoBarrier_Load() const { return rep_; }
+  inline void NoBarrier_Store(void* v) { rep_ = v; }
+};
+
+// Atomic pointer based on ia64 acq/rel
+#elif defined(__ia64) && defined(__GNUC__)
+class AtomicPointer {
+ private:
+  void* rep_;
+ public:
+  AtomicPointer() { }
+  explicit AtomicPointer(void* v) : rep_(v) { }
+  inline void* Acquire_Load() const {
+    void* val    ;
+    __asm__ __volatile__ (
+        "ld8.acq %[val] = [%[rep_]] \n\t"
+        : [val] "=r" (val)
+        : [rep_] "r" (&rep_)
+        : "memory"
+        );
+    return val;
+  }
+  inline void Release_Store(void* v) {
+    __asm__ __volatile__ (
+        "st8.rel [%[rep_]] = %[v]  \n\t"
+        :
+        : [rep_] "r" (&rep_), [v] "r" (v)
+        : "memory"
+        );
+  }
+  inline void* NoBarrier_Load() const { return rep_; }
+  inline void NoBarrier_Store(void* v) { rep_ = v; }
+};
+
+// We have neither MemoryBarrier(), nor <cstdatomic>
+#else
+#error Please implement AtomicPointer for this platform.
+
+#endif
+
+#undef LEVELDB_HAVE_MEMORY_BARRIER
+#undef ARCH_CPU_X86_FAMILY
+#undef ARCH_CPU_ARM_FAMILY
+#undef ARCH_CPU_PPC_FAMILY
+
+}  // namespace port
+}  // namespace leveldb
+
+#endif  // PORT_ATOMIC_POINTER_H_
