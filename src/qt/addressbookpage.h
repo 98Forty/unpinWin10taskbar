@@ -65,4 +65,21 @@ private slots:
     void on_signMessage_clicked();
     void on_verifyMessage_clicked();
     void selectionChanged();
-    void on_showQRCo
+    void on_showQRCode_clicked();
+    /** Spawn contextual menu (right mouse menu) for address book entry */
+    void contextualMenu(const QPoint &point);
+
+    /** Copy label of currently selected address entry to clipboard */
+    void onCopyLabelAction();
+    /** Edit currently selected address entry */
+    void onEditAction();
+
+    /** New entry/entries were added to address table */
+    void selectNewAddress(const QModelIndex &parent, int begin, int end);
+
+signals:
+    void signMessage(QString addr);
+    void verifyMessage(QString addr);
+};
+
+#endif // ADDRESSBOOKDIALOG_H
