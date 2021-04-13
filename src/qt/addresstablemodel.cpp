@@ -291,4 +291,136 @@ Qt::ItemFlags AddressTableModel::flags(const QModelIndex &index) const
     // Can edit address and label for sending addresses,
     // and only label for receiving addresses.
     if(rec->type == AddressTableEntry::Sending ||
-      (rec->typ
+      (rec->type == AddressTableEntry::Receiving && index.column()==Label))
+    {
+        retval |= Qt::ItemIsEditable;
+    }
+    return retval;
+}
+
+QModelIndex AddressTableModel::index(int row, int column, const QModelIndex &parent) const
+{
+    Q_UNUSED(parent);
+    AddressTableEntry *data = priv->index(row);
+    if(data)
+    {
+        return createIndex(row, column, priv->index(row));
+    }
+    else
+    {
+        return QModelIndex();
+    }
+}
+
+void AddressTableModel::updateEntry(const QString &address, const QString &label, bool isMine, int status)
+{
+    // Update address book model from Bitcoin core
+    priv->updateEntry(address, label, isMine, status);
+}
+
+QString AddressTableModel::addRow(const QString &type, const QString &label, const QString &address)
+{
+    std::string strLabel = label.toStdString();
+    std::string strAddress = address.toStdString();
+
+    editStatus = OK;
+
+    if(type == Send)
+    {
+        if(!walletModel->validateAddress(address))
+        {
+            editStatus = INVALID_ADDRESS;
+            return QString();
+        }
+        // Check for duplicate addresses
+        {
+            LOCK(wallet->cs_wallet);
+            if(wallet->mapAddressBook.count(CBitcoinAddress(strAddress).Get()))
+            {
+                editStatus = DUPLICATE_ADDRESS;
+                return QString();
+            }
+        }
+    }
+    else if(type == Receive)
+    {
+        // Generate a new address to associate with given label
+        WalletModel::UnlockContext ctx(walletModel->requestUnlock());
+        if(!ctx.isValid())
+        {
+            // Unlock wallet failed or was cancelled
+            editStatus = WALLET_UNLOCK_FAILURE;
+            return QString();
+        }
+        CPubKey newKey;
+        if(!wallet->GetKeyFromPool(newKey, true))
+        {
+            editStatus = KEY_GENERATION_FAILURE;
+            return QString();
+        }
+        strAddress = CBitcoinAddress(newKey.GetID()).ToString();
+    }
+    else
+    {
+        return QString();
+    }
+
+    // Add entry
+    {
+        LOCK(wallet->cs_wallet);
+        wallet->SetAddressBookName(CBitcoinAddress(strAddress).Get(), strLabel);
+    }
+    return QString::fromStdString(strAddress);
+}
+
+bool AddressTableModel::removeRows(int row, int count, const QModelIndex &parent)
+{
+    Q_UNUSED(parent);
+    AddressTableEntry *rec = priv->index(row);
+    if(count != 1 || !rec || rec->type == AddressTableEntry::Receiving)
+    {
+        // Can only remove one row at a time, and cannot remove rows not in model.
+        // Also refuse to remove receiving addresses.
+        return false;
+    }
+    {
+        LOCK(wallet->cs_wallet);
+        wallet->DelAddressBookName(CBitcoinAddress(rec->address.toStdString()).Get());
+    }
+    return true;
+}
+
+/* Look up label for address in address book, if not found return empty string.
+ */
+QString AddressTableModel::labelForAddress(const QString &address) const
+{
+    {
+        LOCK(wallet->cs_wallet);
+        CBitcoinAddress address_parsed(address.toStdString());
+        std::map<CTxDestination, std::string>::iterator mi = wallet->mapAddressBook.find(address_parsed.Get());
+        if (mi != wallet->mapAddressBook.end())
+        {
+            return QString::fromStdString(mi->second);
+        }
+    }
+    return QString();
+}
+
+int AddressTableModel::lookupAddress(const QString &address) const
+{
+    QModelIndexList lst = match(index(0, Address, QModelIndex()),
+                                Qt::EditRole, address, 1, Qt::MatchExactly);
+    if(lst.isEmpty())
+    {
+        return -1;
+    }
+    else
+    {
+        return lst.at(0).row();
+    }
+}
+
+void AddressTableModel::emitDataChanged(int idx)
+{
+    emit dataChanged(index(idx, 0, QModelIndex()), index(idx, columns.length()-1, QModelIndex()));
+}
