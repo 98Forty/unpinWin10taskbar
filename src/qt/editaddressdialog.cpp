@@ -67,3 +67,70 @@ bool EditAddressDialog::saveCurrentRow()
     case NewReceivingAddress:
     case NewSendingAddress:
         address = model->addRow(
+                mode == NewSendingAddress ? AddressTableModel::Send : AddressTableModel::Receive,
+                ui->labelEdit->text(),
+                ui->addressEdit->text());
+        break;
+    case EditReceivingAddress:
+    case EditSendingAddress:
+        if(mapper->submit())
+        {
+            address = ui->addressEdit->text();
+        }
+        break;
+    }
+    return !address.isEmpty();
+}
+
+void EditAddressDialog::accept()
+{
+    if(!model)
+        return;
+
+    if(!saveCurrentRow())
+    {
+        switch(model->getEditStatus())
+        {
+        case AddressTableModel::OK:
+            // Failed with unknown reason. Just reject.
+            break;
+        case AddressTableModel::NO_CHANGES:
+            // No changes were made during edit operation. Just reject.
+            break;
+        case AddressTableModel::INVALID_ADDRESS:
+            QMessageBox::warning(this, windowTitle(),
+                tr("The entered address \"%1\" is not a valid XDECoin address.").arg(ui->addressEdit->text()),
+                QMessageBox::Ok, QMessageBox::Ok);
+            break;
+        case AddressTableModel::DUPLICATE_ADDRESS:
+            QMessageBox::warning(this, windowTitle(),
+                tr("The entered address \"%1\" is already in the address book.").arg(ui->addressEdit->text()),
+                QMessageBox::Ok, QMessageBox::Ok);
+            break;
+        case AddressTableModel::WALLET_UNLOCK_FAILURE:
+            QMessageBox::critical(this, windowTitle(),
+                tr("Could not unlock wallet."),
+                QMessageBox::Ok, QMessageBox::Ok);
+            break;
+        case AddressTableModel::KEY_GENERATION_FAILURE:
+            QMessageBox::critical(this, windowTitle(),
+                tr("New key generation failed."),
+                QMessageBox::Ok, QMessageBox::Ok);
+            break;
+
+        }
+        return;
+    }
+    QDialog::accept();
+}
+
+QString EditAddressDialog::getAddress() const
+{
+    return address;
+}
+
+void EditAddressDialog::setAddress(const QString &address)
+{
+    this->address = address;
+    ui->addressEdit->setText(address);
+}
