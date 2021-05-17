@@ -633,3 +633,323 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+27"/>
         <source>Sent transaction</source>
+        <translation>Дасланыя транзакцыі</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Incoming transaction</source>
+        <translation>Прынятыя транзакцыі</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date: %1
+Amount: %2
+Type: %3
+Address: %4
+</source>
+        <translation>Дата: %1
+Колькасць: %2
+Тып: %3
+Адрас: %4
+</translation>
+    </message>
+    <message>
+        <location line="+100"/>
+        <location line="+15"/>
+        <source>URI handling</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-15"/>
+        <location line="+15"/>
+        <source>URI can not be parsed! This can be caused by an invalid XDECoin address or malformed URI parameters.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;unlocked&lt;/b&gt;</source>
+        <translation>Гаманец &lt;b&gt;зашыфраваны&lt;/b&gt; і зараз &lt;b&gt;разблакаваны&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</source>
+        <translation>Гаманец &lt;b&gt;зашыфраваны&lt;/b&gt; і зараз &lt;b&gt;заблакаваны&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Backup Wallet</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Wallet Data (*.dat)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Backup Failed</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>There was an error trying to save the wallet data to the new location.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message numerus="yes">
+        <location line="+76"/>
+        <source>%n second(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n minute(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n hour(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n day(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Not staking</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location filename="../bitcoin.cpp" line="+109"/>
+        <source>A fatal error occurred. XDECoin can no longer continue safely and will quit.</source>
+        <translation type="unfinished"/>
+    </message>
+</context>
+<context>
+    <name>ClientModel</name>
+    <message>
+        <location filename="../clientmodel.cpp" line="+90"/>
+        <source>Network Alert</source>
+        <translation type="unfinished"/>
+    </message>
+</context>
+<context>
+    <name>CoinControlDialog</name>
+    <message>
+        <location filename="../forms/coincontroldialog.ui" line="+14"/>
+        <source>Coin Control</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Quantity:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Bytes:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>Amount:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Priority:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>Fee:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Low Output:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location filename="../coincontroldialog.cpp" line="+551"/>
+        <source>no</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location filename="../forms/coincontroldialog.ui" line="+51"/>
+        <source>After Fee:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Change:</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+69"/>
+        <source>(un)select all</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Tree mode</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>List mode</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+45"/>
+        <source>Amount</source>
+        <translation>Колькасць</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Label</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Address</source>
+        <translation>Адрас</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Date</source>
+        <translation>Дата</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Confirmations</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Confirmed</source>
+        <translation>Пацверджана</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Priority</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location filename="../coincontroldialog.cpp" line="-515"/>
+        <source>Copy address</source>
+        <translation>Капіяваць адрас</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy label</source>
+        <translation>Капіяваць пазнаку</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+26"/>
+        <source>Copy amount</source>
+        <translation>Капіяваць колькасць</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>Copy transaction ID</source>
+        <translation>Капіяваць ID транзакцыі</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Copy quantity</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Copy fee</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy after fee</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy bytes</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy priority</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy low output</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy change</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+317"/>
+        <source>highest</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>high</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>medium-high</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>medium</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>low-medium</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>low</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>lowest</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+155"/>
+        <source>DUST</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>yes</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>This label turns red, if the transaction size is bigger than 10000 bytes.
+
+ This means a fee of at least %1 per kb is required.
+
+ Can vary +/- 1 Byte per input.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Transactions with higher priority get more likely into a block.
+
+This label turns red, if the priority is smaller than &quot;medium&quot;.
+
+ This means a fee of 
