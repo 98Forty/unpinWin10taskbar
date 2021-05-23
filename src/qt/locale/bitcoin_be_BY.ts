@@ -2981,3 +2981,257 @@ It is recommended you use the following random password:
 rpcuser=xdecoinrpc
 rpcpassword=%s
 (you do not need to remember this password)
+The username and password MUST NOT be the same.
+If the file does not exist, create it with owner-readable-only file permissions.
+It is also recommended to set alertnotify so you are notified of problems;
+for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.com
+</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+51"/>
+        <source>Find peers using internet relay chat (default: 0)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Sync time with other nodes. Disable if time on your system is precise e.g. syncing with NTP (default: 1)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>When creating transactions, ignore inputs with value less than this (default: 0.01)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Allow JSON-RPC connections from specified IP address</source>
+        <translation>Дазволіць  JSON-RPC злучэнні з пэўнага IP адрасу</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Send commands to node running on &lt;ip&gt; (default: 127.0.0.1)</source>
+        <translation>Адпраўляць каманды вузлу на &lt;ip&gt; (зыходна: 127.0.0.1)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
+        <translation>Выканаць каманду калі лепшы блок зменіцца (%s замяняецца на хэш блока)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Require a confirmations for change (default: 0)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Enforce transaction scripts to use canonical PUSH operators (default: 1)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Execute command when a relevant alert is received (%s in cmd is replaced by message)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Upgrade wallet to latest format</source>
+        <translation>Абнавіць гаманец на новы фармат</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Set key pool size to &lt;n&gt; (default: 100)</source>
+        <translation>Устанавіць памер фонда ключоў у &lt;n&gt; (тыпова: 100)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Rescan the block chain for missing wallet transactions</source>
+        <translation>Перасканаваць ланцуг блокаў дзеля пошуку адсутных транзакцый</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>How many blocks to check at startup (default: 2500, 0 = all)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>How thorough the block verification is (0-6, default: 1)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Imports blocks from external blk000?.dat file</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Use OpenSSL (https) for JSON-RPC connections</source>
+        <translation>Ужываць OpenSSL (https) для JSON-RPC злучэнняў</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Server certificate file (default: server.cert)</source>
+        <translation>Файл-сертыфікат сервера (зыходна: server.cert)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Server private key (default: server.pem)</source>
+        <translation>Прыватны ключ сервера (зыходна: server.pem)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Acceptable ciphers (default: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+53"/>
+        <source>Error: Wallet unlocked for staking only, unable to create transaction.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>WARNING: Invalid checkpoint found! Displayed transactions may not be correct! You may need to upgrade, or notify Developers.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-158"/>
+        <source>This help message</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+95"/>
+        <source>Wallet %s resides outside data directory %s.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Cannot obtain a lock on data directory %s.  XDECoin is probably already running.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-98"/>
+        <source>XDECoin</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+140"/>
+        <source>Unable to bind to %s on this computer (bind returned error %d, %s)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-130"/>
+        <source>Connect through socks proxy</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Allow DNS lookups for -addnode, -seednode and -connect</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+122"/>
+        <source>Loading addresses...</source>
+        <translation>Загружаем адрасы...</translation>
+    </message>
+    <message>
+        <location line="-15"/>
+        <source>Error loading blkindex.dat</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Error loading wallet.dat: Wallet corrupted</source>
+        <translation>Памылка загрузкі wallet.dat: гаманец пашкоджаны</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Error loading wallet.dat: Wallet requires newer version of XDECoin</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Wallet needed to be rewritten: restart XDECoin to complete</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Error loading wallet.dat</source>
+        <translation>Памылка загрузкі wallet.dat</translation>
+    </message>
+    <message>
+        <location line="-16"/>
+        <source>Invalid -proxy address: &apos;%s&apos;</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>Unknown network specified in -onlynet: &apos;%s&apos;</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>Unknown -socks proxy version requested: %i</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Cannot resolve -bind address: &apos;%s&apos;</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Cannot resolve -externalip address: &apos;%s&apos;</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-24"/>
+        <source>Invalid amount for -paytxfee=&lt;amount&gt;: &apos;%s&apos;</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>Error: could not start node</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Sending...</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Invalid amount</source>
+        <translation>Памылковая колькасць</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Insufficient funds</source>
+        <translation>Недастаткова сродкаў</translation>
+    </message>
+    <message>
+        <location line="-34"/>
+        <source>Loading block index...</source>
+        <translation>Загружаем індэкс блокаў...</translation>
+    </message>
+    <message>
+        <location line="-103"/>
+        <source>Add a node to connect to and attempt to keep the connection open</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+122"/>
+        <source>Unable to bind to %s on this computer. XDECoin is probably already running.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-97"/>
+        <source>Fee per KB to add to transactions you send</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+55"/
