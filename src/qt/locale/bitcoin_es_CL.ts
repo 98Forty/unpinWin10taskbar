@@ -1,5 +1,5 @@
 
-<?xml version="1.0" ?><!DOCTYPE TS><TS language="eo" version="2.1">
+<?xml version="1.0" ?><!DOCTYPE TS><TS language="es_CL" version="2.1">
 <context>
     <name>AboutDialog</name>
     <message>
@@ -28,11 +28,14 @@ Distributed under the MIT/X11 software license, see the accompanying file COPYIN
 
 This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/) and cryptographic software written by Eric Young (eay@cryptsoft.com) and UPnP software written by Thomas Bernard.</source>
         <translation>
-Tio ĉi estas eksperimenta programo.
+Este es un software experimental.
 
-Eldonita laŭ la permesilo MIT/X11. Vidu la kunan dosieron COPYING aŭ http://www.opensource.org/licenses/mit-license.php.
+Distribuido bajo la licencia MIT/X11, vea el archivo adjunto
+COPYING o http://www.opensource.org/licenses/mit-license.php.
 
-Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uzo en la &quot;OpenSSL Toolkit&quot; (http://www.openssl.org/) kaj ĉifrajn erojn kreitajn de Eric Young (eay@cryptsoft.com) kaj UPnP-erojn kreitajn de Thomas Bernard.</translation>
+Este producto incluye software desarrollado por OpenSSL Project para su uso en
+el OpenSSL Toolkit (http://www.openssl.org/), software criptográfico escrito por
+Eric Young (eay@cryptsoft.com) y UPnP software escrito por Thomas Bernard.</translation>
     </message>
 </context>
 <context>
@@ -45,17 +48,17 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+22"/>
         <source>Double-click to edit address or label</source>
-        <translation>Duoble-klaku por redakti adreson aŭ etikedon</translation>
+        <translation>Haz doble clic para editar una dirección o etiqueta</translation>
     </message>
     <message>
         <location line="+27"/>
         <source>Create a new address</source>
-        <translation>Krei novan adreson</translation>
+        <translation>Crea una nueva dirección</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Copy the currently selected address to the system clipboard</source>
-        <translation>Kopii elektitan adreson al la tondejo</translation>
+        <translation>Copia la dirección seleccionada al portapapeles</translation>
     </message>
     <message>
         <location line="-11"/>
@@ -70,7 +73,7 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+60"/>
         <source>&amp;Copy Address</source>
-        <translation>&amp;Kopii Adreson</translation>
+        <translation>&amp;Copia dirección</translation>
     </message>
     <message>
         <location line="+11"/>
@@ -90,7 +93,7 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+25"/>
         <source>Delete the currently selected address from the list</source>
-        <translation>Forigi la elektitan adreson el la listo</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-14"/>
@@ -105,17 +108,17 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+14"/>
         <source>&amp;Delete</source>
-        <translation>&amp;Forigi</translation>
+        <translation>&amp;Borrar</translation>
     </message>
     <message>
         <location filename="../addressbookpage.cpp" line="+65"/>
         <source>Copy &amp;Label</source>
-        <translation>Kopii &amp;Etikedon</translation>
+        <translation>Copia &amp;etiqueta</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Edit</source>
-        <translation>&amp;Redakti</translation>
+        <translation>&amp;Editar</translation>
     </message>
     <message>
         <location line="+250"/>
@@ -125,7 +128,7 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+1"/>
         <source>Comma separated file (*.csv)</source>
-        <translation>Perkome disigita dosiero (*.csv)</translation>
+        <translation>Archivos separados por coma (*.csv)</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -143,17 +146,17 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location filename="../addresstablemodel.cpp" line="+144"/>
         <source>Label</source>
-        <translation>Etikedo</translation>
+        <translation>Etiqueta</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Address</source>
-        <translation>Adreso</translation>
+        <translation>Dirección</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>(no label)</source>
-        <translation>(neniu etikedo)</translation>
+        <translation>(sin etiqueta)</translation>
     </message>
 </context>
 <context>
@@ -161,22 +164,22 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location filename="../forms/askpassphrasedialog.ui" line="+26"/>
         <source>Passphrase Dialog</source>
-        <translation>Dialogo pri pasfrazo</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+21"/>
         <source>Enter passphrase</source>
-        <translation>Enigu pasfrazon</translation>
+        <translation>Introduce contraseña actual      </translation>
     </message>
     <message>
         <location line="+14"/>
         <source>New passphrase</source>
-        <translation>Nova pasfrazo</translation>
+        <translation>Nueva contraseña</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Repeat new passphrase</source>
-        <translation>Ripetu la novan pasfrazon</translation>
+        <translation>Repite nueva contraseña</translation>
     </message>
     <message>
         <location line="+33"/>
@@ -191,47 +194,47 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location filename="../askpassphrasedialog.cpp" line="+35"/>
         <source>Enter the new passphrase to the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;10 or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
-        <translation>Enigu novan pasfrazon por la monujo.&lt;br/&gt;Bonvolu uzi pasfrazon kun &lt;b&gt;almenaŭ 10 hazardaj signoj&lt;/b&gt;, aŭ &lt;b&gt;almenaŭ ok vortoj&lt;/b&gt;.</translation>
+        <translation>Introduce la nueva contraseña para la billetera.&lt;br/&gt;Por favor utiliza un contraseña de&lt;b&gt;10 o más caracteres aleatorios&lt;/b&gt;, u &lt;b&gt;ocho o más palabras&lt;/b&gt;.</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Encrypt wallet</source>
-        <translation>Ĉifri la monujon</translation>
+        <translation>Codificar billetera</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>This operation needs your wallet passphrase to unlock the wallet.</source>
-        <translation>Ĉi tiu operacio bezonas vian monujan pasfrazon, por malŝlosi la monujon.</translation>
+        <translation>Esta operación necesita la contraseña para desbloquear la billetera.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Unlock wallet</source>
-        <translation>Malŝlosi la monujon</translation>
+        <translation>Desbloquea billetera</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>This operation needs your wallet passphrase to decrypt the wallet.</source>
-        <translation>Ĉi tiu operacio bezonas vian monujan pasfrazon, por malĉifri la monujon.</translation>
+        <translation>Esta operación necesita la contraseña para decodificar la billetara.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Decrypt wallet</source>
-        <translation>Malĉifri la monujon</translation>
+        <translation>Decodificar cartera</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Change passphrase</source>
-        <translation>Ŝanĝi la pasfrazon</translation>
+        <translation>Cambia contraseña</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Enter the old and new passphrase to the wallet.</source>
-        <translation>Tajpu la malnovan kaj novan monujajn pasfrazojn.</translation>
+        <translation>Introduce la contraseña anterior y la nueva de cartera</translation>
     </message>
     <message>
         <location line="+46"/>
         <source>Confirm wallet encryption</source>
-        <translation>Konfirmo de ĉifrado de la monujo</translation>
+        <translation>Confirma la codificación de cartera</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -241,24 +244,24 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+0"/>
         <source>Are you sure you wish to encrypt your wallet?</source>
-        <translation>Ĉu vi certas, ke vi volas ĉifri la monujon?</translation>
+        <translation>¿Seguro que quieres seguir codificando la billetera?</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
-        <translation>GRAVE: antaŭaj sekur-kopioj de via monujo-dosiero estas forigindaj kiam vi havas nove kreitan ĉifritan monujo-dosieron. Pro sekureco, antaŭaj kopioj de la neĉifrita dosiero ne plu funkcios tuj kiam vi ekuzos la novan ĉifritan dosieron.</translation>
+        <translation>IMPORTANTE: Cualquier versión anterior que hayas realizado de tu archivo de billetera será reemplazada por el nuevo archivo de billetera encriptado. Por razones de seguridad, los respaldos anteriores de los archivos de billetera se volverán inútiles en tanto comiences a usar la nueva billetera encriptada.</translation>
     </message>
     <message>
         <location line="+103"/>
         <location line="+24"/>
         <source>Warning: The Caps Lock key is on!</source>
-        <translation>Atentu: la majuskla baskulo estas ŝaltita!</translation>
+        <translation>Precaucion: Mayúsculas Activadas</translation>
     </message>
     <message>
         <location line="-133"/>
         <location line="+60"/>
         <source>Wallet encrypted</source>
-        <translation>La monujo estas ĉifrita</translation>
+        <translation>Billetera codificada</translation>
     </message>
     <message>
         <location line="-58"/>
@@ -271,40 +274,40 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
         <location line="+44"/>
         <location line="+6"/>
         <source>Wallet encryption failed</source>
-        <translation>Ĉifrado de la monujo fiaskis</translation>
+        <translation>Falló la codificación de la billetera</translation>
     </message>
     <message>
         <location line="-56"/>
         <source>Wallet encryption failed due to an internal error. Your wallet was not encrypted.</source>
-        <translation>Ĉifrado de monujo fiaskis pro interna eraro. Via monujo ne estas ĉifrita.</translation>
+        <translation>La codificación de la billetera falló debido a un error interno. Tu billetera no ha sido codificada.</translation>
     </message>
     <message>
         <location line="+7"/>
         <location line="+50"/>
         <source>The supplied passphrases do not match.</source>
-        <translation>La pasfrazoj entajpitaj ne samas.</translation>
+        <translation>Las contraseñas no coinciden.</translation>
     </message>
     <message>
         <location line="-38"/>
         <source>Wallet unlock failed</source>
-        <translation>Malŝloso de la monujo fiaskis</translation>
+        <translation>Ha fallado el desbloqueo de la billetera</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+12"/>
         <location line="+19"/>
         <source>The passphrase entered for the wallet decryption was incorrect.</source>
-        <translation>La pasfrazo enigita por ĉifrado de monujo ne ĝustas.</translation>
+        <translation>La contraseña introducida para decodificar la billetera es incorrecta.</translation>
     </message>
     <message>
         <location line="-20"/>
         <source>Wallet decryption failed</source>
-        <translation>Malĉifrado de la monujo fiaskis</translation>
+        <translation>Ha fallado la decodificación de la billetera</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Wallet passphrase was successfully changed.</source>
-        <translation>Vi sukcese ŝanĝis la pasfrazon de la monujo.</translation>
+        <translation>La contraseña de billetera ha sido cambiada con éxito.</translation>
     </message>
 </context>
 <context>
@@ -312,32 +315,32 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location filename="../bitcoingui.cpp" line="+282"/>
         <source>Sign &amp;message...</source>
-        <translation>Subskribi &amp;mesaĝon...</translation>
+        <translation>Firmar &amp;Mensaje...</translation>
     </message>
     <message>
         <location line="+251"/>
         <source>Synchronizing with network...</source>
-        <translation>Sinkronigante kun reto...</translation>
+        <translation>Sincronizando con la red...</translation>
     </message>
     <message>
         <location line="-319"/>
         <source>&amp;Overview</source>
-        <translation>&amp;Superrigardo</translation>
+        <translation>&amp;Vista general</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show general overview of wallet</source>
-        <translation>Vidigi ĝeneralan superrigardon de la monujo</translation>
+        <translation>Muestra una vista general de la billetera</translation>
     </message>
     <message>
         <location line="+17"/>
         <source>&amp;Transactions</source>
-        <translation>&amp;Transakcioj</translation>
+        <translation>&amp;Transacciones</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Browse transaction history</source>
-        <translation>Esplori historion de transakcioj</translation>
+        <translation>Explora el historial de transacciónes</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -367,12 +370,12 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+35"/>
         <source>E&amp;xit</source>
-        <translation>&amp;Eliri</translation>
+        <translation>&amp;Salir</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Quit application</source>
-        <translation>Eliri la aplikaĵon</translation>
+        <translation>Salir del programa</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -382,32 +385,32 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+2"/>
         <source>About &amp;Qt</source>
-        <translation>Pri &amp;Qt</translation>
+        <translation>Acerca de</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show information about Qt</source>
-        <translation>Vidigi informojn pri Qt</translation>
+        <translation>Mostrar Información sobre QT</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Options...</source>
-        <translation>&amp;Agordoj...</translation>
+        <translation>&amp;Opciones</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>&amp;Encrypt Wallet...</source>
-        <translation>Ĉifri &amp;Monujon...</translation>
+        <translation>&amp;Codificar la billetera...</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>&amp;Backup Wallet...</source>
-        <translation>&amp;Krei sekurkopion de la monujo...</translation>
+        <translation>&amp;Respaldar billetera...</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Change Passphrase...</source>
-        <translation>Ŝanĝi &amp;Pasfrazon...</translation>
+        <translation>&amp;Cambiar la contraseña...</translation>
     </message>
     <message numerus="yes">
         <location line="+259"/>
@@ -447,27 +450,27 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+3"/>
         <source>Backup wallet to another location</source>
-        <translation>Krei alilokan sekurkopion de monujo</translation>
+        <translation>Respaldar billetera en otra ubicación</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Change the passphrase used for wallet encryption</source>
-        <translation>Ŝanĝi la pasfrazon por ĉifri la monujon</translation>
+        <translation>Cambiar la contraseña utilizada para la codificación de la billetera</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>&amp;Debug window</source>
-        <translation>Sen&amp;cimiga fenestro</translation>
+        <translation>Ventana &amp;Debug</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Open debugging and diagnostic console</source>
-        <translation>Malfermi konzolon de sencimigo kaj diagnozo</translation>
+        <translation>Abre consola de depuración y diagnóstico</translation>
     </message>
     <message>
         <location line="-5"/>
         <source>&amp;Verify message...</source>
-        <translation>&amp;Kontroli mesaĝon...</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-202"/>
@@ -477,7 +480,7 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+0"/>
         <source>Wallet</source>
-        <translation>Monujo</translation>
+        <translation>Cartera</translation>
     </message>
     <message>
         <location line="+180"/>
@@ -487,7 +490,7 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+9"/>
         <source>&amp;Show / Hide</source>
-        <translation>&amp;Montri / Kaŝi</translation>
+        <translation>&amp;Mostrar/Ocultar</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -507,22 +510,22 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+35"/>
         <source>&amp;File</source>
-        <translation>&amp;Dosiero</translation>
+        <translation>&amp;Archivo</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>&amp;Settings</source>
-        <translation>&amp;Agordoj</translation>
+        <translation>&amp;Configuración</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>&amp;Help</source>
-        <translation>&amp;Helpo</translation>
+        <translation>&amp;Ayuda</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Tabs toolbar</source>
-        <translation>Langeto-breto</translation>
+        <translation>Barra de pestañas</translation>
     </message>
     <message>
         <location line="+8"/>
@@ -533,7 +536,7 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
         <location line="+13"/>
         <location line="+9"/>
         <source>[testnet]</source>
-        <translation>[testnet]</translation>
+        <translation>[red-de-pruebas]</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -614,12 +617,12 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+6"/>
         <source>Up to date</source>
-        <translation>Ĝisdata</translation>
+        <translation>Actualizado</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Catching up...</source>
-        <translation>Ĝisdatigante...</translation>
+        <translation>Recuperando...</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -639,12 +642,12 @@ Tiu ĉi produkto enhavas erojn kreitajn de la &quot;OpenSSL Project&quot; por uz
     <message>
         <location line="+27"/>
         <source>Sent transaction</source>
-        <translation>Sendita transakcio</translation>
+        <translation>Transacción enviada</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Incoming transaction</source>
-        <translation>Envenanta transakcio</translation>
+        <translation>Transacción entrante</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -653,11 +656,10 @@ Amount: %2
 Type: %3
 Address: %4
 </source>
-        <translation>Dato: %1
-Sumo: %2
+        <translation>Fecha: %1
+Cantidad: %2
 Tipo: %3
-Adreso: %4
-</translation>
+Dirección: %4</translation>
     </message>
     <message>
         <location line="+100"/>
@@ -674,12 +676,12 @@ Adreso: %4
     <message>
         <location line="+18"/>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;unlocked&lt;/b&gt;</source>
-        <translation>Monujo estas &lt;b&gt;ĉifrita&lt;/b&gt; kaj aktuale &lt;b&gt;malŝlosita&lt;/b&gt;</translation>
+        <translation>La billetera esta &lt;b&gt;codificada&lt;/b&gt; y actualmente &lt;b&gt;desbloqueda&lt;/b&gt;</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</source>
-        <translation>Monujo estas &lt;b&gt;ĉifrita&lt;/b&gt; kaj aktuale &lt;b&gt;ŝlosita&lt;/b&gt;</translation>
+        <translation>La billetera esta &lt;b&gt;codificada&lt;/b&gt; y actualmente &lt;b&gt;bloqueda&lt;/b&gt;</translation>
     </message>
     <message>
         <location line="+25"/>
@@ -714,12 +716,12 @@ Adreso: %4
     <message numerus="yes">
         <location line="+4"/>
         <source>%n hour(s)</source>
-        <translation><numerusform>%n horo</numerusform><numerusform>%n horoj</numerusform></translation>
+        <translation><numerusform>%n hora</numerusform><numerusform>%n horas</numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n day(s)</source>
-        <translation><numerusform>%n tago</numerusform><numerusform>%n tagoj</numerusform></translation>
+        <translation><numerusform>%n día</numerusform><numerusform>%n días</numerusform></translation>
     </message>
     <message>
         <location line="+18"/>
@@ -737,7 +739,7 @@ Adreso: %4
     <message>
         <location filename="../clientmodel.cpp" line="+90"/>
         <source>Network Alert</source>
-        <translation>Reta Averto</translation>
+        <translation>Alerta de Red</translation>
     </message>
 </context>
 <context>
@@ -750,67 +752,67 @@ Adreso: %4
     <message>
         <location line="+31"/>
         <source>Quantity:</source>
-        <translation>Kvanto:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+32"/>
         <source>Bytes:</source>
-        <translation>Bajtoj:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+48"/>
         <source>Amount:</source>
-        <translation>Sumo:</translation>
+        <translation>Cantidad:</translation>
     </message>
     <message>
         <location line="+32"/>
         <source>Priority:</source>
-        <translation>Prioritato:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+48"/>
         <source>Fee:</source>
-        <translation>Krompago:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+35"/>
         <source>Low Output:</source>
-        <translation>Malalta Eligo:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location filename="../coincontroldialog.cpp" line="+551"/>
         <source>no</source>
-        <translation>ne</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location filename="../forms/coincontroldialog.ui" line="+51"/>
         <source>After Fee:</source>
-        <translation>Post krompago:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+35"/>
         <source>Change:</source>
-        <translation>Restmono:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+69"/>
         <source>(un)select all</source>
-        <translation>(mal)elekti ĉion</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+13"/>
         <source>Tree mode</source>
-        <translation>Arboreĝimo</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+16"/>
         <source>List mode</source>
-        <translation>Listreĝimo</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+45"/>
         <source>Amount</source>
-        <translation>Sumo</translation>
+        <translation>Cantidad</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -820,118 +822,118 @@ Adreso: %4
     <message>
         <location line="+5"/>
         <source>Address</source>
-        <translation>Adreso</translation>
+        <translation>Dirección</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Date</source>
-        <translation>Dato</translation>
+        <translation>Fecha</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Confirmations</source>
-        <translation>Konfirmoj</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+3"/>
         <source>Confirmed</source>
-        <translation>Konfirmita</translation>
+        <translation>Confirmado</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Priority</source>
-        <translation>Prioritato</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location filename="../coincontroldialog.cpp" line="-515"/>
         <source>Copy address</source>
-        <translation>Kopii adreson</translation>
+        <translation>Copia dirección</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy label</source>
-        <translation>Kopii etikedon</translation>
+        <translation>Copia etiqueta</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+26"/>
         <source>Copy amount</source>
-        <translation>Kopii sumon</translation>
+        <translation>Copiar Cantidad</translation>
     </message>
     <message>
         <location line="-25"/>
         <source>Copy transaction ID</source>
-        <translation>Kopii transakcian ID-on</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+24"/>
         <source>Copy quantity</source>
-        <translation>Kopii kvanton</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+2"/>
         <source>Copy fee</source>
-        <translation>Kopii krompagon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy after fee</source>
-        <translation>Kopii post krompago</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy bytes</source>
-        <translation>Kopii bajtojn</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy priority</source>
-        <translation>Kopii prioritaton</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy low output</source>
-        <translation>Kopii malaltan eligon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy change</source>
-        <translation>Kopii restmonon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+317"/>
         <source>highest</source>
-        <translation>plej alta</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>high</source>
-        <translation>alta</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>medium-high</source>
-        <translation>mezalta</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>medium</source>
-        <translation>meza</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+4"/>
         <source>low-medium</source>
-        <translation>mezmalalta</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>low</source>
-        <translation>malalta</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>lowest</source>
-        <translation>plej malalta</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+155"/>
@@ -941,7 +943,7 @@ Adreso: %4
     <message>
         <location line="+0"/>
         <source>yes</source>
-        <translation>jes</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+10"/>
@@ -981,17 +983,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+37"/>
         <location line="+66"/>
         <source>(no label)</source>
-        <translation>(neniu etikedo)</translation>
+        <translation>(sin etiqueta)</translation>
     </message>
     <message>
         <location line="-9"/>
         <source>change from %1 (%2)</source>
-        <translation>restmono de %1 (%2)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>(change)</source>
-        <translation>(restmono)</translation>
+        <translation type="unfinished"/>
     </message>
 </context>
 <context>
@@ -999,12 +1001,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/editaddressdialog.ui" line="+14"/>
         <source>Edit Address</source>
-        <translation>Redakti Adreson</translation>
+        <translation>Editar dirección</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>&amp;Label</source>
-        <translation>&amp;Etikedo</translation>
+        <translation>&amp;Etiqueta</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1014,7 +1016,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>&amp;Address</source>
-        <translation>&amp;Adreso</translation>
+        <translation>&amp;Dirección</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1024,27 +1026,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../editaddressdialog.cpp" line="+20"/>
         <source>New receiving address</source>
-        <translation>Nova adreso por ricevi</translation>
+        <translation>Nueva dirección para recibir</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>New sending address</source>
-        <translation>Nova adreso por sendi</translation>
+        <translation>Nueva dirección para enviar</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Edit receiving address</source>
-        <translation>Redakti adreson por ricevi</translation>
+        <translation>Editar dirección de recepción</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Edit sending address</source>
-        <translation>Redakti adreson por sendi</translation>
+        <translation>Editar dirección de envio</translation>
     </message>
     <message>
         <location line="+76"/>
         <source>The entered address &quot;%1&quot; is already in the address book.</source>
-        <translation>La adreso enigita &quot;%1&quot; jam ekzistas en la adresaro.</translation>
+        <translation>La dirección introducida &quot;%1&quot; ya esta guardada en la libreta de direcciones.</translation>
     </message>
     <message>
         <location line="-5"/>
@@ -1054,12 +1056,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+10"/>
         <source>Could not unlock wallet.</source>
-        <translation>Ne eblis malŝlosi monujon.</translation>
+        <translation>No se pudo desbloquear la billetera.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>New key generation failed.</source>
-        <translation>Fiaskis kreo de nova ŝlosilo.</translation>
+        <translation>La generación de nueva clave falló.</translation>
     </message>
 </context>
 <context>
@@ -1111,12 +1113,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/optionsdialog.ui" line="+14"/>
         <source>Options</source>
-        <translation>Agordaĵoj</translation>
+        <translation>Opciones</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>&amp;Main</source>
-        <translation>Ĉ&amp;efa</translation>
+        <translation>&amp;Principal</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -1126,7 +1128,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+15"/>
         <source>Pay transaction &amp;fee</source>
-        <translation>Krompago</translation>
+        <translation>Comisión de &amp;transacciónes</translation>
     </message>
     <message>
         <location line="+31"/>
@@ -1161,7 +1163,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+21"/>
         <source>&amp;Network</source>
-        <translation>&amp;Reto</translation>
+        <translation>&amp;Red</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -1171,7 +1173,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>Map port using &amp;UPnP</source>
-        <translation>Mapigi pordon per &amp;UPnP</translation>
+        <translation>Direcciona el puerto usando &amp;UPnP</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1186,7 +1188,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+9"/>
         <source>Proxy &amp;IP:</source>
-        <translation>Prokurila &amp;IP:</translation>
+        <translation>&amp;IP Proxy:</translation>
     </message>
     <message>
         <location line="+19"/>
@@ -1196,57 +1198,57 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>&amp;Port:</source>
-        <translation>&amp;Pordo:</translation>
+        <translation>&amp;Puerto:</translation>
     </message>
     <message>
         <location line="+19"/>
         <source>Port of the proxy (e.g. 9050)</source>
-        <translation>la pordo de la prokurilo (ekz. 9050)</translation>
+        <translation>Puerto del servidor proxy (ej. 9050)</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>SOCKS &amp;Version:</source>
-        <translation>Versio de SOCKS:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+13"/>
         <source>SOCKS version of the proxy (e.g. 5)</source>
-        <translation>la versio de SOCKS ĉe la prokurilo (ekz. 5)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+36"/>
         <source>&amp;Window</source>
-        <translation>&amp;Fenestro</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+6"/>
         <source>Show only a tray icon after minimizing the window.</source>
-        <translation>Montri nur sistempletan piktogramon post minimumigo de la fenestro.</translation>
+        <translation>Muestra solo un ícono en la bandeja después de minimizar la ventana</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>&amp;Minimize to the tray instead of the taskbar</source>
-        <translation>&amp;Minimumigi al la sistempleto anstataŭ al la taskopleto</translation>
+        <translation>&amp;Minimiza a la bandeja en vez de la barra de tareas</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Minimize instead of exit the application when the window is closed. When this option is enabled, the application will be closed only after selecting Quit in the menu.</source>
-        <translation>Minimumigi la aplikaĵon anstataŭ eliri kaj ĉesi kiam la fenestro estas fermita. Se tiu ĉi estas agordita, la aplikaĵo ĉesas nur kiam oni elektas &quot;Eliri&quot; el la menuo.</translation>
+        <translation>Minimiza la ventana en lugar de salir del programa cuando la ventana se cierra. Cuando esta opción esta activa el programa solo se puede cerrar seleccionando Salir desde el menu.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>M&amp;inimize on close</source>
-        <translation>M&amp;inimumigi je fermo</translation>
+        <translation>M&amp;inimiza a la bandeja al cerrar</translation>
     </message>
     <message>
         <location line="+21"/>
         <source>&amp;Display</source>
-        <translation>&amp;Aspekto</translation>
+        <translation>&amp;Mostrado</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>User Interface &amp;language:</source>
-        <translation>&amp;Lingvo de la fasado:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+13"/>
@@ -1256,12 +1258,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+11"/>
         <source>&amp;Unit to show amounts in:</source>
-        <translation>&amp;Unuo por vidigi sumojn:</translation>
+        <translation>&amp;Unidad en la que mostrar cantitades:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Choose the default subdivision unit to show in the interface and when sending coins.</source>
-        <translation>Elekti la defaŭltan manieron por montri bitmonajn sumojn en la interfaco, kaj kiam vi sendos bitmonon.</translation>
+        <translation>Elige la subdivisión por defecto para mostrar cantidaded en la interfaz cuando se envien monedas</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -1271,12 +1273,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>&amp;Display addresses in transaction list</source>
-        <translation>&amp;Montri adresojn en la listo de transakcioj</translation>
+        <translation>&amp;Muestra direcciones en el listado de transaccioines</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Whether to show coin control features or not.</source>
-        <translation>Ĉu montri detalan adres-regilon, aŭ ne.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+3"/>
@@ -1286,12 +1288,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+71"/>
         <source>&amp;OK</source>
-        <translation>&amp;Bone</translation>
+        <translation>&amp;OK</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>&amp;Cancel</source>
-        <translation>&amp;Nuligi</translation>
+        <translation>&amp;Cancela</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1301,7 +1303,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../optionsdialog.cpp" line="+55"/>
         <source>default</source>
-        <translation>defaŭlta</translation>
+        <translation>predeterminado</translation>
     </message>
     <message>
         <location line="+149"/>
@@ -1318,7 +1320,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+29"/>
         <source>The supplied proxy address is invalid.</source>
-        <translation>La prokurila adreso estas malvalida.</translation>
+        <translation type="unfinished"/>
     </message>
 </context>
 <context>
@@ -1326,7 +1328,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/overviewpage.ui" line="+14"/>
         <source>Form</source>
-        <translation>Formularo</translation>
+        <translation>Formulario</translation>
     </message>
     <message>
         <location line="+33"/>
@@ -1342,12 +1344,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+29"/>
         <source>Unconfirmed:</source>
-        <translation type="unfinished"/>
+        <translation>No confirmados:</translation>
     </message>
     <message>
         <location line="-107"/>
         <source>Wallet</source>
-        <translation>Monujo</translation>
+        <translation>Cartera</translation>
     </message>
     <message>
         <location line="+49"/>
@@ -1357,32 +1359,32 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+16"/>
         <source>Your current spendable balance</source>
-        <translation>via aktuala elspezebla saldo</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+71"/>
         <source>Immature:</source>
-        <translation>Nematura:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+13"/>
         <source>Mined balance that has not yet matured</source>
-        <translation>Minita saldo, kiu ankoraŭ ne maturiĝis</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+20"/>
         <source>Total:</source>
-        <translation>Totalo:</translation>
+        <translation>Total:</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>Your current total balance</source>
-        <translation>via aktuala totala saldo</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+46"/>
         <source>&lt;b&gt;Recent transactions&lt;/b&gt;</source>
-        <translation>&lt;b&gt;Lastaj transakcioj&lt;/b&gt;</translation>
+        <translation>&lt;b&gt;Transacciones recientes&lt;/b&gt;</translation>
     </message>
     <message>
         <location line="-108"/>
@@ -1398,7 +1400,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location filename="../overviewpage.cpp" line="+113"/>
         <location line="+1"/>
         <source>out of sync</source>
-        <translation>nesinkronigita</translation>
+        <translation>desincronizado</translation>
     </message>
 </context>
 <context>
@@ -1464,7 +1466,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/rpcconsole.ui" line="+46"/>
         <source>Client name</source>
-        <translation>Nomo de kliento</translation>
+        <translation>Nombre del cliente</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1478,37 +1480,37 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+23"/>
         <location filename="../rpcconsole.cpp" line="+348"/>
         <source>N/A</source>
-        <translation>neaplikebla</translation>
+        <translation>N/A</translation>
     </message>
     <message>
         <location line="-217"/>
         <source>Client version</source>
-        <translation>Versio de kliento</translation>
+        <translation>Versión del Cliente</translation>
     </message>
     <message>
         <location line="-45"/>
         <source>&amp;Information</source>
-        <translation>&amp;Informoj</translation>
+        <translation>&amp;Información</translation>
     </message>
     <message>
         <location line="+68"/>
         <source>Using OpenSSL version</source>
-        <translation>uzas OpenSSL-version</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+49"/>
         <source>Startup time</source>
-        <translation>Horo de lanĉo</translation>
+        <translation>Tiempo de inicio</translation>
     </message>
     <message>
         <location line="+29"/>
         <source>Network</source>
-        <translation>Reto</translation>
+        <translation>Red</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Number of connections</source>
-        <translation>Nombro de konektoj</translation>
+        <translation>Número de conexiones</translation>
     </message>
     <message>
         <location line="+23"/>
@@ -1518,27 +1520,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+23"/>
         <source>Block chain</source>
-        <translation>Blokĉeno</translation>
+        <translation>Bloquea cadena</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Current number of blocks</source>
-        <translation>Aktuala nombro de blokoj</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+23"/>
         <source>Estimated total blocks</source>
-        <translation>Supozita totalo da blokoj</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+23"/>
         <source>Last block time</source>
-        <translation>Horo de la lasta bloko</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+52"/>
         <source>&amp;Open</source>
-        <translation>&amp;Malfermi</translation>
+        <translation>&amp;Abrir</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -1558,12 +1560,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+24"/>
         <source>&amp;Console</source>
-        <translation>&amp;Konzolo</translation>
+        <translation>&amp;Consola</translation>
     </message>
     <message>
         <location line="-260"/>
         <source>Build date</source>
-        <translation>Dato de kompilado</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-104"/>
@@ -1578,7 +1580,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+279"/>
         <source>Debug log file</source>
-        <translation>Sencimiga protokoldosiero</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+7"/>
@@ -1588,7 +1590,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+102"/>
         <source>Clear console</source>
-        <translation>Malplenigi konzolon</translation>
+        <translation>Limpiar Consola</translation>
     </message>
     <message>
         <location filename="../rpcconsole.cpp" line="-33"/>
@@ -1598,12 +1600,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
-        <translation>Uzu la sagojn supran kaj malsupran por esplori la historion, kaj &lt;b&gt;stir-L&lt;/b&gt; por malplenigi la ekranon.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Type &lt;b&gt;help&lt;/b&gt; for an overview of available commands.</source>
-        <translation>Tajpu &lt;b&gt;help&lt;/b&gt; por superrigardo de la disponeblaj komandoj.</translation>
+        <translation type="unfinished"/>
     </message>
 </context>
 <context>
@@ -1618,17 +1620,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+5"/>
         <location line="+5"/>
         <source>Send Coins</source>
-        <translation>Sendi Monon</translation>
+        <translation>Enviar monedas</translation>
     </message>
     <message>
         <location line="+76"/>
         <source>Coin Control Features</source>
-        <translation>Monregaj Opcioj</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+20"/>
         <source>Inputs...</source>
-        <translation>Enigoj...</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+7"/>
@@ -1638,12 +1640,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+19"/>
         <source>Insufficient funds!</source>
-        <translation>Nesufiĉa mono!</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+77"/>
         <source>Quantity:</source>
-        <translation>Kvanto:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+22"/>
@@ -1654,12 +1656,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-19"/>
         <source>Bytes:</source>
-        <translation>Bajtoj:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+51"/>
         <source>Amount:</source>
-        <translation>Sumo:</translation>
+        <translation>Cantidad:</translation>
     </message>
     <message>
         <location line="+22"/>
@@ -1672,7 +1674,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-191"/>
         <source>Priority:</source>
-        <translation>Prioritato:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+19"/>
@@ -1682,12 +1684,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+32"/>
         <source>Fee:</source>
-        <translation>Krompago:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+35"/>
         <source>Low Output:</source>
-        <translation>Malalta Eligo:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+19"/>
@@ -1697,7 +1699,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+32"/>
         <source>After Fee:</source>
-        <translation>Post krompago:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+35"/>
@@ -1712,12 +1714,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+106"/>
         <source>Send to multiple recipients at once</source>
-        <translation>Sendi samtempe al pluraj ricevantoj</translation>
+        <translation>Enviar a múltiples destinatarios</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Add &amp;Recipient</source>
-        <translation>Aldoni &amp;Ricevonton</translation>
+        <translation>&amp;Agrega destinatario</translation>
     </message>
     <message>
         <location line="+20"/>
@@ -1727,12 +1729,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>Clear &amp;All</source>
-        <translation>&amp;Forigi ĉion</translation>
+        <translation>&amp;Borra todos</translation>
     </message>
     <message>
         <location line="+28"/>
         <source>Balance:</source>
-        <translation>Saldo:</translation>
+        <translation>Balance:</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -1742,12 +1744,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+31"/>
         <source>Confirm the send action</source>
-        <translation>Konfirmi la sendon</translation>
+        <translation>Confirma el envio</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>S&amp;end</source>
-        <translation>Ŝendi</translation>
+        <translation>&amp;Envía</translation>
     </message>
     <message>
         <location filename="../sendcoinsdialog.cpp" line="-173"/>
@@ -1757,42 +1759,42 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+15"/>
         <source>Copy quantity</source>
-        <translation>Kopii kvanton</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy amount</source>
-        <translation>Kopii sumon</translation>
+        <translation>Copiar Cantidad</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy fee</source>
-        <translation>Kopii krompagon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy after fee</source>
-        <translation>Kopii post krompago</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy bytes</source>
-        <translation>Kopii bajtojn</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy priority</source>
-        <translation>Kopii prioritaton</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy low output</source>
-        <translation>Kopii malaltan eligon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy change</source>
-        <translation>Kopii restmonon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+86"/>
@@ -1802,7 +1804,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+5"/>
         <source>Confirm send coins</source>
-        <translation>Konfirmi sendon de bitmono</translation>
+        <translation>Confirmar el envio de monedas</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1817,27 +1819,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+29"/>
         <source>The recipient address is not valid, please recheck.</source>
-        <translation>La adreso de la ricevonto ne validas. Bonvolu kontroli.</translation>
+        <translation>La dirección de destinatarion no es valida, comprueba otra vez.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The amount to pay must be larger than 0.</source>
-        <translation>La pagenda sumo devas esti pli ol 0.</translation>
+        <translation>La cantidad por pagar tiene que ser mayor 0.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The amount exceeds your balance.</source>
-        <translation>La sumo estas pli granda ol via saldo.</translation>
+        <translation>La cantidad sobrepasa tu saldo.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The total exceeds your balance when the %1 transaction fee is included.</source>
-        <translation>La sumo kun la %1 krompago estas pli granda ol via saldo.</translation>
+        <translation>El total sobrepasa tu saldo cuando se incluyen %1 como tasa de envio.</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Duplicate address found, can only send to each address once per send operation.</source>
-        <translation>Iu adreso estas ripetita. Vi povas sendi al ĉiu adreso po unufoje en iu send-operacio.</translation>
+        <translation>Tienes una dirección duplicada, solo puedes enviar a direcciónes individuales de una sola vez.</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -1857,7 +1859,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+13"/>
         <source>(no label)</source>
-        <translation>(neniu etikedo)</translation>
+        <translation>(sin etiqueta)</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -1875,23 +1877,23 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+15"/>
         <source>A&amp;mount:</source>
-        <translation>&amp;Sumo:</translation>
+        <translation>Cantidad:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Pay &amp;To:</source>
-        <translation>&amp;Ricevonto:</translation>
+        <translation>&amp;Pagar a:</translation>
     </message>
     <message>
         <location line="+24"/>
         <location filename="../sendcoinsentry.cpp" line="+25"/>
         <source>Enter a label for this address to add it to your address book</source>
-        <translation>Tajpu etikedon por tiu ĉi adreso kaj aldonu ĝin al via adresaro</translation>
+        <translation>Introduce una etiqueta a esta dirección para añadirla a tu guia</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>&amp;Label:</source>
-        <translation>&amp;Etikedo:</translation>
+        <translation>&amp;Etiqueta:</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -1911,7 +1913,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>Paste address from clipboard</source>
-        <translation>Alglui adreson el tondejo</translation>
+        <translation>Pega dirección desde portapapeles</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1934,18 +1936,18 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/signverifymessagedialog.ui" line="+14"/>
         <source>Signatures - Sign / Verify a Message</source>
-        <translation>Subskriboj - Subskribi / Kontroli mesaĝon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+13"/>
         <location line="+124"/>
         <source>&amp;Sign Message</source>
-        <translation>&amp;Subskribi Mesaĝon</translation>
+        <translation>&amp;Firmar Mensaje</translation>
     </message>
     <message>
         <location line="-118"/>
         <source>You can sign messages with your addresses to prove you own them. Be careful not to sign anything vague, as phishing attacks may try to trick you into signing your identity over to them. Only sign fully-detailed statements you agree to.</source>
-        <translation>Vi povas subskribi mesaĝon per viaj adresoj, por pravigi ke vi estas la posedanto de tiuj adresoj. Atentu, ke vi ne subskriu ion neprecizan, ĉar trompisto povus ruzi kontraŭ vi kaj ŝteli vian identecon. Subskribu nur plene detaligitaj deklaroj pri kiuj vi konsentas.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+18"/>
@@ -1967,7 +1969,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-193"/>
         <source>Paste address from clipboard</source>
-        <translation>Alglui adreson de tondejo</translation>
+        <translation>Pega dirección desde portapapeles</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1977,12 +1979,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+12"/>
         <source>Enter the message you want to sign here</source>
-        <translation>Tajpu la mesaĝon, kiun vi volas sendi, cîi tie</translation>
+        <translation>Escriba el mensaje que desea firmar</translation>
     </message>
     <message>
         <location line="+24"/>
         <source>Copy the current signature to the system clipboard</source>
-        <translation>Kopii la aktualan subskribon al la tondejo</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+21"/>
@@ -1992,24 +1994,24 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+17"/>
         <source>Reset all sign message fields</source>
-        <translation>Reagordigi ĉiujn prisubskribajn kampojn</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+3"/>
         <location line="+146"/>
         <source>Clear &amp;All</source>
-        <translation>&amp;Forigi Ĉion</translation>
+        <translation>&amp;Borra todos</translation>
     </message>
     <message>
         <location line="-87"/>
         <location line="+70"/>
         <source>&amp;Verify Message</source>
-        <translation>&amp;Kontroli Mesaĝon</translation>
+        <translation>&amp;Firmar Mensaje</translation>
     </message>
     <message>
         <location line="-64"/>
         <source>Enter the signing address, message (ensure you copy line breaks, spaces, tabs, etc. exactly) and signature below to verify the message. Be careful not to read more into the signature than what is in the signed message itself, to avoid being tricked by a man-in-the-middle attack.</source>
-        <translation>Enmeti la subskriban adreson, la mesaĝon (kune kun ĉiu linisalto, spaceto, taboj, ktp. precize) kaj la subskribon ĉi sube por kontroli la mesaĝon. Atentu, ke vi ne komprenu per la subskribo pli ol la enhavo de la mesaĝo mem, por eviti homo-en-la-mezo-atakon.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+21"/>
@@ -2024,7 +2026,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+17"/>
         <source>Reset all verify message fields</source>
-        <translation>Reagordigi ĉiujn prikontrolajn kampojn</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location filename="../signverifymessagedialog.cpp" line="+27"/>
@@ -2035,7 +2037,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-2"/>
         <source>Click &quot;Sign Message&quot; to generate signature</source>
-        <translation>Klaku &quot;Subskribi Mesaĝon&quot; por krei subskribon</translation>
+        <translation>Click en &quot;Firmar Mensage&quot; para conseguir firma</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -2046,7 +2048,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+82"/>
         <location line="+81"/>
         <source>The entered address is invalid.</source>
-        <translation>La adreso, kiun vi enmetis, estas nevalida.</translation>
+        <translation>La dirección introducida &quot;%1&quot; no es una dirección Bitcoin valida.</translation>
     </message>
     <message>
         <location line="-81"/>
@@ -2054,59 +2056,59 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+73"/>
         <location line="+8"/>
         <source>Please check the address and try again.</source>
-        <translation>Bonvolu kontroli la adreson kaj reprovi.</translation>
+        <translation>Por favor, revise la dirección Bitcoin e inténtelo denuevo</translation>
     </message>
     <message>
         <location line="-81"/>
         <location line="+81"/>
         <source>The entered address does not refer to a key.</source>
-        <translation>La adreso, kiun vi enmetis, referencas neniun ŝlosilon.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-73"/>
         <source>Wallet unlock was cancelled.</source>
-        <translation>Malŝloso de monujo estas nuligita.</translation>
+        <translation>Ha fallado el desbloqueo de la billetera</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Private key for the entered address is not available.</source>
-        <translation>La privata ŝlosilo por la enigita adreso ne disponeblas.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+12"/>
         <source>Message signing failed.</source>
-        <translation>Subskribo de mesaĝo fiaskis.</translation>
+        <translation>Firma fallida</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Message signed.</source>
-        <translation>Mesaĝo estas subskribita.</translation>
+        <translation>Mensaje firmado</translation>
     </message>
     <message>
         <location line="+59"/>
         <source>The signature could not be decoded.</source>
-        <translation>Ne eblis malĉifri la subskribon.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+0"/>
         <location line="+13"/>
         <source>Please check the signature and try again.</source>
-        <translation>Bonvolu kontroli la subskribon kaj reprovu.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+0"/>
         <source>The signature did not match the message digest.</source>
-        <translation>La subskribo ne kongruis kun la mesaĝ-kompilaĵo.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+7"/>
         <source>Message verification failed.</source>
-        <translation>Kontrolo de mesaĝo malsukcesis.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+5"/>
         <source>Message verified.</source>
-        <translation>Mesaĝo sukcese kontrolita.</translation>
+        <translation>Mensaje comprobado</translation>
     </message>
 </context>
 <context>
@@ -2114,7 +2116,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../transactiondesc.cpp" line="+19"/>
         <source>Open until %1</source>
-        <translation>Malferma ĝis %1</translation>
+        <translation>Abierto hasta %1</translation>
     </message>
     <message numerus="yes">
         <location line="-2"/>
@@ -2129,42 +2131,42 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+2"/>
         <source>%1/offline</source>
-        <translation>%1/senkonekte</translation>
+        <translation>%1/fuera de linea</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>%1/unconfirmed</source>
-        <translation>%1/nekonfirmite</translation>
+        <translation>%1/no confirmado</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>%1 confirmations</source>
-        <translation>%1 konfirmoj</translation>
+        <translation>%1 confirmaciónes</translation>
     </message>
     <message>
         <location line="+18"/>
         <source>Status</source>
-        <translation>Stato</translation>
+        <translation>Estado</translation>
     </message>
     <message numerus="yes">
         <location line="+7"/>
         <source>, broadcast through %n node(s)</source>
-        <translation><numerusform>, elsendita(j) tra %n nodo</numerusform><numerusform>, elsendita(j) tra %n nodoj</numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Date</source>
-        <translation>Dato</translation>
+        <translation>Fecha</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Source</source>
-        <translation>Fonto</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+0"/>
         <source>Generated</source>
-        <translation>Kreita</translation>
+        <translation>Generado</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -2177,18 +2179,18 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+22"/>
         <location line="+58"/>
         <source>To</source>
-        <translation>Al</translation>
+        <translation>A</translation>
     </message>
     <message>
         <location line="-77"/>
         <location line="+2"/>
         <source>own address</source>
-        <translation>propra adreso</translation>
+        <translation>propia dirección</translation>
     </message>
     <message>
         <location line="-2"/>
         <source>label</source>
-        <translation>etikedo</translation>
+        <translation>etiqueta</translation>
     </message>
     <message>
         <location line="+37"/>
@@ -2197,17 +2199,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+17"/>
         <location line="+30"/>
         <source>Credit</source>
-        <translation>Kredito</translation>
+        <translation>Credito</translation>
     </message>
     <message numerus="yes">
         <location line="-102"/>
         <source>matures in %n more block(s)</source>
-        <translation><numerusform>maturiĝos post %n bloko</numerusform><numerusform>maturiĝos post %n blokoj</numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+2"/>
         <source>not accepted</source>
-        <translation>ne akceptita</translation>
+        <translation>no aceptada</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -2215,32 +2217,32 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+15"/>
         <location line="+30"/>
         <source>Debit</source>
-        <translation>Debeto</translation>
+        <translation>Debito</translation>
     </message>
     <message>
         <location line="-39"/>
         <source>Transaction fee</source>
-        <translation>Krompago</translation>
+        <translation>Comisión transacción</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>Net amount</source>
-        <translation>Neta sumo</translation>
+        <translation>Cantidad total</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Message</source>
-        <translation>Mesaĝo</translation>
+        <translation>Mensaje</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Comment</source>
-        <translation>Komento</translation>
+        <translation>Comentario</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Transaction ID</source>
-        <translation>Transakcia ID</translation>
+        <translation>ID de Transacción</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -2250,42 +2252,42 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>Debug information</source>
-        <translation>Sencimigaj informoj</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+8"/>
         <source>Transaction</source>
-        <translation>Transakcio</translation>
+        <translation>Transacción</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Inputs</source>
-        <translation>Enigoj</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+23"/>
         <source>Amount</source>
-        <translation>Sumo</translation>
+        <translation>Cantidad</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>true</source>
-        <translation>vera</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+0"/>
         <source>false</source>
-        <translation>malvera</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-211"/>
         <source>, has not been successfully broadcast yet</source>
-        <translation>, ankoraŭ ne elsendita sukcese</translation>
+        <translation>, no ha sido emitido satisfactoriamente todavía</translation>
     </message>
     <message>
         <location line="+35"/>
         <source>unknown</source>
-        <translation>nekonata</translation>
+        <translation>desconocido</translation>
     </message>
 </context>
 <context>
@@ -2293,12 +2295,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/transactiondescdialog.ui" line="+14"/>
         <source>Transaction details</source>
-        <translation>Transakciaj detaloj</translation>
+        <translation>Detalles de transacción</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>This pane shows a detailed description of the transaction</source>
-        <translation>Tiu ĉi panelo montras detalan priskribon de la transakcio</translation>
+        <translation>Esta ventana muestra información detallada sobre la transacción</translation>
     </message>
 </context>
 <context>
@@ -2306,7 +2308,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../transactiontablemodel.cpp" line="+226"/>
         <source>Date</source>
-        <translation>Dato</translation>
+        <translation>Fecha</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -2316,37 +2318,37 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+0"/>
         <source>Address</source>
-        <translation>Adreso</translation>
+        <translation>Dirección</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Amount</source>
-        <translation>Sumo</translation>
+        <translation>Cantidad</translation>
     </message>
     <message>
         <location line="+60"/>
         <source>Open until %1</source>
-        <translation>Malferma ĝis %1</translation>
+        <translation>Abierto hasta %1</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Confirmed (%1 confirmations)</source>
-        <translation>Konfirmita (%1 konfirmoj)</translation>
+        <translation>Confirmado (%1 confirmaciones)</translation>
     </message>
     <message numerus="yes">
         <location line="-15"/>
         <source>Open for %n more block(s)</source>
-        <translation><numerusform>Malferma dum ankoraŭ %n bloko</numerusform><numerusform>Malferma dum ankoraŭ %n blokoj</numerusform></translation>
+        <translation><numerusform>Abierto para &amp;n bloque más</numerusform><numerusform>Abierto para &amp;n bloques más</numerusform></translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Offline</source>
-        <translation>Senkonekte</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+3"/>
         <source>Unconfirmed</source>
-        <translation>Nekonfirmita</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+3"/>
@@ -2366,67 +2368,67 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>This block was not received by any other nodes and will probably not be accepted!</source>
-        <translation>Tiun ĉi blokon ne ricevis ajna alia nodo, kaj ĝi verŝajne ne akceptiĝos!</translation>
+        <translation>Este bloque no ha sido recibido por otros nodos y probablemente no sea aceptado !</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Generated but not accepted</source>
-        <translation>Kreita sed ne akceptita</translation>
+        <translation>Generado pero no acceptado</translation>
     </message>
     <message>
         <location line="+42"/>
         <source>Received with</source>
-        <translation>Ricevita kun</translation>
+        <translation>Recibido con</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Received from</source>
-        <translation>Ricevita de</translation>
+        <translation>Recibido de</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Sent to</source>
-        <translation>Sendita al</translation>
+        <translation>Enviado a</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Payment to yourself</source>
-        <translation>Pago al vi mem</translation>
+        <translation>Pagar a usted mismo</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Mined</source>
-        <translation>Minita</translation>
+        <translation>Minado</translation>
     </message>
     <message>
         <location line="+38"/>
         <source>(n/a)</source>
-        <translation>neaplikebla</translation>
+        <translation>(n/a)</translation>
     </message>
     <message>
         <location line="+190"/>
         <source>Transaction status. Hover over this field to show number of confirmations.</source>
-        <translation>Transakcia stato. Ŝvebi super tiu ĉi kampo por montri la nombron de konfirmoj.</translation>
+        <translation>Estado de transacción. Pasa el raton sobre este campo para ver el numero de confirmaciónes.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Date and time that the transaction was received.</source>
-        <translation>Dato kaj horo kiam la transakcio alvenis.</translation>
+        <translation>Fecha y hora cuando se recibió la transaccion</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Type of transaction.</source>
-        <translation>Tipo de transakcio.</translation>
+        <translation>Tipo de transacción.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Destination address of transaction.</source>
-        <translation>Celadreso de la transakcio.</translation>
+        <translation>Dirección de destino para la transacción</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Amount removed from or added to balance.</source>
-        <translation>Sumo elprenita de aŭ aldonita al la saldo.</translation>
+        <translation>Cantidad restada o añadida al balance</translation>
     </message>
 </context>
 <context>
@@ -2435,102 +2437,102 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location filename="../transactionview.cpp" line="+55"/>
         <location line="+16"/>
         <source>All</source>
-        <translation>Ĉiuj</translation>
+        <translation>Todo</translation>
     </message>
     <message>
         <location line="-15"/>
         <source>Today</source>
-        <translation>Hodiaŭ</translation>
+        <translation>Hoy</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This week</source>
-        <translation>Ĉi-semajne</translation>
+        <translation>Esta semana</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This month</source>
-        <translation>Ĉi-monate</translation>
+        <translation>Esta mes</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Last month</source>
-        <translation>Pasintmonate</translation>
+        <translation>Mes pasado</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This year</source>
-        <translation>Ĉi-jare</translation>
+        <translation>Este año</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Range...</source>
-        <translation>Intervalo...</translation>
+        <translation>Rango...</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Received with</source>
-        <translation>Ricevita kun</translation>
+        <translation>Recibido con</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Sent to</source>
-        <translation>Sendita al</translation>
+        <translation>Enviado a</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>To yourself</source>
-        <translation>Al vi mem</translation>
+        <translation>A ti mismo</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Mined</source>
-        <translation>Minita</translation>
+        <translation>Minado</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Other</source>
-        <translation>Aliaj</translation>
+        <translation>Otra</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Enter address or label to search</source>
-        <translation>Tajpu adreson aŭ etikedon por serĉi</translation>
+        <translation>Introduce una dirección o etiqueta para  buscar</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Min amount</source>
-        <translation>Minimuma sumo</translation>
+        <translation>Cantidad minima</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>Copy address</source>
-        <translation>Kopii adreson</translation>
+        <translation>Copia dirección</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy label</source>
-        <translation>Kopii etikedon</translation>
+        <translation>Copia etiqueta</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy amount</source>
-        <translation>Kopii sumon</translation>
+        <translation>Copiar Cantidad</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy transaction ID</source>
-        <translation>Kopii transakcian ID-on</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Edit label</source>
-        <translation>Redakti etikedon</translation>
+        <translation>Edita etiqueta</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show transaction details</source>
-        <translation>Montri detalojn de transakcio</translation>
+        <translation>Mostrar detalles de la transacción</translation>
     </message>
     <message>
         <location line="+144"/>
@@ -2540,17 +2542,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Comma separated file (*.csv)</source>
-        <translation>Perkome disigita dosiero (*.csv)</translation>
+        <translation>Archivos separados por coma (*.csv)</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Confirmed</source>
-        <translation>Konfirmita</translation>
+        <translation>Confirmado</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Date</source>
-        <translation>Dato</translation>
+        <translation>Fecha</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2560,17 +2562,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Label</source>
-        <translation>Etikedo</translation>
+        <translation>Etiqueta</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Address</source>
-        <translation>Adreso</translation>
+        <translation>Dirección</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Amount</source>
-        <translation>Sumo</translation>
+        <translation>Cantidad</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2590,12 +2592,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+100"/>
         <source>Range:</source>
-        <translation>Intervalo:</translation>
+        <translation>Rango:</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>to</source>
-        <translation>al</translation>
+        <translation>para</translation>
     </message>
 </context>
 <context>
@@ -2616,7 +2618,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Usage:</source>
-        <translation>Uzado:</translation>
+        <translation>Uso:</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2626,17 +2628,20 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>List commands</source>
-        <translation>Listigi komandojn</translation>
+        <translation>Muestra comandos
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Get help for a command</source>
-        <translation>Vidigi helpon pri iu komando</translation>
+        <translation>Recibir ayuda para un comando
+</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Options:</source>
-        <translation>Agordoj:</translation>
+        <translation>Opciones:
+</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2651,17 +2656,18 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+2"/>
         <source>Specify wallet file (within data directory)</source>
-        <translation>Specifi monujan dosieron (ene de dosierujo por datumoj)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-1"/>
         <source>Specify data directory</source>
-        <translation>Specifi dosieron por datumoj</translation>
+        <translation>Especifica directorio para los datos
+</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Set database cache size in megabytes (default: 25)</source>
-        <translation>Specifi grandon de datumbazo je megabajtoj (defaŭlte: 25)</translation>
+        <translation>Asigna el tamaño del caché de la base de datos en MB (25 predeterminado)</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2676,17 +2682,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Maintain at most &lt;n&gt; connections to peers (default: 125)</source>
-        <translation>Subteni maksimume &lt;n&gt; konektojn al samtavolanoj (defaŭlte: 125)</translation>
+        <translation>Mantener al menos &lt;n&gt; conecciones por cliente (por defecto: 125) </translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Connect to a node to retrieve peer addresses, and disconnect</source>
-        <translation>Konekti al nodo por ricevi adresojn de samtavolanoj, kaj malkonekti</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Specify your own public address</source>
-        <translation>Specifi vian propran publikan adreson</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+5"/>
@@ -2701,17 +2707,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+5"/>
         <source>Threshold for disconnecting misbehaving peers (default: 100)</source>
-        <translation>Sojlo por malkonekti misagantajn samtavolanojn (defaŭlte: 100)</translation>
+        <translation>Umbral de desconección de clientes con mal comportamiento (por defecto: 100)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Number of seconds to keep misbehaving peers from reconnecting (default: 86400)</source>
-        <translation>Nombro da sekundoj por rifuzi rekonekton de misagantaj samtavolanoj (defaŭlte: 86400)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-44"/>
         <source>An error occurred while setting up the RPC port %u for listening on IPv4: %s</source>
-        <translation>Eraro okazis dum estigo de RPC-pordo %u por aŭskulti per IPv4: %s</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+51"/>
@@ -2736,7 +2742,8 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-11"/>
         <source>Accept command line and JSON-RPC commands</source>
-        <translation>Akcepti komandojn JSON-RPC kaj el komandlinio</translation>
+        <translation>Aceptar comandos consola y JSON-RPC
+</translation>
     </message>
     <message>
         <location line="+101"/>
@@ -2761,22 +2768,24 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-88"/>
         <source>Run in the background as a daemon and accept commands</source>
-        <translation>Ruli fone kiel demono kaj akcepti komandojn</translation>
+        <translation>Correr como demonio y acepta comandos
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Use the test network</source>
-        <translation>Uzi la test-reton</translation>
+        <translation>Usa la red de pruebas
+</translation>
     </message>
     <message>
         <location line="-24"/>
         <source>Accept connections from outside (default: 1 if no -proxy or -connect)</source>
-        <translation>Akcepti konektojn el ekstere (defaŭlte: 1 se ne estas -proxy nek -connect)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-38"/>
         <source>An error occurred while setting up the RPC port %u for listening on IPv6, falling back to IPv4: %s</source>
-        <translation>Eraro okazis dum estigo de RPC-pordo %u por aŭskulti per IPv6; retrodefaŭltas al IPv4: %s</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+117"/>
@@ -2791,7 +2800,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+11"/>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
-        <translation>Averto: -paytxfee estas agordita per tre alta valoro! Tio estas la krompago, kion vi pagos se vi sendas la transakcion.</translation>
+        <translation>Precaución: -paytxfee es muy alta. Esta es la comisión que pagarás si envias una transacción.</translation>
     </message>
     <message>
         <location line="+61"/>
@@ -2801,37 +2810,38 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-31"/>
         <source>Warning: error reading wallet.dat! All keys read correctly, but transaction data or address book entries might be missing or incorrect.</source>
-        <translation>Averto: okazis eraro dum lego de wallet.dat! Ĉiuj ŝlosiloj sukcese legiĝis, sed la transakciaj datumoj aŭ la adresaro eble mankas aŭ malĝustas.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-18"/>
         <source>Warning: wallet.dat corrupt, data salvaged! Original wallet.dat saved as wallet.{timestamp}.bak in %s; if your balance or transactions are incorrect you should restore from a backup.</source>
-        <translation>Averto: via wallet.dat estas difektita, sed la datumoj sukcese saviĝis! La originala wallet.dat estas nun konservita kiel wallet.{timestamp}.bak en %s; se via saldo aŭ transakcioj estas malĝustaj vi devus restaŭri per alia sekurkopio.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-30"/>
         <source>Attempt to recover private keys from a corrupt wallet.dat</source>
-        <translation>Provo ripari privatajn ŝlosilojn el difektita wallet.dat</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+4"/>
         <source>Block creation options:</source>
-        <translation>Blok-kreaj agordaĵoj:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-62"/>
         <source>Connect only to the specified node(s)</source>
-        <translation>Konekti nur al specifita(j) nodo(j)</translation>
+        <translation>Conecta solo al nodo especificado
+</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Discover own IP address (default: 1 when listening and no -externalip)</source>
-        <translation>Malkovri la propran IP-adreson (defaŭlte: 1 dum aŭskultado sen -externalip)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+94"/>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
-        <translation>Ne sukcesis aŭskulti ajnan pordon. Uzu -listen=0 se tion vi volas.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-90"/>
@@ -2856,17 +2866,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-82"/>
         <source>Maximum per-connection receive buffer, &lt;n&gt;*1000 bytes (default: 5000)</source>
-        <translation>Maksimuma po riceva bufro por konektoj, &lt;n&gt;*1000 bajtoj (defaŭlte: 5000)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Maximum per-connection send buffer, &lt;n&gt;*1000 bytes (default: 1000)</source>
-        <translation>Maksimuma po senda bufro por konektoj, &lt;n&gt;*1000 bajtoj (defaŭlte: 1000)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-16"/>
         <source>Only connect to nodes in network &lt;net&gt; (IPv4, IPv6 or Tor)</source>
-        <translation>Konekti nur la nodoj en la reto &lt;net&gt; (IPv4, IPv6 aŭ Tor)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+28"/>
@@ -2886,7 +2896,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+35"/>
         <source>SSL options: (see the Bitcoin Wiki for SSL setup instructions)</source>
-        <translation>SSL-agordaĵoj: (vidu la vikio de Bitmono por instrukcioj pri agordado de SSL)</translation>
+        <translation>Opciones SSL: (ver la Bitcoin Wiki para instrucciones de configuración SSL)</translation>
     </message>
     <message>
         <location line="-74"/>
@@ -2896,7 +2906,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+41"/>
         <source>Send trace/debug info to console instead of debug.log file</source>
-        <translation>Sendi spurajn/sencimigajn informojn al la konzolo anstataŭ al dosiero debug.log</translation>
+        <translation>Enviar informacion de seguimiento a la consola en vez del archivo debug.log</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2911,17 +2921,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-1"/>
         <source>Set minimum block size in bytes (default: 0)</source>
-        <translation>Agordi minimuman grandon de blokoj je bajtoj (defaŭlte: 0)</translation>
+        <translation>Establezca el tamaño mínimo del bloque en bytes (por defecto: 0)</translation>
     </message>
     <message>
         <location line="-29"/>
         <source>Shrink debug.log file on client startup (default: 1 when no -debug)</source>
-        <translation>Malpligrandigi la sencimigan protokol-dosieron kiam kliento lanĉiĝas (defaŭlte: 1 kiam mankas -debug)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-42"/>
         <source>Specify connection timeout in milliseconds (default: 5000)</source>
-        <translation>Specifi konektan tempolimon je milisekundoj (defaŭlte: 5000)</translation>
+        <translation>Especifica tiempo de espera para conexion en milisegundos (predeterminado: 5000)</translation>
     </message>
     <message>
         <location line="+109"/>
@@ -2932,12 +2942,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-80"/>
         <source>Use UPnP to map the listening port (default: 0)</source>
-        <translation>Uzi UPnP por mapi la aŭskultan pordon (defaŭlte: 0)</translation>
+        <translation>Intenta usar UPnP para mapear el puerto de escucha (default: 0)</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Use UPnP to map the listening port (default: 1 when listening)</source>
-        <translation>Uzi UPnP por mapi la aŭskultan pordon (defaŭlte: 1 dum aŭskultado)</translation>
+        <translation>Intenta usar UPnP para mapear el puerto de escucha (default: 1 when listening)</translation>
     </message>
     <message>
         <location line="-25"/>
@@ -2947,7 +2957,8 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+42"/>
         <source>Username for JSON-RPC connections</source>
-        <translation>Salutnomo por konektoj JSON-RPC</translation>
+        <translation>Usuario para las conexiones JSON-RPC
+</translation>
     </message>
     <message>
         <location line="+47"/>
@@ -2967,17 +2978,18 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-2"/>
         <source>Warning: This version is obsolete, upgrade required!</source>
-        <translation>Averto: tiu ĉi versio estas eksdata. Vi bezonas ĝisdatigon!</translation>
+        <translation>Advertencia: Esta versión está obsoleta, se necesita actualizar!</translation>
     </message>
     <message>
         <location line="-48"/>
         <source>wallet.dat corrupt, salvage failed</source>
-        <translation>wallet.dat estas difektita, riparo malsukcesis</translation>
+        <translation>wallet.dat corrompió, guardado fallido</translation>
     </message>
     <message>
         <location line="-54"/>
         <source>Password for JSON-RPC connections</source>
-        <translation>Pasvorto por konektoj JSON-RPC</translation>
+        <translation>Contraseña para las conexiones JSON-RPC
+</translation>
     </message>
     <message>
         <location line="-84"/>
@@ -3012,22 +3024,24 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+16"/>
         <source>Allow JSON-RPC connections from specified IP address</source>
-        <translation>Permesi konektojn JSON-RPC de specifa IP-adreso</translation>
+        <translation>Permite conexiones JSON-RPC desde la dirección IP especificada
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Send commands to node running on &lt;ip&gt; (default: 127.0.0.1)</source>
-        <translation>Sendi komandon al nodo ĉe &lt;ip&gt; (defaŭlte: 127.0.0.1)</translation>
+        <translation>Envia comando al nodo situado en &lt;ip&gt; (predeterminado: 127.0.0.1)
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
-        <translation>Plenumi komandon kiam plej bona bloko ŝanĝiĝas (%s en cmd anstataŭiĝas per bloka haketaĵo)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+3"/>
         <source>Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)</source>
-        <translation>Plenumi komandon kiam monuja transakcio ŝanĝiĝas (%s en cmd anstataŭiĝas per TxID)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+3"/>
@@ -3047,17 +3061,19 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+3"/>
         <source>Upgrade wallet to latest format</source>
-        <translation>Ĝisdatigi monujon al plej lasta formato</translation>
+        <translation>Actualizar billetera al formato actual</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Set key pool size to &lt;n&gt; (default: 100)</source>
-        <translation>Agordi la grandon de la ŝlosilo-vico al &lt;n&gt; (defaŭlte: 100)</translation>
+        <translation>Ajusta el numero de claves en reserva &lt;n&gt; (predeterminado: 100)
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Rescan the block chain for missing wallet transactions</source>
-        <translation>Reskani la blokĉenon por mankantaj monujaj transakcioj</translation>
+        <translation>Rescanea la cadena de bloques para transacciones perdidas de la cartera
+</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -3077,17 +3093,20 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+8"/>
         <source>Use OpenSSL (https) for JSON-RPC connections</source>
-        <translation>Uzi OpenSSL (https) por konektoj JSON-RPC</translation>
+        <translation>Usa OpenSSL (https) para las conexiones JSON-RPC
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Server certificate file (default: server.cert)</source>
-        <translation>Dosiero de servila atestilo (defaŭlte: server.cert)</translation>
+        <translation>Certificado del servidor (Predeterminado: server.cert)
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Server private key (default: server.pem)</source>
-        <translation>Dosiero de servila privata ŝlosilo (defaŭlte: server.pem)</translation>
+        <translation>Clave privada del servidor (Predeterminado: server.pem)
+</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3107,7 +3126,8 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="-158"/>
         <source>This help message</source>
-        <translation>Tiu ĉi helpmesaĝo</translation>
+        <translation>Este mensaje de ayuda
+</translation>
     </message>
     <message>
         <location line="+95"/>
@@ -3127,7 +3147,7 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+140"/>
         <source>Unable to bind to %s on this computer (bind returned error %d, %s)</source>
-        <translation>Ne eblis bindi al %s en tiu ĉi komputilo (bind resendis eraron %d, %s)</translation>
+        <translation>No es posible escuchar en el %s en este ordenador (bind returned error %d, %s)</translation>
     </message>
     <message>
         <location line="-130"/>
@@ -3137,12 +3157,13 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+3"/>
         <source>Allow DNS lookups for -addnode, -seednode and -connect</source>
-        <translation>Permesi DNS-elserĉojn por -addnote, -seednote kaj -connect</translation>
+        <translation>Permite búsqueda DNS para addnode y connect
+</translation>
     </message>
     <message>
         <location line="+122"/>
         <source>Loading addresses...</source>
-        <translation>Ŝarĝante adresojn...</translation>
+        <translation>Cargando direcciónes...</translation>
     </message>
     <message>
         <location line="-15"/>
@@ -3152,7 +3173,7 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+2"/>
         <source>Error loading wallet.dat: Wallet corrupted</source>
-        <translation>Eraro dum ŝargado de wallet.dat: monujo difektita</translation>
+        <translation>Error cargando wallet.dat: Billetera corrupta</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -3167,37 +3188,37 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+1"/>
         <source>Error loading wallet.dat</source>
-        <translation>Eraro dum ŝargado de wallet.dat</translation>
+        <translation>Error cargando wallet.dat</translation>
     </message>
     <message>
         <location line="-16"/>
         <source>Invalid -proxy address: &apos;%s&apos;</source>
-        <translation>Nevalid adreso -proxy: &apos;%s&apos;</translation>
+        <translation>Dirección -proxy invalida: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Unknown network specified in -onlynet: &apos;%s&apos;</source>
-        <translation>Nekonata reto specifita en -onlynet: &apos;%s&apos;</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-1"/>
         <source>Unknown -socks proxy version requested: %i</source>
-        <translation>Nekonata versio de -socks petita: %i</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+4"/>
         <source>Cannot resolve -bind address: &apos;%s&apos;</source>
-        <translation>Ne eblas trovi la adreson -bind: &apos;%s&apos;</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+2"/>
         <source>Cannot resolve -externalip address: &apos;%s&apos;</source>
-        <translation>Ne eblas trovi la adreson -externalip: &apos;%s&apos;</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-24"/>
         <source>Invalid amount for -paytxfee=&lt;amount&gt;: &apos;%s&apos;</source>
-        <translation>Nevalida sumo por -paytxfee=&lt;amount&gt;: &apos;%s&apos;</translation>
+        <translation>Cantidad inválida para -paytxfee=&lt;amount&gt;: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -3212,22 +3233,22 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+5"/>
         <source>Invalid amount</source>
-        <translation>Nevalida sumo</translation>
+        <translation>Cantidad inválida</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Insufficient funds</source>
-        <translation>Nesufiĉa mono</translation>
+        <translation>Fondos insuficientes</translation>
     </message>
     <message>
         <location line="-34"/>
         <source>Loading block index...</source>
-        <translation>Ŝarĝante blok-indekson...</translation>
+        <translation>Cargando el index de bloques...</translation>
     </message>
     <message>
         <location line="-103"/>
         <source>Add a node to connect to and attempt to keep the connection open</source>
-        <translation>Aldoni nodon por alkonekti kaj provi daŭrigi la malferman konekton</translation>
+        <translation>Agrega un nodo para conectarse and attempt to keep the connection open</translation>
     </message>
     <message>
         <location line="+122"/>
@@ -3247,12 +3268,12 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+25"/>
         <source>Loading wallet...</source>
-        <translation>Ŝargado de monujo...</translation>
+        <translation>Cargando cartera...</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Cannot downgrade wallet</source>
-        <translation>Ne eblas malpromocii monujon</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
@@ -3262,36 +3283,34 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+1"/>
         <source>Cannot write default address</source>
-        <translation>Ne eblas skribi defaŭltan adreson</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+1"/>
         <source>Rescanning...</source>
-        <translation>Reskanado...</translation>
+        <translation>Rescaneando...</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Done loading</source>
-        <translation>Ŝargado finiĝis</translation>
+        <translation>Carga completa</translation>
     </message>
     <message>
         <location line="-167"/>
         <source>To use the %s option</source>
-        <translation>Por uzi la agordon %s</translation>
+        <translation>Para utilizar la opción %s</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Error</source>
-        <translation>Eraro</translation>
+        <translation>Error</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>You must set rpcpassword=&lt;password&gt; in the configuration file:
 %s
 If the file does not exist, create it with owner-readable-only file permissions.</source>
-        <translation>Vi devas agordi rpcpassword=&lt;password&gt; en la konfigura dosiero:
-%s
-Se la dosiero ne ekzistas, kreu ĝin kun permeso &quot;nur posedanto rajtas legi&quot;.</translation>
+        <translation type="unfinished"/>
     </message>
 </context>
 </TS>
