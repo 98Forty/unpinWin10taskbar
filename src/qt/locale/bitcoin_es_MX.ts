@@ -1705,4 +1705,283 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <translation>Enviar a múltiples receptores a la vez</translation>
     </message>
     <message>
-        <location lin
+        <location line="+3"/>
+        <source>Add &amp;Recipient</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Remove all transaction fields</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Clear &amp;All</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>Balance:</source>
+        <translation>Saldo:</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>123.456 XDE</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Confirm the send action</source>
+        <translation>Confirme la acción de enviar</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>S&amp;end</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location filename="../sendcoinsdialog.cpp" line="-173"/>
+        <source>Enter a XDECoin address (e.g. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Copy quantity</source>
+        <translation>copiar cantidad</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy amount</source>
+        <translation>copiar monto</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy fee</source>
+        <translation>copiar cuota</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy after fee</source>
+        <translation>copiar despues de cuota</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy bytes</source>
+        <translation>copiar bytes</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy priority</source>
+        <translation>copiar prioridad</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy low output</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy change</source>
+        <translation>copiar cambio</translation>
+    </message>
+    <message>
+        <location line="+86"/>
+        <source>&lt;b&gt;%1&lt;/b&gt; to %2 (%3)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Confirm send coins</source>
+        <translation>Confirme para mandar monedas</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Are you sure you want to send %1?</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source> and </source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>The recipient address is not valid, please recheck.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The amount to pay must be larger than 0.</source>
+        <translation>El monto a pagar debe ser mayor a 0</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The amount exceeds your balance.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The total exceeds your balance when the %1 transaction fee is included.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Duplicate address found, can only send to each address once per send operation.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Error: Transaction creation failed.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Error: The transaction was rejected. This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+251"/>
+        <source>WARNING: Invalid XDECoin address</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>(no label)</source>
+        <translation>(sin etiqueta)</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>WARNING: unknown change address</source>
+        <translation type="unfinished"/>
+    </message>
+</context>
+<context>
+    <name>SendCoinsEntry</name>
+    <message>
+        <location filename="../forms/sendcoinsentry.ui" line="+14"/>
+        <source>Form</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>A&amp;mount:</source>
+        <translation>M&amp;onto</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Pay &amp;To:</source>
+        <translation>Pagar &amp;a:</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <location filename="../sendcoinsentry.cpp" line="+25"/>
+        <source>Enter a label for this address to add it to your address book</source>
+        <translation>Ingrese una etiqueta para esta dirección para agregarlo en su libreta de direcciones.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>&amp;Label:</source>
+        <translation>&amp;Etiqueta</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>The address to send the payment to  (e.g. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Choose address from address book</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Alt+A</source>
+        <translation>Alt+A</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Paste address from clipboard</source>
+        <translation>Pegar dirección  del portapapeles</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Alt+P</source>
+        <translation>Alt+P</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Remove this recipient</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location filename="../sendcoinsentry.cpp" line="+1"/>
+        <source>Enter a XDECoin address (e.g. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</source>
+        <translation type="unfinished"/>
+    </message>
+</context>
+<context>
+    <name>SignVerifyMessageDialog</name>
+    <message>
+        <location filename="../forms/signverifymessagedialog.ui" line="+14"/>
+        <source>Signatures - Sign / Verify a Message</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+13"/>
+        <location line="+124"/>
+        <source>&amp;Sign Message</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-118"/>
+        <source>You can sign messages with your addresses to prove you own them. Be careful not to sign anything vague, as phishing attacks may try to trick you into signing your identity over to them. Only sign fully-detailed statements you agree to.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>The address to sign the message with (e.g. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+10"/>
+        <location line="+203"/>
+        <source>Choose an address from the address book</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-193"/>
+        <location line="+203"/>
+        <source>Alt+A</source>
+        <translation>Alt+A</translation>
+    </message>
+    <message>
+        <location line="-193"/>
+        <source>Paste address from clipboard</source>
+        <translation>Pegar dirección  del portapapeles</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Alt+P</source>
+        <translation>Alt+P</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Enter the message you want to sign here</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Copy the current signature to the system clipboard</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>Sign the message to prove you own this XDECoin address</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Reset all sign message fields</source>
+        <translation type="unfinished"/>
+    </message>
+    <m
