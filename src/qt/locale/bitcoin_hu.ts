@@ -1,16 +1,16 @@
 
-<?xml version="1.0" ?><!DOCTYPE TS><TS language="hr" version="2.1">
+<?xml version="1.0" ?><!DOCTYPE TS><TS language="hu" version="2.1">
 <context>
     <name>AboutDialog</name>
     <message>
         <location filename="../forms/aboutdialog.ui" line="+14"/>
         <source>About XDECoin</source>
-        <translation type="unfinished"/>
+        <translation>A XDECoin-ról</translation>
     </message>
     <message>
         <location line="+39"/>
         <source>&lt;b&gt;XDECoin&lt;/b&gt; version</source>
-        <translation type="unfinished"/>
+        <translation>&lt;b&gt;XDECoin&lt;/b&gt; verzió</translation>
     </message>
     <message>
         <location line="+41"/>
@@ -27,7 +27,11 @@ This is experimental software.
 Distributed under the MIT/X11 software license, see the accompanying file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/) and cryptographic software written by Eric Young (eay@cryptsoft.com) and UPnP software written by Thomas Bernard.</source>
-        <translation type="unfinished"/>
+        <translation>
+Ez egy kísérleti program.
+MIT/X11 szoftverlicenc alatt kiadva, lásd a mellékelt COPYING fájlt vagy a http://www.opensource.org/licenses/mit-license.php weboldalt.
+
+Ez a termék tartalmaz az OpenSSL Project által az OpenSSL Toolkit-hez (http://www.openssl.org/) fejlesztett szoftvert; kriptográfiai szoftvert, melyet Eric Young (eay@cryptsoft.com) írt; és Thomas Bernard által írt UPnP szoftvert.</translation>
     </message>
 </context>
 <context>
@@ -35,102 +39,102 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../forms/addressbookpage.ui" line="+14"/>
         <source>Address Book</source>
-        <translation type="unfinished"/>
+        <translation>Címjegyzék</translation>
     </message>
     <message>
         <location line="+22"/>
         <source>Double-click to edit address or label</source>
-        <translation>Dvostruki klik za uređivanje adrese ili oznake</translation>
+        <translation>Kattints duplán a cím vagy címke szerkesztéséhez</translation>
     </message>
     <message>
         <location line="+27"/>
         <source>Create a new address</source>
-        <translation>Dodajte novu adresu</translation>
+        <translation>Új cím létrehozása</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Copy the currently selected address to the system clipboard</source>
-        <translation>Kopiraj trenutno odabranu adresu u međuspremnik</translation>
+        <translation>A kiválasztott cím másolása a vágólapra</translation>
     </message>
     <message>
         <location line="-11"/>
         <source>&amp;New Address</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Új Cím</translation>
     </message>
     <message>
         <location line="-46"/>
         <source>These are your XDECoin addresses for receiving payments. You may want to give a different one to each sender so you can keep track of who is paying you.</source>
-        <translation type="unfinished"/>
+        <translation>Ezek a XDECoin-címeid a fizetések fogadásához. Érdemes minden küldőnek egy külön címet létrehozni, hogy könnyebben követhesd személyenként a tranzakciókat.</translation>
     </message>
     <message>
         <location line="+60"/>
         <source>&amp;Copy Address</source>
-        <translation>&amp;Kopirati adresu</translation>
+        <translation>&amp;Cím Másolása</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Show &amp;QR Code</source>
-        <translation type="unfinished"/>
+        <translation>&amp;QR Kód Mutatása</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Sign a message to prove you own a XDECoin address</source>
-        <translation type="unfinished"/>
+        <translation>Írj alá egy üzenetet, hogy bizonyíthasd egy XDECoin-cím birtoklását</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Sign &amp;Message</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Üzenet Aláírása</translation>
     </message>
     <message>
         <location line="+25"/>
         <source>Delete the currently selected address from the list</source>
-        <translation type="unfinished"/>
+        <translation>A kiválasztott cím törlése a listáról</translation>
     </message>
     <message>
         <location line="-14"/>
         <source>Verify a message to ensure it was signed with a specified XDECoin address</source>
-        <translation type="unfinished"/>
+        <translation>Hitelesíts egy üzenetet ahhoz, hogy bebizonyosodjon XDECoin-cím alapján a feladó kiléte</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>&amp;Verify Message</source>
-        <translation type="unfinished"/>
+        <translation>Üzenet &amp;Hitelesítése</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>&amp;Delete</source>
-        <translation>&amp;Brisanje</translation>
+        <translation>&amp;Törlés</translation>
     </message>
     <message>
         <location filename="../addressbookpage.cpp" line="+65"/>
         <source>Copy &amp;Label</source>
-        <translation>Kopirati &amp;oznaku</translation>
+        <translation>Címke &amp;Másolása</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Edit</source>
-        <translation>&amp;Izmjeniti</translation>
+        <translation>Sz&amp;erkesztés</translation>
     </message>
     <message>
         <location line="+250"/>
         <source>Export Address Book Data</source>
-        <translation type="unfinished"/>
+        <translation>Címjegyzék Exportálása</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Comma separated file (*.csv)</source>
-        <translation>Datoteka vrijednosti odvojenih zarezom (*. csv)</translation>
+        <translation>Vesszővel elválasztott fájl (*.csv)</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Error exporting</source>
-        <translation type="unfinished"/>
+        <translation>Hiba exportálás</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Could not write to file %1.</source>
-        <translation type="unfinished"/>
+        <translation>Nem lehetett írni a fájlt a következő helyen: %1.</translation>
     </message>
 </context>
 <context>
@@ -138,17 +142,17 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../addresstablemodel.cpp" line="+144"/>
         <source>Label</source>
-        <translation>Oznaka</translation>
+        <translation>Címke</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Address</source>
-        <translation>Adresa</translation>
+        <translation>Cím</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>(no label)</source>
-        <translation>(bez oznake)</translation>
+        <translation>(nincs címke)</translation>
     </message>
 </context>
 <context>
@@ -156,104 +160,104 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../forms/askpassphrasedialog.ui" line="+26"/>
         <source>Passphrase Dialog</source>
-        <translation type="unfinished"/>
+        <translation>Kulcsszó Párbeszédablak</translation>
     </message>
     <message>
         <location line="+21"/>
         <source>Enter passphrase</source>
-        <translation>Unesite lozinku</translation>
+        <translation>Add meg a jelszót</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>New passphrase</source>
-        <translation>Nova lozinka</translation>
+        <translation>Új jelszó</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Repeat new passphrase</source>
-        <translation>Ponovite novu lozinku</translation>
+        <translation>Új jelszó ismét</translation>
     </message>
     <message>
         <location line="+33"/>
         <source>Serves to disable the trivial sendmoney when OS account compromised. Provides no real security.</source>
-        <translation type="unfinished"/>
+        <translation>Triviálisan a sendmoney parancs letiltására szolgál, amennyiben az OS felhasználója kompromittálódik. Nem ad valós biztonságot.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>For staking only</source>
-        <translation type="unfinished"/>
+        <translation>Csak kamatoztatásra</translation>
     </message>
     <message>
         <location filename="../askpassphrasedialog.cpp" line="+35"/>
         <source>Enter the new passphrase to the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;10 or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
-        <translation>Unesite novi lozinku za novčanik. &lt;br/&gt; Molimo Vas da koristite zaporku od &lt;b&gt;10 ili više slučajnih znakova,&lt;/b&gt; ili &lt;b&gt;osam ili više riječi.&lt;/b&gt;</translation>
+        <translation>Írd be az új jelszót a tárcához.&lt;br/&gt;Használj &lt;b&gt;legalább 10 véletlenszerű karaktert&lt;/b&gt;, vagy &lt;b&gt;legalább nyolc szót&lt;/b&gt;.</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Encrypt wallet</source>
-        <translation>Šifriranje novčanika</translation>
+        <translation>Tárca kódolása</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>This operation needs your wallet passphrase to unlock the wallet.</source>
-        <translation>Ova operacija treba lozinku vašeg novčanika kako bi se novčanik otključao.</translation>
+        <translation>Ez a művelet a tárcád jelszavának megadását igényli annak megnyitásához.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Unlock wallet</source>
-        <translation>Otključaj novčanik</translation>
+        <translation>Tárca feloldása</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>This operation needs your wallet passphrase to decrypt the wallet.</source>
-        <translation>Ova operacija treba lozinku vašeg novčanika kako bi se novčanik dešifrirao.</translation>
+        <translation>Ez a művelet a tárcád jelszavának megadását igényli annak dekódolásához.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Decrypt wallet</source>
-        <translation>Dešifriranje novčanika.</translation>
+        <translation>Tárca dekódolása</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Change passphrase</source>
-        <translation>Promjena lozinke</translation>
+        <translation>Jelszó megváltoztatása</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Enter the old and new passphrase to the wallet.</source>
-        <translation>Unesite staru i novu lozinku za novčanik.</translation>
+        <translation>Írd be a tárca régi és új jelszavát.</translation>
     </message>
     <message>
         <location line="+46"/>
         <source>Confirm wallet encryption</source>
-        <translation>Potvrdi šifriranje novčanika</translation>
+        <translation>Biztosan kódolni akarod a tárcát?</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR COINS&lt;/b&gt;!</source>
-        <translation type="unfinished"/>
+        <translation>Figyelmeztetés: Ha kódolod a tárcád és elveszíted annak jelszavát, el fogod &lt;b&gt;VESZÍTENI AZ ÖSSZES ÉRMÉDET&lt;/b&gt;!</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Are you sure you wish to encrypt your wallet?</source>
-        <translation>Jeste li sigurni da želite šifrirati svoj novčanik?</translation>
+        <translation>Biztosan kódolni akarod a tárcát?</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
-        <translation type="unfinished"/>
+        <translation>FONTOS: A pénztárca-fájl korábbi mentéseit ezzel az új, titkosított pénztárca-fájllal kell helyettesíteni. Biztonsági okokból a pénztárca-fájl korábbi titkosítás nélküli mentései haszontalanná válnak amint elkezdi használni az új, titkosított pénztárcát.</translation>
     </message>
     <message>
         <location line="+103"/>
         <location line="+24"/>
         <source>Warning: The Caps Lock key is on!</source>
-        <translation>Upozorenje: Tipka Caps Lock je uključena!</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-133"/>
         <location line="+60"/>
         <source>Wallet encrypted</source>
-        <translation>Novčanik šifriran</translation>
+        <translation>Tárca kódolva</translation>
     </message>
     <message>
         <location line="-58"/>
@@ -266,40 +270,40 @@ This product includes software developed by the OpenSSL Project for use in the O
         <location line="+44"/>
         <location line="+6"/>
         <source>Wallet encryption failed</source>
-        <translation>Šifriranje novčanika nije uspjelo</translation>
+        <translation>Tárca kódolása sikertelen.</translation>
     </message>
     <message>
         <location line="-56"/>
         <source>Wallet encryption failed due to an internal error. Your wallet was not encrypted.</source>
-        <translation>Šifriranje novčanika nije uspjelo zbog interne pogreške. Vaš novčanik nije šifriran.</translation>
+        <translation>Tárca kódolása belső hiba miatt sikertelen. A tárcád nem lett kódolva.</translation>
     </message>
     <message>
         <location line="+7"/>
         <location line="+50"/>
         <source>The supplied passphrases do not match.</source>
-        <translation>Priložene lozinke se ne podudaraju.</translation>
+        <translation>A megadott jelszavak nem egyeznek.</translation>
     </message>
     <message>
         <location line="-38"/>
         <source>Wallet unlock failed</source>
-        <translation>Otključavanje novčanika nije uspjelo</translation>
+        <translation>Tárca megnyitása sikertelen</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+12"/>
         <location line="+19"/>
         <source>The passphrase entered for the wallet decryption was incorrect.</source>
-        <translation>Lozinka za dešifriranje novčanika nije točna.</translation>
+        <translation>Hibás jelszó.</translation>
     </message>
     <message>
         <location line="-20"/>
         <source>Wallet decryption failed</source>
-        <translation>Dešifriranje novčanika nije uspjelo</translation>
+        <translation>Dekódolás sikertelen.</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Wallet passphrase was successfully changed.</source>
-        <translation>Lozinka novčanika je uspješno promijenjena.</translation>
+        <translation>Jelszó megváltoztatva.</translation>
     </message>
 </context>
 <context>
@@ -307,32 +311,32 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../bitcoingui.cpp" line="+282"/>
         <source>Sign &amp;message...</source>
-        <translation>&amp;Potpišite poruku...</translation>
+        <translation>Üzenet aláírása...</translation>
     </message>
     <message>
         <location line="+251"/>
         <source>Synchronizing with network...</source>
-        <translation>Usklađivanje s mrežom ...</translation>
+        <translation>Szinkronizálás a hálózattal...</translation>
     </message>
     <message>
         <location line="-319"/>
         <source>&amp;Overview</source>
-        <translation>&amp;Pregled</translation>
+        <translation>&amp;Áttekintés</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show general overview of wallet</source>
-        <translation>Prikaži opći pregled novčanika</translation>
+        <translation>Tárca általános áttekintése</translation>
     </message>
     <message>
         <location line="+17"/>
         <source>&amp;Transactions</source>
-        <translation>&amp;Transakcije</translation>
+        <translation>&amp;Tranzakciók</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Browse transaction history</source>
-        <translation>Pretraži povijest transakcija</translation>
+        <translation>Tranzakciótörténet megtekintése</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -362,12 +366,12 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+35"/>
         <source>E&amp;xit</source>
-        <translation>&amp;Izlaz</translation>
+        <translation>&amp;Kilépés</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Quit application</source>
-        <translation>Izlazak iz programa</translation>
+        <translation>Kilépés</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -377,37 +381,37 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+2"/>
         <source>About &amp;Qt</source>
-        <translation>Više o &amp;Qt</translation>
+        <translation>A &amp;Qt-ról</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show information about Qt</source>
-        <translation>Prikaži informacije o Qt</translation>
+        <translation>Információk a Qt ról</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Options...</source>
-        <translation>&amp;Postavke</translation>
+        <translation>&amp;Opciók...</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>&amp;Encrypt Wallet...</source>
-        <translation>&amp;Šifriraj novčanik...</translation>
+        <translation>Tárca &amp;kódolása...</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>&amp;Backup Wallet...</source>
-        <translation>&amp;Backup novčanika...</translation>
+        <translation>&amp;Bisztonsági másolat készítése a Tárcáról</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Change Passphrase...</source>
-        <translation>&amp;Promijena lozinke...</translation>
+        <translation>Jelszó &amp;megváltoztatása...</translation>
     </message>
     <message numerus="yes">
         <location line="+259"/>
         <source>~%n block(s) remaining</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+6"/>
@@ -442,27 +446,27 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+3"/>
         <source>Backup wallet to another location</source>
-        <translation>Napravite sigurnosnu kopiju novčanika na drugoj lokaciji</translation>
+        <translation>Biztonsági másolat készítése a Tárcáról egy másik helyre</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Change the passphrase used for wallet encryption</source>
-        <translation>Promijenite lozinku za šifriranje novčanika</translation>
+        <translation>Tárcakódoló jelszó megváltoztatása</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>&amp;Debug window</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Debug ablak</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Open debugging and diagnostic console</source>
-        <translation type="unfinished"/>
+        <translation>Hibakereső és diagnosztikai konzol megnyitása</translation>
     </message>
     <message>
         <location line="-5"/>
         <source>&amp;Verify message...</source>
-        <translation>&amp;Potvrdite poruku...</translation>
+        <translation>Üzenet &amp;valódiságának ellenőrzése</translation>
     </message>
     <message>
         <location line="-202"/>
@@ -472,7 +476,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+0"/>
         <source>Wallet</source>
-        <translation>Novčanik</translation>
+        <translation>Tárca</translation>
     </message>
     <message>
         <location line="+180"/>
@@ -482,7 +486,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+9"/>
         <source>&amp;Show / Hide</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Mutat / Elrejt</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -502,22 +506,22 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+35"/>
         <source>&amp;File</source>
-        <translation>&amp;Datoteka</translation>
+        <translation>&amp;Fájl</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>&amp;Settings</source>
-        <translation>&amp;Konfiguracija</translation>
+        <translation>&amp;Beállítások</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>&amp;Help</source>
-        <translation>&amp;Pomoć</translation>
+        <translation>&amp;Súgó</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Tabs toolbar</source>
-        <translation>Traka kartica</translation>
+        <translation>Fül eszköztár</translation>
     </message>
     <message>
         <location line="+8"/>
@@ -528,7 +532,7 @@ This product includes software developed by the OpenSSL Project for use in the O
         <location line="+13"/>
         <location line="+9"/>
         <source>[testnet]</source>
-        <translation>[testnet]</translation>
+        <translation>[teszthálózat]</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -539,7 +543,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message numerus="yes">
         <location line="+75"/>
         <source>%n active connection(s) to XDECoin network</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+40"/>
@@ -574,7 +578,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message numerus="yes">
         <location line="-403"/>
         <source>%n second(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="-312"/>
@@ -594,27 +598,27 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message numerus="yes">
         <location line="+297"/>
         <source>%n minute(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n hour(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n day(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Up to date</source>
-        <translation>Ažurno</translation>
+        <translation>Naprakész</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Catching up...</source>
-        <translation>Ažuriranje...</translation>
+        <translation>Frissítés...</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -634,12 +638,12 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+27"/>
         <source>Sent transaction</source>
-        <translation>Poslana transakcija</translation>
+        <translation>Tranzakció elküldve.</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Incoming transaction</source>
-        <translation>Dolazna transakcija</translation>
+        <translation>Beérkező tranzakció</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -648,10 +652,10 @@ Amount: %2
 Type: %3
 Address: %4
 </source>
-        <translation>Datum:%1
-Iznos:%2
-Tip:%3
-Adresa:%4
+        <translation>Dátum: %1
+Összeg: %2
+Típus: %3
+Cím: %4
 </translation>
     </message>
     <message>
@@ -669,12 +673,12 @@ Adresa:%4
     <message>
         <location line="+18"/>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;unlocked&lt;/b&gt;</source>
-        <translation>Novčanik je &lt;b&gt;šifriran&lt;/b&gt; i trenutno &lt;b&gt;otključan&lt;/b&gt;</translation>
+        <translation>Tárca &lt;b&gt;kódolva&lt;/b&gt; és jelenleg &lt;b&gt;nyitva&lt;/b&gt;.</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</source>
-        <translation>Novčanik je &lt;b&gt;šifriran&lt;/b&gt; i trenutno &lt;b&gt;zaključan&lt;/b&gt;</translation>
+        <translation>Tárca &lt;b&gt;kódolva&lt;/b&gt; és jelenleg &lt;b&gt;zárva&lt;/b&gt;.</translation>
     </message>
     <message>
         <location line="+25"/>
@@ -699,22 +703,22 @@ Adresa:%4
     <message numerus="yes">
         <location line="+76"/>
         <source>%n second(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n minute(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n hour(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n day(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+18"/>
@@ -732,7 +736,7 @@ Adresa:%4
     <message>
         <location filename="../clientmodel.cpp" line="+90"/>
         <source>Network Alert</source>
-        <translation type="unfinished"/>
+        <translation>Hálózati figyelmeztetés</translation>
     </message>
 </context>
 <context>
@@ -755,7 +759,7 @@ Adresa:%4
     <message>
         <location line="+48"/>
         <source>Amount:</source>
-        <translation>Iznos:</translation>
+        <translation>Összeg:</translation>
     </message>
     <message>
         <location line="+32"/>
@@ -805,7 +809,7 @@ Adresa:%4
     <message>
         <location line="+45"/>
         <source>Amount</source>
-        <translation>Iznos</translation>
+        <translation>Összeg</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -815,12 +819,12 @@ Adresa:%4
     <message>
         <location line="+5"/>
         <source>Address</source>
-        <translation>Adresa</translation>
+        <translation>Cím</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>Dátum</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -830,7 +834,7 @@ Adresa:%4
     <message>
         <location line="+3"/>
         <source>Confirmed</source>
-        <translation>Potvrđeno</translation>
+        <translation>Megerősítve</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -840,23 +844,23 @@ Adresa:%4
     <message>
         <location filename="../coincontroldialog.cpp" line="-515"/>
         <source>Copy address</source>
-        <translation>Kopirati adresu</translation>
+        <translation>Cím másolása</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy label</source>
-        <translation>Kopirati oznaku</translation>
+        <translation>Címke másolása</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+26"/>
         <source>Copy amount</source>
-        <translation>Kopiraj iznos</translation>
+        <translation>Összeg másolása</translation>
     </message>
     <message>
         <location line="-25"/>
         <source>Copy transaction ID</source>
-        <translation type="unfinished"/>
+        <translation>Tranzakcióazonosító másolása</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -976,7 +980,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+37"/>
         <location line="+66"/>
         <source>(no label)</source>
-        <translation>(bez oznake)</translation>
+        <translation>(nincs címke)</translation>
     </message>
     <message>
         <location line="-9"/>
@@ -994,12 +998,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/editaddressdialog.ui" line="+14"/>
         <source>Edit Address</source>
-        <translation>Izmjeni adresu</translation>
+        <translation>Cím szerkesztése</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>&amp;Label</source>
-        <translation>&amp;Oznaka</translation>
+        <translation>Cím&amp;ke</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1009,7 +1013,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>&amp;Address</source>
-        <translation>&amp;Adresa</translation>
+        <translation>&amp;Cím</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1019,27 +1023,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../editaddressdialog.cpp" line="+20"/>
         <source>New receiving address</source>
-        <translation>Nova adresa za primanje</translation>
+        <translation>Új fogadó cím</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>New sending address</source>
-        <translation>Nova adresa za slanje</translation>
+        <translation>Új küldő cím</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Edit receiving address</source>
-        <translation>Uredi adresu za primanje</translation>
+        <translation>Fogadó cím szerkesztése</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Edit sending address</source>
-        <translation>Uredi adresu za slanje</translation>
+        <translation>Küldő cím szerkesztése</translation>
     </message>
     <message>
         <location line="+76"/>
         <source>The entered address &quot;%1&quot; is already in the address book.</source>
-        <translation>Upisana adresa &quot;%1&quot; je već u adresaru.</translation>
+        <translation>A megadott &quot;%1&quot; cím már szerepel a címjegyzékben.</translation>
     </message>
     <message>
         <location line="-5"/>
@@ -1049,12 +1053,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+10"/>
         <source>Could not unlock wallet.</source>
-        <translation>Ne mogu otključati novčanik.</translation>
+        <translation>Tárca feloldása sikertelen</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>New key generation failed.</source>
-        <translation>Stvaranje novog ključa nije uspjelo.</translation>
+        <translation>Új kulcs generálása sikertelen</translation>
     </message>
 </context>
 <context>
@@ -1106,12 +1110,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/optionsdialog.ui" line="+14"/>
         <source>Options</source>
-        <translation>Postavke</translation>
+        <translation>Opciók</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>&amp;Main</source>
-        <translation>&amp;Glavno</translation>
+        <translation>&amp;Fő</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -1121,7 +1125,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+15"/>
         <source>Pay transaction &amp;fee</source>
-        <translation>Plati &amp;naknadu za transakciju</translation>
+        <translation>Tranzakciós &amp;díj fizetése</translation>
     </message>
     <message>
         <location line="+31"/>
@@ -1156,7 +1160,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+21"/>
         <source>&amp;Network</source>
-        <translation>&amp;Mreža</translation>
+        <translation>&amp;Hálózat</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -1166,7 +1170,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>Map port using &amp;UPnP</source>
-        <translation>Mapiraj port koristeći &amp;UPnP</translation>
+        <translation>&amp;UPnP port-feltérképezés</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1191,57 +1195,57 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>&amp;Port:</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Port:</translation>
     </message>
     <message>
         <location line="+19"/>
         <source>Port of the proxy (e.g. 9050)</source>
-        <translation>Port od proxy-a (npr. 9050)</translation>
+        <translation>Proxy portja (pl.: 9050)</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>SOCKS &amp;Version:</source>
-        <translation>SOCKS &amp;Verzija:</translation>
+        <translation>SOCKS &amp;Verzió:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>SOCKS version of the proxy (e.g. 5)</source>
-        <translation type="unfinished"/>
+        <translation>A proxy SOCKS verziója  (pl. 5)</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>&amp;Window</source>
-        <translation>&amp;Prozor</translation>
+        <translation>&amp;Ablak</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Show only a tray icon after minimizing the window.</source>
-        <translation>Prikaži samo ikonu u sistemskoj traci nakon minimiziranja prozora</translation>
+        <translation>Kicsinyítés után csak eszköztár-ikont mutass</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>&amp;Minimize to the tray instead of the taskbar</source>
-        <translation>&amp;Minimiziraj u sistemsku traku umjesto u traku programa</translation>
+        <translation>&amp;Kicsinyítés a tálcára az eszköztár helyett</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Minimize instead of exit the application when the window is closed. When this option is enabled, the application will be closed only after selecting Quit in the menu.</source>
-        <translation>Minimizirati umjesto izaći iz aplikacije kada je prozor zatvoren. Kada je ova opcija omogućena, aplikacija će biti zatvorena tek nakon odabira Izlaz u izborniku.</translation>
+        <translation>Az alkalmazásból való kilépés helyett az eszköztárba kicsinyíti az alkalmazást az ablak bezárásakor. Ez esetben az alkalmazás csak a Kilépés menüponttal zárható be.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>M&amp;inimize on close</source>
-        <translation>M&amp;inimiziraj kod zatvaranja</translation>
+        <translation>K&amp;icsinyítés záráskor</translation>
     </message>
     <message>
         <location line="+21"/>
         <source>&amp;Display</source>
-        <translation>&amp;Prikaz</translation>
+        <translation>&amp;Megjelenítés</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>User Interface &amp;language:</source>
-        <translation type="unfinished"/>
+        <translation>Felhasználófelület nye&amp;lve:</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -1251,12 +1255,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+11"/>
         <source>&amp;Unit to show amounts in:</source>
-        <translation>&amp;Jedinica za prikazivanje iznosa:</translation>
+        <translation>&amp;Mértékegység:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Choose the default subdivision unit to show in the interface and when sending coins.</source>
-        <translation>Izaberite željeni najmanji dio bitcoina koji će biti prikazan u sučelju i koji će se koristiti za plaćanje.</translation>
+        <translation>Válaszd ki az interfészen és érmék küldésekor megjelenítendő alapértelmezett alegységet.</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -1266,7 +1270,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>&amp;Display addresses in transaction list</source>
-        <translation>&amp;Prikaži adrese u popisu transakcija</translation>
+        <translation>&amp;Címek megjelenítése a tranzakciólistában</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1281,12 +1285,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+71"/>
         <source>&amp;OK</source>
-        <translation>&amp;U redu</translation>
+        <translation>&amp;OK</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>&amp;Cancel</source>
-        <translation>&amp;Odustani</translation>
+        <translation>Megszakítás</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1296,7 +1300,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../optionsdialog.cpp" line="+55"/>
         <source>default</source>
-        <translation>standardne vrijednosti</translation>
+        <translation>alapértelmezett</translation>
     </message>
     <message>
         <location line="+149"/>
@@ -1313,7 +1317,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+29"/>
         <source>The supplied proxy address is invalid.</source>
-        <translation type="unfinished"/>
+        <translation>A megadott proxy cím nem érvényes.</translation>
     </message>
 </context>
 <context>
@@ -1321,7 +1325,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/overviewpage.ui" line="+14"/>
         <source>Form</source>
-        <translation>Oblik</translation>
+        <translation>Űrlap</translation>
     </message>
     <message>
         <location line="+33"/>
@@ -1342,7 +1346,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-107"/>
         <source>Wallet</source>
-        <translation>Novčanik</translation>
+        <translation>Tárca</translation>
     </message>
     <message>
         <location line="+49"/>
@@ -1352,32 +1356,32 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+16"/>
         <source>Your current spendable balance</source>
-        <translation type="unfinished"/>
+        <translation>Jelenlegi egyenleg</translation>
     </message>
     <message>
         <location line="+71"/>
         <source>Immature:</source>
-        <translation type="unfinished"/>
+        <translation>Éretlen:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Mined balance that has not yet matured</source>
-        <translation type="unfinished"/>
+        <translation>Bányászott egyenleg amely még nem érett be.</translation>
     </message>
     <message>
         <location line="+20"/>
         <source>Total:</source>
-        <translation>Ukupno:</translation>
+        <translation>Összesen:</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>Your current total balance</source>
-        <translation type="unfinished"/>
+        <translation>Aktuális egyenleged</translation>
     </message>
     <message>
         <location line="+46"/>
         <source>&lt;b&gt;Recent transactions&lt;/b&gt;</source>
-        <translation>&lt;b&gt;Nedavne transakcije&lt;/b&gt;</translation>
+        <translation>&lt;b&gt;Legutóbbi tranzakciók&lt;/b&gt;</translation>
     </message>
     <message>
         <location line="-108"/>
@@ -1393,7 +1397,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location filename="../overviewpage.cpp" line="+113"/>
         <location line="+1"/>
         <source>out of sync</source>
-        <translation type="unfinished"/>
+        <translation>Nincs szinkronban.</translation>
     </message>
 </context>
 <context>
@@ -1459,7 +1463,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/rpcconsole.ui" line="+46"/>
         <source>Client name</source>
-        <translation>Ime klijenta</translation>
+        <translation>Kliens néve</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1473,37 +1477,37 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+23"/>
         <location filename="../rpcconsole.cpp" line="+348"/>
         <source>N/A</source>
-        <translation>N/A</translation>
+        <translation>Nem elérhető</translation>
     </message>
     <message>
         <location line="-217"/>
         <source>Client version</source>
-        <translation>Verzija klijenta</translation>
+        <translation>Kliens verzió</translation>
     </message>
     <message>
         <location line="-45"/>
         <source>&amp;Information</source>
-        <translation>&amp;Informacija</translation>
+        <translation>&amp;Információ</translation>
     </message>
     <message>
         <location line="+68"/>
         <source>Using OpenSSL version</source>
-        <translation>Koristim OpenSSL verziju</translation>
+        <translation>Használt OpenSSL verzió</translation>
     </message>
     <message>
         <location line="+49"/>
         <source>Startup time</source>
-        <translation type="unfinished"/>
+        <translation>Bekapcsolás ideje</translation>
     </message>
     <message>
         <location line="+29"/>
         <source>Network</source>
-        <translation>Mreža</translation>
+        <translation>Hálózat</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Number of connections</source>
-        <translation>Broj konekcija</translation>
+        <translation>Kapcsolatok száma</translation>
     </message>
     <message>
         <location line="+23"/>
@@ -1513,27 +1517,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+23"/>
         <source>Block chain</source>
-        <translation>Lanac blokova</translation>
+        <translation>Blokklánc</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Current number of blocks</source>
-        <translation>Trenutni broj blokova</translation>
+        <translation>Aktuális blokkok száma</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>Estimated total blocks</source>
-        <translation>Procjenjeni ukupni broj blokova</translation>
+        <translation>Becsült összes blokk</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>Last block time</source>
-        <translation>Posljednje vrijeme bloka</translation>
+        <translation>Utolsó blokk ideje</translation>
     </message>
     <message>
         <location line="+52"/>
         <source>&amp;Open</source>
-        <translation>&amp;Otvori</translation>
+        <translation>&amp;Megnyitás</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -1553,12 +1557,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+24"/>
         <source>&amp;Console</source>
-        <translation>&amp;Konzola</translation>
+        <translation>&amp;Konzol</translation>
     </message>
     <message>
         <location line="-260"/>
         <source>Build date</source>
-        <translation type="unfinished"/>
+        <translation>Fordítás dátuma</translation>
     </message>
     <message>
         <location line="-104"/>
@@ -1573,7 +1577,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+279"/>
         <source>Debug log file</source>
-        <translation type="unfinished"/>
+        <translation>Debug naplófájl</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1583,7 +1587,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+102"/>
         <source>Clear console</source>
-        <translation>Očisti konzolu</translation>
+        <translation>Konzol törlése</translation>
     </message>
     <message>
         <location filename="../rpcconsole.cpp" line="-33"/>
@@ -1593,12 +1597,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
-        <translation type="unfinished"/>
+        <translation>Navigálhat a fel és le nyilakkal, és &lt;b&gt;Ctrl-L&lt;/b&gt; -vel törölheti a képernyőt.</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Type &lt;b&gt;help&lt;/b&gt; for an overview of available commands.</source>
-        <translation type="unfinished"/>
+        <translation>Írd be azt, hogy &lt;b&gt;help&lt;/b&gt; az elérhető parancsok áttekintéséhez.</translation>
     </message>
 </context>
 <context>
@@ -1613,7 +1617,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+5"/>
         <location line="+5"/>
         <source>Send Coins</source>
-        <translation>Slanje novca</translation>
+        <translation>Érmék küldése</translation>
     </message>
     <message>
         <location line="+76"/>
@@ -1654,7 +1658,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+51"/>
         <source>Amount:</source>
-        <translation>Iznos:</translation>
+        <translation>Összeg:</translation>
     </message>
     <message>
         <location line="+22"/>
@@ -1707,12 +1711,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+106"/>
         <source>Send to multiple recipients at once</source>
-        <translation>Pošalji k nekoliko primatelja odjednom</translation>
+        <translation>Küldés több címzettnek egyszerre</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Add &amp;Recipient</source>
-        <translation>&amp;Dodaj primatelja</translation>
+        <translation>&amp;Címzett hozzáadása</translation>
     </message>
     <message>
         <location line="+20"/>
@@ -1722,12 +1726,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>Clear &amp;All</source>
-        <translation>Obriši &amp;sve</translation>
+        <translation>Mindent &amp;töröl</translation>
     </message>
     <message>
         <location line="+28"/>
         <source>Balance:</source>
-        <translation>Stanje:</translation>
+        <translation>Egyenleg:</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -1737,12 +1741,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+31"/>
         <source>Confirm the send action</source>
-        <translation>Potvrdi akciju slanja</translation>
+        <translation>Küldés megerősítése</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>S&amp;end</source>
-        <translation>&amp;Pošalji</translation>
+        <translation>&amp;Küldés</translation>
     </message>
     <message>
         <location filename="../sendcoinsdialog.cpp" line="-173"/>
@@ -1757,7 +1761,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Copy amount</source>
-        <translation>Kopiraj iznos</translation>
+        <translation>Összeg másolása</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1797,7 +1801,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+5"/>
         <source>Confirm send coins</source>
-        <translation>Potvrdi slanje novca</translation>
+        <translation>Küldés megerősítése</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1812,27 +1816,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+29"/>
         <source>The recipient address is not valid, please recheck.</source>
-        <translation>Adresa primatelja je nevaljala, molimo provjerite je ponovo.</translation>
+        <translation>A címzett címe érvénytelen, kérlek, ellenőrizd.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The amount to pay must be larger than 0.</source>
-        <translation>Iznos mora biti veći od 0.</translation>
+        <translation>A fizetendő összegnek nagyobbnak kell lennie 0-nál.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The amount exceeds your balance.</source>
-        <translation>Iznos je veći od stanja računa.</translation>
+        <translation>Nincs ennyi bitcoin az egyenlegeden.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The total exceeds your balance when the %1 transaction fee is included.</source>
-        <translation>Iznos je veći od stanja računa kad se doda naknada za transakcije od %1.</translation>
+        <translation>A küldeni kívánt összeg és a %1 tranzakciós díj együtt meghaladja az egyenlegeden rendelkezésedre álló összeget.</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Duplicate address found, can only send to each address once per send operation.</source>
-        <translation>Pronašli smo adresu koja se ponavlja. U svakom plaćanju program može svaku adresu koristiti samo jedanput.</translation>
+        <translation>Többször szerepel ugyanaz a cím. Egy küldési műveletben egy címre csak egyszer lehet küldeni.</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -1852,7 +1856,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+13"/>
         <source>(no label)</source>
-        <translation>(bez oznake)</translation>
+        <translation>(nincs címke)</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -1870,23 +1874,24 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+15"/>
         <source>A&amp;mount:</source>
-        <translation>&amp;Iznos:</translation>
+        <translation>Összeg:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Pay &amp;To:</source>
-        <translation>&amp;Primatelj plaćanja:</translation>
+        <translation>Címzett:</translation>
     </message>
     <message>
         <location line="+24"/>
         <location filename="../sendcoinsentry.cpp" line="+25"/>
         <source>Enter a label for this address to add it to your address book</source>
-        <translation>Unesite oznaku za ovu adresu kako bi ju dodali u vaš adresar</translation>
+        <translation>Milyen címkével kerüljön be ez a cím a címtáradba?
+</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>&amp;Label:</source>
-        <translation>&amp;Oznaka:</translation>
+        <translation>Címke:</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -1906,7 +1911,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>Paste address from clipboard</source>
-        <translation>Zalijepi adresu iz međuspremnika</translation>
+        <translation>Cím beillesztése a vágólapról</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1935,12 +1940,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+13"/>
         <location line="+124"/>
         <source>&amp;Sign Message</source>
-        <translation>&amp;Potpišite poruku</translation>
+        <translation>Üzenet aláírása...</translation>
     </message>
     <message>
         <location line="-118"/>
         <source>You can sign messages with your addresses to prove you own them. Be careful not to sign anything vague, as phishing attacks may try to trick you into signing your identity over to them. Only sign fully-detailed statements you agree to.</source>
-        <translation>Možete potpisati poruke sa svojom adresom kako bi dokazali da ih posjedujete. Budite oprezni da ne potpisujete ništa mutno, jer bi vas phishing napadi mogli na prevaru natjerati da prepišete svoj identitet njima. Potpisujte samo detaljno objašnjene izjave sa kojima se slažete.</translation>
+        <translation>Aláírhat a címeivel üzeneteket, amivel bizonyíthatja, hogy a címek az önéi. Vigyázzon, hogy ne írjon alá semmi félreérthetőt, mivel a phising támadásokkal megpróbálhatják becsapni, hogy az azonosságát átírja másokra. Csak olyan részletes állításokat írjon alá, amivel egyetért.</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -1962,7 +1967,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-193"/>
         <source>Paste address from clipboard</source>
-        <translation>Zalijepi adresu iz međuspremnika</translation>
+        <translation>Cím beillesztése a vágólapról</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1972,12 +1977,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+12"/>
         <source>Enter the message you want to sign here</source>
-        <translation>Upišite poruku koju želite potpisati ovdje</translation>
+        <translation>Ide írja az aláírandó üzenetet</translation>
     </message>
     <message>
         <location line="+24"/>
         <source>Copy the current signature to the system clipboard</source>
-        <translation type="unfinished"/>
+        <translation>A jelenleg kiválasztott aláírás másolása a rendszer-vágólapra</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -1993,18 +1998,18 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+3"/>
         <location line="+146"/>
         <source>Clear &amp;All</source>
-        <translation>Obriši &amp;sve</translation>
+        <translation>Mindent &amp;töröl</translation>
     </message>
     <message>
         <location line="-87"/>
         <location line="+70"/>
         <source>&amp;Verify Message</source>
-        <translation>&amp;Potvrdite poruku</translation>
+        <translation>Üzenet ellenőrzése</translation>
     </message>
     <message>
         <location line="-64"/>
         <source>Enter the signing address, message (ensure you copy line breaks, spaces, tabs, etc. exactly) and signature below to verify the message. Be careful not to read more into the signature than what is in the signed message itself, to avoid being tricked by a man-in-the-middle attack.</source>
-        <translation type="unfinished"/>
+        <translation>Írja be az aláírás címét, az üzenetet (ügyelve arra, hogy az új-sor, szóköz, tab, stb. karaktereket is pontosan) és az aláírást az üzenet ellenőrzéséhez. Ügyeljen arra, ne gondoljon többet az aláírásról, mint amennyi az aláírt szövegben ténylegesen áll, hogy elkerülje a köztes-ember (man-in-the-middle) támadást.</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -2041,7 +2046,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+82"/>
         <location line="+81"/>
         <source>The entered address is invalid.</source>
-        <translation type="unfinished"/>
+        <translation>A megadott cím nem érvényes.</translation>
     </message>
     <message>
         <location line="-81"/>
@@ -2049,7 +2054,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+73"/>
         <location line="+8"/>
         <source>Please check the address and try again.</source>
-        <translation type="unfinished"/>
+        <translation>Ellenőrizze a címet és próbálja meg újra.</translation>
     </message>
     <message>
         <location line="-81"/>
@@ -2060,7 +2065,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-73"/>
         <source>Wallet unlock was cancelled.</source>
-        <translation>Otključavanje novčanika je otkazano.</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+8"/>
@@ -2070,23 +2075,23 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+12"/>
         <source>Message signing failed.</source>
-        <translation type="unfinished"/>
+        <translation>Üzenet aláírása nem sikerült.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Message signed.</source>
-        <translation>Poruka je potpisana.</translation>
+        <translation>Üzenet aláírva.</translation>
     </message>
     <message>
         <location line="+59"/>
         <source>The signature could not be decoded.</source>
-        <translation type="unfinished"/>
+        <translation>Az aláírást nem sikerült dekódolni.</translation>
     </message>
     <message>
         <location line="+0"/>
         <location line="+13"/>
         <source>Please check the signature and try again.</source>
-        <translation type="unfinished"/>
+        <translation>Ellenőrizd az aláírást és próbáld újra.</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -2096,12 +2101,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>Message verification failed.</source>
-        <translation type="unfinished"/>
+        <translation>Az üzenet ellenőrzése nem sikerült.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Message verified.</source>
-        <translation type="unfinished"/>
+        <translation>Üzenet ellenőrizve.</translation>
     </message>
 </context>
 <context>
@@ -2109,12 +2114,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../transactiondesc.cpp" line="+19"/>
         <source>Open until %1</source>
-        <translation>Otvoren do %1</translation>
+        <translation>Megnyitva %1-ig</translation>
     </message>
     <message numerus="yes">
         <location line="-2"/>
         <source>Open for %n block(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+8"/>
@@ -2124,66 +2129,66 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+2"/>
         <source>%1/offline</source>
-        <translation>%1 nije dostupan</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+2"/>
         <source>%1/unconfirmed</source>
-        <translation>%1/nepotvrđeno</translation>
+        <translation>%1/megerősítetlen</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>%1 confirmations</source>
-        <translation>%1 potvrda</translation>
+        <translation>%1 megerősítés</translation>
     </message>
     <message>
         <location line="+18"/>
         <source>Status</source>
-        <translation>Status</translation>
+        <translation>Állapot</translation>
     </message>
     <message numerus="yes">
         <location line="+7"/>
         <source>, broadcast through %n node(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>Dátum</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Source</source>
-        <translation>Izvor</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="+0"/>
         <source>Generated</source>
-        <translation>Generiran</translation>
+        <translation>Legenerálva</translation>
     </message>
     <message>
         <location line="+5"/>
         <location line="+17"/>
         <source>From</source>
-        <translation>Od</translation>
+        <translation>Űrlap</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+22"/>
         <location line="+58"/>
         <source>To</source>
-        <translation>Za</translation>
+        <translation>Címzett</translation>
     </message>
     <message>
         <location line="-77"/>
         <location line="+2"/>
         <source>own address</source>
-        <translation>vlastita adresa</translation>
+        <translation>saját cím</translation>
     </message>
     <message>
         <location line="-2"/>
         <source>label</source>
-        <translation>oznaka</translation>
+        <translation>címke</translation>
     </message>
     <message>
         <location line="+37"/>
@@ -2192,17 +2197,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+17"/>
         <location line="+30"/>
         <source>Credit</source>
-        <translation>Uplaćeno</translation>
+        <translation>Jóváírás</translation>
     </message>
     <message numerus="yes">
         <location line="-102"/>
         <source>matures in %n more block(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+2"/>
         <source>not accepted</source>
-        <translation>Nije prihvaćeno</translation>
+        <translation>elutasítva</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -2210,32 +2215,32 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+15"/>
         <location line="+30"/>
         <source>Debit</source>
-        <translation>Zaduženje</translation>
+        <translation>Terhelés</translation>
     </message>
     <message>
         <location line="-39"/>
         <source>Transaction fee</source>
-        <translation>Naknada za transakciju</translation>
+        <translation>Tranzakciós díj</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>Net amount</source>
-        <translation>Neto iznos</translation>
+        <translation>Nettó összeg</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Message</source>
-        <translation>Poruka</translation>
+        <translation>Üzenet</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Comment</source>
-        <translation>Komentar</translation>
+        <translation>Megjegyzés</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Transaction ID</source>
-        <translation>ID transakcije</translation>
+        <translation>Tranzakcióazonosító</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -2245,42 +2250,42 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>Debug information</source>
-        <translation type="unfinished"/>
+        <translation>Debug információ</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Transaction</source>
-        <translation>Transakcija</translation>
+        <translation>Tranzakció</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Inputs</source>
-        <translation>Unosi</translation>
+        <translation>Bemenetek</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>Amount</source>
-        <translation>Iznos</translation>
+        <translation>Összeg</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>true</source>
-        <translation type="unfinished"/>
+        <translation>igaz</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>false</source>
-        <translation type="unfinished"/>
+        <translation>hamis</translation>
     </message>
     <message>
         <location line="-211"/>
         <source>, has not been successfully broadcast yet</source>
-        <translation>, još nije bio uspješno emitiran</translation>
+        <translation>, még nem sikerült elküldeni.</translation>
     </message>
     <message>
         <location line="+35"/>
         <source>unknown</source>
-        <translation>nepoznato</translation>
+        <translation>ismeretlen</translation>
     </message>
 </context>
 <context>
@@ -2288,12 +2293,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/transactiondescdialog.ui" line="+14"/>
         <source>Transaction details</source>
-        <translation>Detalji transakcije</translation>
+        <translation>Tranzakció részletei</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>This pane shows a detailed description of the transaction</source>
-        <translation>Ova panela prikazuje detaljni opis transakcije</translation>
+        <translation>Ez a mező a tranzakció részleteit mutatja</translation>
     </message>
 </context>
 <context>
@@ -2301,37 +2306,37 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../transactiontablemodel.cpp" line="+226"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>Dátum</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Type</source>
-        <translation>Tip</translation>
+        <translation>Típus</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Address</source>
-        <translation>Adresa</translation>
+        <translation>Cím</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Amount</source>
-        <translation>Iznos</translation>
+        <translation>Összeg</translation>
     </message>
     <message>
         <location line="+60"/>
         <source>Open until %1</source>
-        <translation>Otvoren do %1</translation>
+        <translation>%1-ig megnyitva</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Confirmed (%1 confirmations)</source>
-        <translation>Potvrđen (%1 potvrda)</translation>
+        <translation>Megerősítve (%1 megerősítés)</translation>
     </message>
     <message numerus="yes">
         <location line="-15"/>
         <source>Open for %n more block(s)</source>
-        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+6"/>
@@ -2361,67 +2366,67 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>This block was not received by any other nodes and will probably not be accepted!</source>
-        <translation>Generirano - Upozorenje: ovaj blok nije bio primljen od strane bilo kojeg drugog noda i vjerojatno neće biti prihvaćen!</translation>
+        <translation>Ezt a blokkot egyetlen másik csomópont sem kapta meg, így valószínűleg nem lesz elfogadva!</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Generated but not accepted</source>
-        <translation>Generirano, ali nije prihvaćeno</translation>
+        <translation>Legenerálva, de még el nem fogadva.</translation>
     </message>
     <message>
         <location line="+42"/>
         <source>Received with</source>
-        <translation>Primljeno s</translation>
+        <translation>Erre a címre</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Received from</source>
-        <translation>Primljeno od</translation>
+        <translation>Erről az</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Sent to</source>
-        <translation>Poslano za</translation>
+        <translation>Erre a címre</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Payment to yourself</source>
-        <translation>Plaćanje samom sebi</translation>
+        <translation>Magadnak kifizetve</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Mined</source>
-        <translation>Rudareno</translation>
+        <translation>Kibányászva</translation>
     </message>
     <message>
         <location line="+38"/>
         <source>(n/a)</source>
-        <translation>(n/d)</translation>
+        <translation>(nincs)</translation>
     </message>
     <message>
         <location line="+190"/>
         <source>Transaction status. Hover over this field to show number of confirmations.</source>
-        <translation>Status transakcije</translation>
+        <translation>Tranzakció állapota. Húzd ide a kurzort, hogy lásd a megerősítések számát.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Date and time that the transaction was received.</source>
-        <translation>Datum i vrijeme kad je transakcija primljena</translation>
+        <translation>Tranzakció fogadásának dátuma és időpontja.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Type of transaction.</source>
-        <translation>Vrsta transakcije.</translation>
+        <translation>Tranzakció típusa.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Destination address of transaction.</source>
-        <translation>Odredište transakcije</translation>
+        <translation>A tranzakció címzettjének címe.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Amount removed from or added to balance.</source>
-        <translation>Iznos odbijen od ili dodan k saldu.</translation>
+        <translation>Az egyenleghez jóváírt vagy ráterhelt összeg.</translation>
     </message>
 </context>
 <context>
@@ -2430,102 +2435,102 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location filename="../transactionview.cpp" line="+55"/>
         <location line="+16"/>
         <source>All</source>
-        <translation>Sve</translation>
+        <translation>Mind</translation>
     </message>
     <message>
         <location line="-15"/>
         <source>Today</source>
-        <translation>Danas</translation>
+        <translation>Mai</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This week</source>
-        <translation>Ovaj tjedan</translation>
+        <translation>Ezen a héten</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This month</source>
-        <translation>Ovaj mjesec</translation>
+        <translation>Ebben a hónapban</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Last month</source>
-        <translation>Prošli mjesec</translation>
+        <translation>Múlt hónapban</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This year</source>
-        <translation>Ove godine</translation>
+        <translation>Ebben az évben</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Range...</source>
-        <translation>Raspon...</translation>
+        <translation>Tartomány ...</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Received with</source>
-        <translation>Primljeno s</translation>
+        <translation>Erre a címre</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Sent to</source>
-        <translation>Poslano za</translation>
+        <translation>Erre a címre</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>To yourself</source>
-        <translation>Tebi</translation>
+        <translation>Magadnak</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Mined</source>
-        <translation>Rudareno</translation>
+        <translation>Kibányászva</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Other</source>
-        <translation>Ostalo</translation>
+        <translation>Más</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Enter address or label to search</source>
-        <translation>Unesite adresu ili oznaku za pretraživanje</translation>
+        <translation>Írd be a keresendő címet vagy címkét</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Min amount</source>
-        <translation>Min iznos</translation>
+        <translation>Minimális összeg</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>Copy address</source>
-        <translation>Kopirati adresu</translation>
+        <translation>Cím másolása</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy label</source>
-        <translation>Kopirati oznaku</translation>
+        <translation>Címke másolása</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy amount</source>
-        <translation>Kopiraj iznos</translation>
+        <translation>Összeg másolása</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy transaction ID</source>
-        <translation type="unfinished"/>
+        <translation>Tranzakcióazonosító másolása</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Edit label</source>
-        <translation>Izmjeniti oznaku</translation>
+        <translation>Címke szerkesztése</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show transaction details</source>
-        <translation type="unfinished"/>
+        <translation>Tranzakciós részletek megjelenítése</translation>
     </message>
     <message>
         <location line="+144"/>
@@ -2535,42 +2540,42 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Comma separated file (*.csv)</source>
-        <translation>Datoteka podataka odvojenih zarezima (*.csv)</translation>
+        <translation>Vesszővel elválasztott fájl (*.csv)</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Confirmed</source>
-        <translation>Potvrđeno</translation>
+        <translation>Megerősítve</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Date</source>
-        <translation>Datum</translation>
+        <translation>Dátum</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Type</source>
-        <translation>Tip</translation>
+        <translation>Típus</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Label</source>
-        <translation>Oznaka</translation>
+        <translation>Címke</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Address</source>
-        <translation>Adresa</translation>
+        <translation>Cím</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Amount</source>
-        <translation>Iznos</translation>
+        <translation>Összeg</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>ID</source>
-        <translation>ID</translation>
+        <translation>Azonosító</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -2585,12 +2590,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+100"/>
         <source>Range:</source>
-        <translation>Raspon:</translation>
+        <translation>Tartomány:</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>to</source>
-        <translation>za</translation>
+        <translation>meddig</translation>
     </message>
 </context>
 <context>
@@ -2611,7 +2616,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Usage:</source>
-        <translation>Upotreba:</translation>
+        <translation>Használat:</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2621,17 +2626,20 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>List commands</source>
-        <translation>Prikaži komande</translation>
+        <translation>Parancsok kilistázása
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Get help for a command</source>
-        <translation>Potraži pomoć za komandu</translation>
+        <translation>Segítség egy parancsról
+</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Options:</source>
-        <translation>Postavke:</translation>
+        <translation>Opciók
+</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2651,12 +2659,13 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-1"/>
         <source>Specify data directory</source>
-        <translation>Odredi direktorij za datoteke</translation>
+        <translation>Adatkönyvtár
+</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Set database cache size in megabytes (default: 25)</source>
-        <translation>Postavi cache za bazu podataka u MB (zadano:25)</translation>
+        <translation>Az adatbázis gyorsítótár mérete megabájtban (alapértelmezés: 25)</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2671,17 +2680,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Maintain at most &lt;n&gt; connections to peers (default: 125)</source>
-        <translation>Održavaj najviše &lt;n&gt; veza sa članovima (default: 125)</translation>
+        <translation>Maximálisan &lt;n&gt; számú kapcsolat fenntartása a peerekkel (alapértelmezés: 125)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Connect to a node to retrieve peer addresses, and disconnect</source>
-        <translation type="unfinished"/>
+        <translation>Kapcsolódás egy csomóponthoz a peerek címeinek megszerzése miatt, majd szétkapcsolás</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Specify your own public address</source>
-        <translation type="unfinished"/>
+        <translation>Adja meg az Ön saját nyilvános címét</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -2696,12 +2705,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+5"/>
         <source>Threshold for disconnecting misbehaving peers (default: 100)</source>
-        <translation>Prag za odspajanje članova koji se čudno ponašaju (default: 100)</translation>
+        <translation>Helytelenül viselkedő peerek leválasztási határértéke (alapértelmezés: 100)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Number of seconds to keep misbehaving peers from reconnecting (default: 86400)</source>
-        <translation>Broj sekundi koliko se članovima koji se čudno ponašaju neće dopustiti da se opet spoje (default: 86400)</translation>
+        <translation>Helytelenül viselkedő peerek kizárási ideje másodpercben (alapértelmezés: 86400)</translation>
     </message>
     <message>
         <location line="-44"/>
@@ -2731,7 +2740,8 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-11"/>
         <source>Accept command line and JSON-RPC commands</source>
-        <translation>Prihvati komande iz tekst moda i JSON-RPC</translation>
+        <translation>Parancssoros és JSON-RPC parancsok elfogadása
+</translation>
     </message>
     <message>
         <location line="+101"/>
@@ -2756,12 +2766,14 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-88"/>
         <source>Run in the background as a daemon and accept commands</source>
-        <translation>Izvršavaj u pozadini kao uslužnik i prihvaćaj komande</translation>
+        <translation>Háttérben futtatás daemonként és parancsok elfogadása
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Use the test network</source>
-        <translation>Koristi test mrežu</translation>
+        <translation>Teszthálózat használata
+</translation>
     </message>
     <message>
         <location line="-24"/>
@@ -2786,7 +2798,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+11"/>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
-        <translation>Upozorenje: -paytxfee je podešen na preveliki iznos.  To je iznos koji ćete platiti za obradu transakcije.</translation>
+        <translation>Figyelem: a -paytxfee nagyon magas.  Ennyi tranzakciós díjat fogsz fizetni, ha elküldöd a tranzakciót.</translation>
     </message>
     <message>
         <location line="+61"/>
@@ -2811,12 +2823,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+4"/>
         <source>Block creation options:</source>
-        <translation>Opcije za kreiranje bloka:</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-62"/>
         <source>Connect only to the specified node(s)</source>
-        <translation>Poveži se samo sa određenim nodom</translation>
+        <translation>Csatlakozás csak a megadott csomóponthoz</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -2826,7 +2838,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+94"/>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
-        <translation type="unfinished"/>
+        <translation>Egyik hálózati porton sem sikerül hallgatni. Használja a -listen=0 kapcsolót, ha ezt szeretné.</translation>
     </message>
     <message>
         <location line="-90"/>
@@ -2881,7 +2893,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+35"/>
         <source>SSL options: (see the Bitcoin Wiki for SSL setup instructions)</source>
-        <translation>SSL postavke: (za detalje o podešavanju SSL opcija vidi Bitcoin Wiki)</translation>
+        <translation>SSL-opciók: (lásd a Bitcoin Wiki SSL-beállítási instrukcióit)</translation>
     </message>
     <message>
         <location line="-74"/>
@@ -2891,7 +2903,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+41"/>
         <source>Send trace/debug info to console instead of debug.log file</source>
-        <translation>Šalji trace/debug informacije na konzolu umjesto u debug.log datoteku</translation>
+        <translation>trace/debug információ küldése a konzolra a debog.log fájl helyett</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2906,7 +2918,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-1"/>
         <source>Set minimum block size in bytes (default: 0)</source>
-        <translation>Podesite minimalnu veličinu bloka u bajtovima (default: 0)</translation>
+        <translation type="unfinished"/>
     </message>
     <message>
         <location line="-29"/>
@@ -2916,7 +2928,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-42"/>
         <source>Specify connection timeout in milliseconds (default: 5000)</source>
-        <translation>Odredi vremenski prozor za spajanje na mrežu u milisekundama (ugrađeni izbor: 5000)</translation>
+        <translation>Csatlakozás időkerete milliszekundumban (alapértelmezett: 5000)</translation>
     </message>
     <message>
         <location line="+109"/>
@@ -2927,12 +2939,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-80"/>
         <source>Use UPnP to map the listening port (default: 0)</source>
-        <translation>Pokušaj koristiti UPnP da otvoriš port za uslugu (default: 0)</translation>
+        <translation>UPnP-használat engedélyezése a figyelő port feltérképezésénél (default: 0)</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Use UPnP to map the listening port (default: 1 when listening)</source>
-        <translation>Pokušaj koristiti UPnP da otvoriš port za uslugu (default: 1 when listening)</translation>
+        <translation>UPnP-használat engedélyezése a figyelő port feltérképezésénél (default: 1 when listening)</translation>
     </message>
     <message>
         <location line="-25"/>
@@ -2942,7 +2954,8 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+42"/>
         <source>Username for JSON-RPC connections</source>
-        <translation>Korisničko ime za JSON-RPC veze</translation>
+        <translation>Felhasználói név JSON-RPC csatlakozásokhoz
+</translation>
     </message>
     <message>
         <location line="+47"/>
@@ -2972,7 +2985,8 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-54"/>
         <source>Password for JSON-RPC connections</source>
-        <translation>Lozinka za JSON-RPC veze</translation>
+        <translation>Jelszó JSON-RPC csatlakozásokhoz
+</translation>
     </message>
     <message>
         <location line="-84"/>
@@ -3007,22 +3021,24 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+16"/>
         <source>Allow JSON-RPC connections from specified IP address</source>
-        <translation>Dozvoli JSON-RPC povezivanje s određene IP adrese</translation>
+        <translation>JSON-RPC csatlakozások engedélyezése meghatározott IP-címről
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Send commands to node running on &lt;ip&gt; (default: 127.0.0.1)</source>
-        <translation>Pošalji komande nodu na adresi &lt;ip&gt; (ugrađeni izbor: 127.0.0.1)</translation>
+        <translation>Parancsok küldése &lt;ip&gt; címen működő csomóponthoz (alapértelmezett: 127.0.0.1)
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
-        <translation>Izvršite naredbu kada se najbolji blok promjeni (%s u cmd je zamjenjen sa block hash)</translation>
+        <translation>Parancs, amit akkor hajt végre, amikor a legjobb blokk megváltozik (%s a cmd-ban lecserélődik a blokk hash-re)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)</source>
-        <translation type="unfinished"/>
+        <translation>Parancs, amit akkor hajt végre, amikor egy tárca-tranzakció megváltozik  (%s a parancsban lecserélődik a blokk TxID-re)</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -3042,17 +3058,19 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+3"/>
         <source>Upgrade wallet to latest format</source>
-        <translation>Nadogradite novčanik u posljednji format.</translation>
+        <translation>A Tárca frissítése a legfrissebb formátumra</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Set key pool size to &lt;n&gt; (default: 100)</source>
-        <translation>Podesi memorijski prostor za ključeve na &lt;n&gt; (ugrađeni izbor: 100)</translation>
+        <translation>Kulcskarika mérete &lt;n&gt; (alapértelmezett: 100)
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Rescan the block chain for missing wallet transactions</source>
-        <translation>Ponovno pretraži lanac blokova za transakcije koje nedostaju</translation>
+        <translation>Blokklánc újraszkennelése hiányzó tárca-tranzakciók után
+</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -3072,17 +3090,20 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+8"/>
         <source>Use OpenSSL (https) for JSON-RPC connections</source>
-        <translation>Koristi OpenSSL (https) za JSON-RPC povezivanje</translation>
+        <translation>OpenSSL (https) használata JSON-RPC csatalkozásokhoz
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Server certificate file (default: server.cert)</source>
-        <translation>Uslužnikov SSL certifikat (ugrađeni izbor: server.cert)</translation>
+        <translation>Szervertanúsítvány-fájl (alapértelmezett: server.cert)
+</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Server private key (default: server.pem)</source>
-        <translation>Uslužnikov privatni ključ (ugrađeni izbor: server.pem)</translation>
+        <translation>Szerver titkos kulcsa (alapértelmezett: server.pem)
+</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3102,7 +3123,8 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="-158"/>
         <source>This help message</source>
-        <translation>Ova poruka za pomoć</translation>
+        <translation>Ez a súgó-üzenet
+</translation>
     </message>
     <message>
         <location line="+95"/>
@@ -3122,7 +3144,7 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+140"/>
         <source>Unable to bind to %s on this computer (bind returned error %d, %s)</source>
-        <translation>Program ne može koristiti %s na ovom računalu (bind returned error %d, %s)</translation>
+        <translation>A %s nem elérhető ezen a gépen (bind returned error %d, %s)</translation>
     </message>
     <message>
         <location line="-130"/>
@@ -3132,12 +3154,12 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+3"/>
         <source>Allow DNS lookups for -addnode, -seednode and -connect</source>
-        <translation>Dozvoli DNS upite za dodavanje nodova i povezivanje</translation>
+        <translation>DNS-kikeresés engedélyezése az addnode-nál és a connect-nél</translation>
     </message>
     <message>
         <location line="+122"/>
         <source>Loading addresses...</source>
-        <translation>Učitavanje adresa...</translation>
+        <translation>Címek betöltése...</translation>
     </message>
     <message>
         <location line="-15"/>
@@ -3147,7 +3169,7 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+2"/>
         <source>Error loading wallet.dat: Wallet corrupted</source>
-        <translation>Greška kod učitavanja wallet.dat: Novčanik pokvaren</translation>
+        <translation>Hiba a wallet.dat betöltése közben: meghibásodott tárca</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -3162,37 +3184,37 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+1"/>
         <source>Error loading wallet.dat</source>
-        <translation>Greška kod učitavanja wallet.dat</translation>
+        <translation>Hiba az wallet.dat betöltése közben</translation>
     </message>
     <message>
         <location line="-16"/>
         <source>Invalid -proxy address: &apos;%s&apos;</source>
-        <translation>Nevaljala -proxy adresa: &apos;%s&apos;</translation>
+        <translation>Érvénytelen -proxy cím: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Unknown network specified in -onlynet: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Ismeretlen hálózat lett megadva -onlynet: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Unknown -socks proxy version requested: %i</source>
-        <translation type="unfinished"/>
+        <translation>Ismeretlen -socks proxy kérése: %i</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Cannot resolve -bind address: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Csatlakozási cím (-bind address) feloldása nem sikerült: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Cannot resolve -externalip address: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Külső cím (-externalip address) feloldása nem sikerült: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="-24"/>
         <source>Invalid amount for -paytxfee=&lt;amount&gt;: &apos;%s&apos;</source>
-        <translation>Nevaljali iznos za opciju -paytxfee=&lt;amount&gt;: &apos;%s&apos;</translation>
+        <translation>Étvénytelen -paytxfee=&lt;összeg&gt; összeg: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -3207,22 +3229,22 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+5"/>
         <source>Invalid amount</source>
-        <translation>Nevaljali iznos za opciju</translation>
+        <translation>Étvénytelen összeg</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Insufficient funds</source>
-        <translation>Nedovoljna sredstva</translation>
+        <translation>Nincs elég bitcoinod.</translation>
     </message>
     <message>
         <location line="-34"/>
         <source>Loading block index...</source>
-        <translation>Učitavanje indeksa blokova...</translation>
+        <translation>Blokkindex betöltése...</translation>
     </message>
     <message>
         <location line="-103"/>
         <source>Add a node to connect to and attempt to keep the connection open</source>
-        <translation>Unesite nod s kojim se želite spojiti and attempt to keep the connection open</translation>
+        <translation>Elérendő csomópont megadása and attempt to keep the connection open</translation>
     </message>
     <message>
         <location line="+122"/>
@@ -3242,12 +3264,12 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+25"/>
         <source>Loading wallet...</source>
-        <translation>Učitavanje novčanika...</translation>
+        <translation>Tárca betöltése...</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Cannot downgrade wallet</source>
-        <translation>Nije moguće novčanik vratiti na prijašnju verziju.</translation>
+        <translation>Nem sikerült a Tárca visszaállítása a korábbi verzióra</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3257,34 +3279,36 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+1"/>
         <source>Cannot write default address</source>
-        <translation>Nije moguće upisati zadanu adresu.</translation>
+        <translation>Nem sikerült az alapértelmezett címet írni.</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Rescanning...</source>
-        <translation>Rescaniranje</translation>
+        <translation>Újraszkennelés...</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Done loading</source>
-        <translation>Učitavanje gotovo</translation>
+        <translation>Betöltés befejezve.</translation>
     </message>
     <message>
         <location line="-167"/>
         <source>To use the %s option</source>
-        <translation type="unfinished"/>
+        <translation>Használd a %s opciót</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Error</source>
-        <translation>Greška</translation>
+        <translation>Hiba</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>You must set rpcpassword=&lt;password&gt; in the configuration file:
 %s
 If the file does not exist, create it with owner-readable-only file permissions.</source>
-        <translation type="unfinished"/>
+        <translation>Be kell állítani rpcpassword=&lt;password&gt; a konfigurációs fájlban
+%s
+Ha a fájl nem létezik, hozd létre &apos;csak a felhasználó által olvasható&apos; fájl engedéllyel</translation>
     </message>
 </context>
 </TS>
