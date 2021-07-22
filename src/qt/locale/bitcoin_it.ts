@@ -751,4 +751,318 @@ Indirizzo: %4
         <location line="+31"/>
         <source>Quantity:</source>
         <translation>Quantità:</translation>
-   
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Bytes:</source>
+        <translation>Byte:</translation>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>Amount:</source>
+        <translation>Importo:</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Priority:</source>
+        <translation>Priorità:</translation>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>Fee:</source>
+        <translation>Commissione:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Low Output:</source>
+        <translation>Low Output:</translation>
+    </message>
+    <message>
+        <location filename="../coincontroldialog.cpp" line="+551"/>
+        <source>no</source>
+        <translation>no</translation>
+    </message>
+    <message>
+        <location filename="../forms/coincontroldialog.ui" line="+51"/>
+        <source>After Fee:</source>
+        <translation>Dopo Commissione:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Change:</source>
+        <translation>Resto:</translation>
+    </message>
+    <message>
+        <location line="+69"/>
+        <source>(un)select all</source>
+        <translation>(de)seleziona tutto</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Tree mode</source>
+        <translation>Modalità Albero</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>List mode</source>
+        <translation>Modalità Lista</translation>
+    </message>
+    <message>
+        <location line="+45"/>
+        <source>Amount</source>
+        <translation>Importo</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Label</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Address</source>
+        <translation>Indirizzo</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Date</source>
+        <translation>Data</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Confirmations</source>
+        <translation>Conferme:</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Confirmed</source>
+        <translation>Confermato</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Priority</source>
+        <translation>Priorità</translation>
+    </message>
+    <message>
+        <location filename="../coincontroldialog.cpp" line="-515"/>
+        <source>Copy address</source>
+        <translation>Copia l&apos;indirizzo</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy label</source>
+        <translation>Copia l&apos;etichetta</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+26"/>
+        <source>Copy amount</source>
+        <translation>Copia l&apos;importo</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>Copy transaction ID</source>
+        <translation>Copia l&apos;ID transazione</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Copy quantity</source>
+        <translation>Copia quantità</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Copy fee</source>
+        <translation>Copia commissione</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy after fee</source>
+        <translation>Copia dopo commissione</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy bytes</source>
+        <translation>Copia byte</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy priority</source>
+        <translation>Copia priorità</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy low output</source>
+        <translation>Copia low output</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy change</source>
+        <translation>Copia resto</translation>
+    </message>
+    <message>
+        <location line="+317"/>
+        <source>highest</source>
+        <translation>massima</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>high</source>
+        <translation>alta</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>medium-high</source>
+        <translation>medio-alta</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>medium</source>
+        <translation>media</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>low-medium</source>
+        <translation>medio-bassa</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>low</source>
+        <translation>bassa</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>lowest</source>
+        <translation>infima</translation>
+    </message>
+    <message>
+        <location line="+155"/>
+        <source>DUST</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>yes</source>
+        <translation>si</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>This label turns red, if the transaction size is bigger than 10000 bytes.
+
+ This means a fee of at least %1 per kb is required.
+
+ Can vary +/- 1 Byte per input.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Transactions with higher priority get more likely into a block.
+
+This label turns red, if the priority is smaller than &quot;medium&quot;.
+
+ This means a fee of at least %1 per kb is required.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This label turns red, if any recipient receives an amount smaller than %1.
+
+ This means a fee of at least %2 is required. 
+
+ Amounts below 0.546 times the minimum relay fee are shown as DUST.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This label turns red, if the change is smaller than %1.
+
+ This means a fee of at least %2 is required.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+37"/>
+        <location line="+66"/>
+        <source>(no label)</source>
+        <translation>(nessuna etichetta)</translation>
+    </message>
+    <message>
+        <location line="-9"/>
+        <source>change from %1 (%2)</source>
+        <translation>resto da %1 (%2)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>(change)</source>
+        <translation>(resto)</translation>
+    </message>
+</context>
+<context>
+    <name>EditAddressDialog</name>
+    <message>
+        <location filename="../forms/editaddressdialog.ui" line="+14"/>
+        <source>Edit Address</source>
+        <translation>Modifica l&apos;indirizzo</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>&amp;Label</source>
+        <translation>&amp;Etichetta</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>The label associated with this address book entry</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>&amp;Address</source>
+        <translation>&amp;Indirizzo</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>The address associated with this address book entry. This can only be modified for sending addresses.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location filename="../editaddressdialog.cpp" line="+20"/>
+        <source>New receiving address</source>
+        <translation>Nuovo indirizzo di ricezione</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>New sending address</source>
+        <translation>Nuovo indirizzo d&apos;invio</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Edit receiving address</source>
+        <translation>Modifica indirizzo di ricezione</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Edit sending address</source>
+        <translation>Modifica indirizzo d&apos;invio</translation>
+    </message>
+    <message>
+        <location line="+76"/>
+        <source>The entered address &quot;%1&quot; is already in the address book.</source>
+        <translation>L&apos;indirizzo inserito &quot;%1&quot; è già in rubrica.</translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>The entered address &quot;%1&quot; is not a valid XDECoin address.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Could not unlock wallet.</source>
+        <translation>Impossibile sbloccare il portamonete.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>New key generation failed.</source>
+        <translation>Generazione della nuova chiave non riuscita.</translation>
+    </message>
+</context>
+<context>
+    <name>GUIUtil::HelpMessageBox</name>
+    <message>
+     
