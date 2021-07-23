@@ -1623,4 +1623,297 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+76"/>
         <source>Coin Control Features</source>
-        <tr
+        <translation>Funzionalità di Coin Control</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Inputs...</source>
+        <translation>Input...</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>automatically selected</source>
+        <translation>selezionato automaticamente</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Insufficient funds!</source>
+        <translation>Fondi insufficienti!</translation>
+    </message>
+    <message>
+        <location line="+77"/>
+        <source>Quantity:</source>
+        <translation>Quantità:</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <location line="+35"/>
+        <source>0</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-19"/>
+        <source>Bytes:</source>
+        <translation>Byte:</translation>
+    </message>
+    <message>
+        <location line="+51"/>
+        <source>Amount:</source>
+        <translation>Importo:</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <location line="+86"/>
+        <location line="+86"/>
+        <location line="+32"/>
+        <source>0.00 XDE</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-191"/>
+        <source>Priority:</source>
+        <translation>Priorità:</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>medium</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Fee:</source>
+        <translation>Commissione:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Low Output:</source>
+        <translation>Low Output:</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>no</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>After Fee:</source>
+        <translation>Dopo Commissione:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Change</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+50"/>
+        <source>custom change address</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+106"/>
+        <source>Send to multiple recipients at once</source>
+        <translation>Spedisci a diversi beneficiari in una volta sola</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Add &amp;Recipient</source>
+        <translation>&amp;Aggiungi beneficiario</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Remove all transaction fields</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Clear &amp;All</source>
+        <translation>Cancella &amp;tutto</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>Balance:</source>
+        <translation>Saldo:</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>123.456 XDE</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Confirm the send action</source>
+        <translation>Conferma la spedizione</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>S&amp;end</source>
+        <translation>&amp;Spedisci</translation>
+    </message>
+    <message>
+        <location filename="../sendcoinsdialog.cpp" line="-173"/>
+        <source>Enter a XDECoin address (e.g. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Copy quantity</source>
+        <translation>Copia quantità</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy amount</source>
+        <translation>Copia l&apos;importo</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy fee</source>
+        <translation>Copia commissione</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy after fee</source>
+        <translation>Copia dopo commissione</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy bytes</source>
+        <translation>Copia byte</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy priority</source>
+        <translation>Copia priorità</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy low output</source>
+        <translation>Copia low output</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy change</source>
+        <translation>Copia resto</translation>
+    </message>
+    <message>
+        <location line="+86"/>
+        <source>&lt;b&gt;%1&lt;/b&gt; to %2 (%3)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Confirm send coins</source>
+        <translation>Conferma la spedizione di bitcoin</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Are you sure you want to send %1?</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source> and </source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>The recipient address is not valid, please recheck.</source>
+        <translation>L&apos;indirizzo del beneficiario non è valido, per cortesia controlla.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The amount to pay must be larger than 0.</source>
+        <translation>L&apos;importo da pagare dev&apos;essere maggiore di 0.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The amount exceeds your balance.</source>
+        <translation>L&apos;importo è superiore al saldo attuale</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The total exceeds your balance when the %1 transaction fee is included.</source>
+        <translation>Il totale è superiore al saldo attuale includendo la commissione %1.</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Duplicate address found, can only send to each address once per send operation.</source>
+        <translation>Trovato un indirizzo doppio, si può spedire solo una volta a ciascun indirizzo in una singola operazione.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Error: Transaction creation failed.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Error: The transaction was rejected. This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+251"/>
+        <source>WARNING: Invalid XDECoin address</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>(no label)</source>
+        <translation>(nessuna etichetta)</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>WARNING: unknown change address</source>
+        <translation type="unfinished"/>
+    </message>
+</context>
+<context>
+    <name>SendCoinsEntry</name>
+    <message>
+        <location filename="../forms/sendcoinsentry.ui" line="+14"/>
+        <source>Form</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>A&amp;mount:</source>
+        <translation>&amp;Importo:</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Pay &amp;To:</source>
+        <translation>Paga &amp;a:</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <location filename="../sendcoinsentry.cpp" line="+25"/>
+        <source>Enter a label for this address to add it to your address book</source>
+        <translation>Inserisci un&apos;etichetta per questo indirizzo, per aggiungerlo nella rubrica</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>&amp;Label:</source>
+        <translation>&amp;Etichetta</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>The address to send the payment to  (e.g. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Choose address from address book</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Alt+A</source>
+        <translation>Alt+A</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Paste address from clipboard</source>
+        <translation>Incollare l&apos;indirizzo dagli appunti</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Alt+P</source>
+        <translation>Alt+P</translati
