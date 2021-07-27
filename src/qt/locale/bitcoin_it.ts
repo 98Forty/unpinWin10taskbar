@@ -2157,4 +2157,301 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <translation>Data</translation>
     </message>
     <message>
-        <location line="+
+        <location line="+7"/>
+        <source>Source</source>
+        <translation>Sorgente</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Generated</source>
+        <translation>Generato</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location line="+17"/>
+        <source>From</source>
+        <translation>Da</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+22"/>
+        <location line="+58"/>
+        <source>To</source>
+        <translation>A</translation>
+    </message>
+    <message>
+        <location line="-77"/>
+        <location line="+2"/>
+        <source>own address</source>
+        <translation>proprio indirizzo</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>label</source>
+        <translation>etichetta</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <location line="+12"/>
+        <location line="+45"/>
+        <location line="+17"/>
+        <location line="+30"/>
+        <source>Credit</source>
+        <translation>Credito</translation>
+    </message>
+    <message numerus="yes">
+        <location line="-102"/>
+        <source>matures in %n more block(s)</source>
+        <translation><numerusform>matura in %n ulteriore blocco</numerusform><numerusform>matura in altri %n blocchi</numerusform></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>not accepted</source>
+        <translation>non accettate</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <location line="+8"/>
+        <location line="+15"/>
+        <location line="+30"/>
+        <source>Debit</source>
+        <translation>Debito</translation>
+    </message>
+    <message>
+        <location line="-39"/>
+        <source>Transaction fee</source>
+        <translation>Commissione transazione</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Net amount</source>
+        <translation>Importo netto</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Message</source>
+        <translation>Messaggio</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Comment</source>
+        <translation>Commento</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Transaction ID</source>
+        <translation>ID della transazione</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Generated coins must mature 510 blocks before they can be spent. When you generated this block, it was broadcast to the network to be added to the block chain. If it fails to get into the chain, its state will change to &quot;not accepted&quot; and it won&apos;t be spendable. This may occasionally happen if another node generates a block within a few seconds of yours.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Debug information</source>
+        <translation>Informazione di debug</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Transaction</source>
+        <translation>Transazione</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Inputs</source>
+        <translation>Input</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Amount</source>
+        <translation>Importo</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>true</source>
+        <translation>vero</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>false</source>
+        <translation>falso</translation>
+    </message>
+    <message>
+        <location line="-211"/>
+        <source>, has not been successfully broadcast yet</source>
+        <translation>, non è stato ancora trasmesso con successo</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>unknown</source>
+        <translation>sconosciuto</translation>
+    </message>
+</context>
+<context>
+    <name>TransactionDescDialog</name>
+    <message>
+        <location filename="../forms/transactiondescdialog.ui" line="+14"/>
+        <source>Transaction details</source>
+        <translation>Dettagli sulla transazione</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>This pane shows a detailed description of the transaction</source>
+        <translation>Questo pannello mostra una descrizione dettagliata della transazione</translation>
+    </message>
+</context>
+<context>
+    <name>TransactionTableModel</name>
+    <message>
+        <location filename="../transactiontablemodel.cpp" line="+226"/>
+        <source>Date</source>
+        <translation>Data</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Type</source>
+        <translation>Tipo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Address</source>
+        <translation>Indirizzo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Amount</source>
+        <translation>Importo</translation>
+    </message>
+    <message>
+        <location line="+60"/>
+        <source>Open until %1</source>
+        <translation>Aperto fino a %1</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Confirmed (%1 confirmations)</source>
+        <translation>Confermato (%1 conferme)</translation>
+    </message>
+    <message numerus="yes">
+        <location line="-15"/>
+        <source>Open for %n more block(s)</source>
+        <translation><numerusform>Aperto per %n altro blocco</numerusform><numerusform>Aperto per altri %n blocchi</numerusform></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Offline</source>
+        <translation>Offline</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Unconfirmed</source>
+        <translation>Non confermato:</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Confirming (%1 of %2 recommended confirmations)</source>
+        <translation>In conferma (%1 di %2 conferme raccomandate)</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Conflicted</source>
+        <translation>In conflitto</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Immature (%1 confirmations, will be available after %2)</source>
+        <translation>Immaturo (%1 conferme, sarà disponibile fra %2)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>This block was not received by any other nodes and will probably not be accepted!</source>
+        <translation>Questo blocco non è stato ricevuto da altri nodi e probabilmente non sarà accettato!</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Generated but not accepted</source>
+        <translation>Generati, ma non accettati</translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>Received with</source>
+        <translation>Ricevuto tramite</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Received from</source>
+        <translation>Ricevuto da</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Sent to</source>
+        <translation>Spedito a</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Payment to yourself</source>
+        <translation>Pagamento a te stesso</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Mined</source>
+        <translation>Ottenuto dal mining</translation>
+    </message>
+    <message>
+        <location line="+38"/>
+        <source>(n/a)</source>
+        <translation>(N / a)</translation>
+    </message>
+    <message>
+        <location line="+190"/>
+        <source>Transaction status. Hover over this field to show number of confirmations.</source>
+        <translation>Stato della transazione. Passare con il mouse su questo campo per vedere il numero di conferme.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Date and time that the transaction was received.</source>
+        <translation>Data e ora in cui la transazione è stata ricevuta.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Type of transaction.</source>
+        <translation>Tipo di transazione.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Destination address of transaction.</source>
+        <translation>Indirizzo di destinazione della transazione.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Amount removed from or added to balance.</source>
+        <translation>Importo rimosso o aggiunto al saldo.</translation>
+    </message>
+</context>
+<context>
+    <name>TransactionView</name>
+    <message>
+        <location filename="../transactionview.cpp" line="+55"/>
+        <location line="+16"/>
+        <source>All</source>
+        <translation>Tutti</translation>
+    </message>
+    <message>
+        <location line="-15"/>
+        <source>Today</source>
+        <translation>Oggi</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This week</source>
+        <translation>Questa settimana</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This month</source>
+        <translation>Questo mese</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <sou
