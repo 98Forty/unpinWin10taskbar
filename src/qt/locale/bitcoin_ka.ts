@@ -298,4 +298,302 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="-20"/>
         <source>Wallet decryption failed</source>
-        <t
+        <translation>საფულის განშიფრვა ვერ მოხერხდა</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Wallet passphrase was successfully changed.</source>
+        <translation>საფულის ფრაზა-პაროლი შეცვლილია.</translation>
+    </message>
+</context>
+<context>
+    <name>BitcoinGUI</name>
+    <message>
+        <location filename="../bitcoingui.cpp" line="+282"/>
+        <source>Sign &amp;message...</source>
+        <translation>ხელ&amp;მოწერა</translation>
+    </message>
+    <message>
+        <location line="+251"/>
+        <source>Synchronizing with network...</source>
+        <translation>ქსელთან სინქრონიზება...</translation>
+    </message>
+    <message>
+        <location line="-319"/>
+        <source>&amp;Overview</source>
+        <translation>მიმ&amp;ოხილვა</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show general overview of wallet</source>
+        <translation>საფულის ზოგადი მიმოხილვა</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>&amp;Transactions</source>
+        <translation>&amp;ტრანსაქციები</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Browse transaction history</source>
+        <translation>ტრანსაქციების ისტორიის დათვალიერება</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>&amp;Address Book</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Edit the list of stored addresses and labels</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-13"/>
+        <source>&amp;Receive coins</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show the list of addresses for receiving payments</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>&amp;Send coins</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>E&amp;xit</source>
+        <translation>&amp;გასვლა</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Quit application</source>
+        <translation>გასვლა</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Show information about XDECoin</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>About &amp;Qt</source>
+        <translation>&amp;Qt-ს შესახებ</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show information about Qt</source>
+        <translation>ინფორმაცია Qt-ს შესახებ</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>&amp;Options...</source>
+        <translation>&amp;ოპციები</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>&amp;Encrypt Wallet...</source>
+        <translation>საფულის &amp;დაშიფრვა</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>&amp;Backup Wallet...</source>
+        <translation>საფულის &amp;არქივირება</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>&amp;Change Passphrase...</source>
+        <translation>ფრაზა-პაროლის შე&amp;ცვლა</translation>
+    </message>
+    <message numerus="yes">
+        <location line="+259"/>
+        <source>~%n block(s) remaining</source>
+        <translation type="unfinished"><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Downloaded %1 of %2 blocks of transaction history (%3% done).</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-256"/>
+        <source>&amp;Export...</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-64"/>
+        <source>Send coins to a XDECoin address</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+47"/>
+        <source>Modify configuration options for XDECoin</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Export the data in the current tab to a file</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-14"/>
+        <source>Encrypt or decrypt wallet</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Backup wallet to another location</source>
+        <translation>საფულის არქივირება სხვა ადგილზე</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Change the passphrase used for wallet encryption</source>
+        <translation>საფულის დაშიფრვის ფრაზა-პაროლის შეცვლა</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>&amp;Debug window</source>
+        <translation>და&amp;ხვეწის ფანჯარა</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Open debugging and diagnostic console</source>
+        <translation>დახვეწისა და გიაგნოსტიკის კონსოლის გაშვება</translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>&amp;Verify message...</source>
+        <translation>&amp;ვერიფიკაცია</translation>
+    </message>
+    <message>
+        <location line="-202"/>
+        <source>XDECoin</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Wallet</source>
+        <translation>საფულე</translation>
+    </message>
+    <message>
+        <location line="+180"/>
+        <source>&amp;About XDECoin</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>&amp;Show / Hide</source>
+        <translation>&amp;ჩვენება/დაფარვა</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Unlock wallet</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>&amp;Lock Wallet</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Lock wallet</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>&amp;File</source>
+        <translation>&amp;ფაილი</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>&amp;Settings</source>
+        <translation>&amp;პარამეტრები</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>&amp;Help</source>
+        <translation>&amp;დახმარება</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Tabs toolbar</source>
+        <translation>ბარათების პანელი</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Actions toolbar</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+13"/>
+        <location line="+9"/>
+        <source>[testnet]</source>
+        <translation>[testnet]</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+60"/>
+        <source>XDECoin client</source>
+        <translation type="unfinished"/>
+    </message>
+    <message numerus="yes">
+        <location line="+75"/>
+        <source>%n active connection(s) to XDECoin network</source>
+        <translation type="unfinished"><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>Downloaded %1 blocks of transaction history.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+413"/>
+        <source>Staking.&lt;br&gt;Your weight is %1&lt;br&gt;Network weight is %2&lt;br&gt;Expected time to earn reward is %3</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Not staking because wallet is locked</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Not staking because wallet is offline</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Not staking because wallet is syncing</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Not staking because you don&apos;t have mature coins</source>
+        <translation type="unfinished"/>
+    </message>
+    <message numerus="yes">
+        <location line="-403"/>
+        <source>%n second(s) ago</source>
+        <translation type="unfinished"><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="-312"/>
+        <source>About XDECoin card</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show information about XDECoin card</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>&amp;Unlock Wallet...</source>
+        <translation type="unfinished"/>
+    </message>
+    <message numerus="yes">
+        <location line="+297"
