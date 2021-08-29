@@ -1,4 +1,5 @@
-<?xml version="1.0" ?><!DOCTYPE TS><TS language="ky" version="2.1">
+
+<?xml version="1.0" ?><!DOCTYPE TS><TS language="la" version="2.1">
 <context>
     <name>AboutDialog</name>
     <message>
@@ -26,7 +27,11 @@ This is experimental software.
 Distributed under the MIT/X11 software license, see the accompanying file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/) and cryptographic software written by Eric Young (eay@cryptsoft.com) and UPnP software written by Thomas Bernard.</source>
-        <translation type="unfinished"/>
+        <translation>Hoc est experimentale programma.
+
+Distributum sub MIT/X11 licentia programmatum, vide comitantem plicam COPYING vel http://www.opensource.org/licenses/mit-license.php.
+
+Hoc productum continet programmata composita ab OpenSSL Project pro utendo in OpenSSL Toolkit (http://www.openssl.org/) et programmata cifrarum scripta ab Eric Young (eay@cryptsoft.com) et UPnP programmata scripta ab Thomas Bernard.</translation>
     </message>
 </context>
 <context>
@@ -39,17 +44,17 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+22"/>
         <source>Double-click to edit address or label</source>
-        <translation type="unfinished"/>
+        <translation>Dupliciter-clicca ut inscriptionem vel titulum mutes</translation>
     </message>
     <message>
         <location line="+27"/>
         <source>Create a new address</source>
-        <translation>Жаң даректи жасоо</translation>
+        <translation>Crea novam inscriptionem</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Copy the currently selected address to the system clipboard</source>
-        <translation type="unfinished"/>
+        <translation>Copia inscriptionem iam selectam in latibulum systematis</translation>
     </message>
     <message>
         <location line="-11"/>
@@ -64,7 +69,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+60"/>
         <source>&amp;Copy Address</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Copia Inscriptionem</translation>
     </message>
     <message>
         <location line="+11"/>
@@ -84,7 +89,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+25"/>
         <source>Delete the currently selected address from the list</source>
-        <translation type="unfinished"/>
+        <translation>Dele active selectam inscriptionem ex enumeratione</translation>
     </message>
     <message>
         <location line="-14"/>
@@ -99,17 +104,17 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+14"/>
         <source>&amp;Delete</source>
-        <translation>Ө&amp;чүрүү</translation>
+        <translation>&amp;Dele</translation>
     </message>
     <message>
         <location filename="../addressbookpage.cpp" line="+65"/>
         <source>Copy &amp;Label</source>
-        <translation type="unfinished"/>
+        <translation>Copia &amp;Titulum</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Edit</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Muta</translation>
     </message>
     <message>
         <location line="+250"/>
@@ -119,7 +124,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+1"/>
         <source>Comma separated file (*.csv)</source>
-        <translation type="unfinished"/>
+        <translation>Comma Separata Plica (*.csv)</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -137,17 +142,17 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../addresstablemodel.cpp" line="+144"/>
         <source>Label</source>
-        <translation type="unfinished"/>
+        <translation>Titulus</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Address</source>
-        <translation>Дарек</translation>
+        <translation>Inscriptio</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>(no label)</source>
-        <translation>(аты жок)</translation>
+        <translation>(nullus titulus)</translation>
     </message>
 </context>
 <context>
@@ -155,22 +160,22 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../forms/askpassphrasedialog.ui" line="+26"/>
         <source>Passphrase Dialog</source>
-        <translation type="unfinished"/>
+        <translation>Dialogus Tesserae</translation>
     </message>
     <message>
         <location line="+21"/>
         <source>Enter passphrase</source>
-        <translation type="unfinished"/>
+        <translation>Insere tesseram</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>New passphrase</source>
-        <translation type="unfinished"/>
+        <translation>Nova tessera</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Repeat new passphrase</source>
-        <translation type="unfinished"/>
+        <translation>Itera novam tesseram</translation>
     </message>
     <message>
         <location line="+33"/>
@@ -185,47 +190,47 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../askpassphrasedialog.cpp" line="+35"/>
         <source>Enter the new passphrase to the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;10 or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
-        <translation type="unfinished"/>
+        <translation>Insero novam tesseram cassidili.&lt;br/&gt;Sodes tessera &lt;b&gt;10 pluriumve fortuitarum litterarum&lt;/b&gt; utere aut &lt;b&gt;octo pluriumve verborum&lt;/b&gt;.</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Encrypt wallet</source>
-        <translation type="unfinished"/>
+        <translation>Cifra cassidile</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>This operation needs your wallet passphrase to unlock the wallet.</source>
-        <translation type="unfinished"/>
+        <translation>Huic operationi necesse est tessera cassidili tuo ut cassidile reseret.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Unlock wallet</source>
-        <translation type="unfinished"/>
+        <translation>Resera cassidile</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>This operation needs your wallet passphrase to decrypt the wallet.</source>
-        <translation type="unfinished"/>
+        <translation>Huic operationi necesse est tessera cassidili tuo ut cassidile decifret.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Decrypt wallet</source>
-        <translation type="unfinished"/>
+        <translation>Decifra cassidile</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Change passphrase</source>
-        <translation type="unfinished"/>
+        <translation>Muta tesseram</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Enter the old and new passphrase to the wallet.</source>
-        <translation type="unfinished"/>
+        <translation>Insero veterem novamque tesseram cassidili.</translation>
     </message>
     <message>
         <location line="+46"/>
         <source>Confirm wallet encryption</source>
-        <translation type="unfinished"/>
+        <translation>Confirma cifrationem cassidilis</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -235,24 +240,24 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+0"/>
         <source>Are you sure you wish to encrypt your wallet?</source>
-        <translation type="unfinished"/>
+        <translation>Certusne es te velle tuum cassidile cifrare?</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
-        <translation type="unfinished"/>
+        <translation>GRAVE: Oportet ulla prioria conservata quae fecisti de plica tui cassidilis reponi a nove generata cifrata plica cassidilis.  Propter securitatem, prioria conservata de plica non cifrata cassidilis inutilia fiet simul atque incipis uti novo cifrato cassidili.</translation>
     </message>
     <message>
         <location line="+103"/>
         <location line="+24"/>
         <source>Warning: The Caps Lock key is on!</source>
-        <translation type="unfinished"/>
+        <translation>Monitio: Litterae ut capitales seratae sunt!</translation>
     </message>
     <message>
         <location line="-133"/>
         <location line="+60"/>
         <source>Wallet encrypted</source>
-        <translation type="unfinished"/>
+        <translation>Cassidile cifratum</translation>
     </message>
     <message>
         <location line="-58"/>
@@ -265,40 +270,40 @@ This product includes software developed by the OpenSSL Project for use in the O
         <location line="+44"/>
         <location line="+6"/>
         <source>Wallet encryption failed</source>
-        <translation type="unfinished"/>
+        <translation>Cassidile cifrare abortum est</translation>
     </message>
     <message>
         <location line="-56"/>
         <source>Wallet encryption failed due to an internal error. Your wallet was not encrypted.</source>
-        <translation type="unfinished"/>
+        <translation>Cassidile cifrare abortum est propter internum errorem.  Tuum cassidile cifratum non est.</translation>
     </message>
     <message>
         <location line="+7"/>
         <location line="+50"/>
         <source>The supplied passphrases do not match.</source>
-        <translation type="unfinished"/>
+        <translation>Tesserae datae non eaedem sunt.</translation>
     </message>
     <message>
         <location line="-38"/>
         <source>Wallet unlock failed</source>
-        <translation type="unfinished"/>
+        <translation>Cassidile reserare abortum est.</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+12"/>
         <location line="+19"/>
         <source>The passphrase entered for the wallet decryption was incorrect.</source>
-        <translation type="unfinished"/>
+        <translation>Tessera inserta pro cassidilis decifrando prava erat.</translation>
     </message>
     <message>
         <location line="-20"/>
         <source>Wallet decryption failed</source>
-        <translation type="unfinished"/>
+        <translation>Cassidile decifrare abortum est.</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Wallet passphrase was successfully changed.</source>
-        <translation type="unfinished"/>
+        <translation>Tessera cassidilis successa est in mutando.</translation>
     </message>
 </context>
 <context>
@@ -306,32 +311,32 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location filename="../bitcoingui.cpp" line="+282"/>
         <source>Sign &amp;message...</source>
-        <translation type="unfinished"/>
+        <translation>Signa &amp;nuntium...</translation>
     </message>
     <message>
         <location line="+251"/>
         <source>Synchronizing with network...</source>
-        <translation type="unfinished"/>
+        <translation>Synchronizans cum rete...</translation>
     </message>
     <message>
         <location line="-319"/>
         <source>&amp;Overview</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Summarium</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show general overview of wallet</source>
-        <translation type="unfinished"/>
+        <translation>Monstra generale summarium cassidilis</translation>
     </message>
     <message>
         <location line="+17"/>
         <source>&amp;Transactions</source>
-        <translation>&amp;Транзакциялар</translation>
+        <translation>&amp;Transactiones</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Browse transaction history</source>
-        <translation type="unfinished"/>
+        <translation>Inspicio historiam transactionum</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -361,12 +366,12 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+35"/>
         <source>E&amp;xit</source>
-        <translation type="unfinished"/>
+        <translation>E&amp;xi</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Quit application</source>
-        <translation type="unfinished"/>
+        <translation>Exi applicatione</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -376,37 +381,37 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+2"/>
         <source>About &amp;Qt</source>
-        <translation type="unfinished"/>
+        <translation>Informatio de &amp;Qt</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show information about Qt</source>
-        <translation type="unfinished"/>
+        <translation>Monstra informationem de Qt</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Options...</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Optiones</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>&amp;Encrypt Wallet...</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Cifra Cassidile...</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>&amp;Backup Wallet...</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Conserva Cassidile...</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>&amp;Change Passphrase...</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Muta tesseram...</translation>
     </message>
     <message numerus="yes">
         <location line="+259"/>
         <source>~%n block(s) remaining</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+6"/>
@@ -441,27 +446,27 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+3"/>
         <source>Backup wallet to another location</source>
-        <translation type="unfinished"/>
+        <translation>Conserva cassidile in locum alium</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Change the passphrase used for wallet encryption</source>
-        <translation type="unfinished"/>
+        <translation>Muta tesseram utam pro cassidilis cifrando</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>&amp;Debug window</source>
-        <translation type="unfinished"/>
+        <translation>Fenestra &amp;Debug</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Open debugging and diagnostic console</source>
-        <translation type="unfinished"/>
+        <translation>Aperi terminalem debug et diagnosticalem</translation>
     </message>
     <message>
         <location line="-5"/>
         <source>&amp;Verify message...</source>
-        <translation>Билдирүүнү &amp;текшерүү...</translation>
+        <translation>&amp;Verifica nuntium...</translation>
     </message>
     <message>
         <location line="-202"/>
@@ -471,7 +476,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+0"/>
         <source>Wallet</source>
-        <translation>Капчык</translation>
+        <translation>Cassidile</translation>
     </message>
     <message>
         <location line="+180"/>
@@ -481,7 +486,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+9"/>
         <source>&amp;Show / Hide</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Monstra/Occulta</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -501,22 +506,22 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+35"/>
         <source>&amp;File</source>
-        <translation>&amp;Файл</translation>
+        <translation>&amp;Plica</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>&amp;Settings</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Configuratio</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>&amp;Help</source>
-        <translation>&amp;Жардам</translation>
+        <translation>&amp;Auxilium</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Tabs toolbar</source>
-        <translation type="unfinished"/>
+        <translation>Tabella instrumentorum &quot;Tabs&quot;</translation>
     </message>
     <message>
         <location line="+8"/>
@@ -527,7 +532,7 @@ This product includes software developed by the OpenSSL Project for use in the O
         <location line="+13"/>
         <location line="+9"/>
         <source>[testnet]</source>
-        <translation type="unfinished"/>
+        <translation>[testnet]</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -538,7 +543,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message numerus="yes">
         <location line="+75"/>
         <source>%n active connection(s) to XDECoin network</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+40"/>
@@ -573,7 +578,7 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message numerus="yes">
         <location line="-403"/>
         <source>%n second(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="-312"/>
@@ -593,27 +598,27 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message numerus="yes">
         <location line="+297"/>
         <source>%n minute(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n hour(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n day(s) ago</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Up to date</source>
-        <translation>Жаңыланган</translation>
+        <translation>Recentissimo</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Catching up...</source>
-        <translation type="unfinished"/>
+        <translation>Persequens...</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -633,12 +638,12 @@ This product includes software developed by the OpenSSL Project for use in the O
     <message>
         <location line="+27"/>
         <source>Sent transaction</source>
-        <translation type="unfinished"/>
+        <translation>Transactio missa</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Incoming transaction</source>
-        <translation type="unfinished"/>
+        <translation>Transactio incipiens</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -647,7 +652,11 @@ Amount: %2
 Type: %3
 Address: %4
 </source>
-        <translation type="unfinished"/>
+        <translation>Dies: %1
+Quantitas: %2
+Typus: %3
+Inscriptio: %4
+</translation>
     </message>
     <message>
         <location line="+100"/>
@@ -664,12 +673,12 @@ Address: %4
     <message>
         <location line="+18"/>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;unlocked&lt;/b&gt;</source>
-        <translation type="unfinished"/>
+        <translation>Cassidile &lt;b&gt;cifratum&lt;/b&gt; est et iam nunc &lt;b&gt;reseratum&lt;/b&gt;</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</source>
-        <translation type="unfinished"/>
+        <translation>Cassidile &lt;b&gt;cifratum&lt;/b&gt; est et iam nunc &lt;b&gt;seratum&lt;/b&gt;</translation>
     </message>
     <message>
         <location line="+25"/>
@@ -694,22 +703,22 @@ Address: %4
     <message numerus="yes">
         <location line="+76"/>
         <source>%n second(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n minute(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n hour(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation><numerusform>%n hora</numerusform><numerusform>%n horae</numerusform></translation>
     </message>
     <message numerus="yes">
         <location line="+4"/>
         <source>%n day(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation><numerusform>%n dies</numerusform><numerusform>%n dies</numerusform></translation>
     </message>
     <message>
         <location line="+18"/>
@@ -727,7 +736,7 @@ Address: %4
     <message>
         <location filename="../clientmodel.cpp" line="+90"/>
         <source>Network Alert</source>
-        <translation type="unfinished"/>
+        <translation>Monitio Retis</translation>
     </message>
 </context>
 <context>
@@ -750,7 +759,7 @@ Address: %4
     <message>
         <location line="+48"/>
         <source>Amount:</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas:</translation>
     </message>
     <message>
         <location line="+32"/>
@@ -800,7 +809,7 @@ Address: %4
     <message>
         <location line="+45"/>
         <source>Amount</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -810,12 +819,12 @@ Address: %4
     <message>
         <location line="+5"/>
         <source>Address</source>
-        <translation>Дарек</translation>
+        <translation>Inscriptio</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Date</source>
-        <translation>Дата</translation>
+        <translation>Dies</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -825,7 +834,7 @@ Address: %4
     <message>
         <location line="+3"/>
         <source>Confirmed</source>
-        <translation type="unfinished"/>
+        <translation>Confirmatum</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -835,23 +844,23 @@ Address: %4
     <message>
         <location filename="../coincontroldialog.cpp" line="-515"/>
         <source>Copy address</source>
-        <translation type="unfinished"/>
+        <translation>Copia inscriptionem</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy label</source>
-        <translation type="unfinished"/>
+        <translation>Copia titulum</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+26"/>
         <source>Copy amount</source>
-        <translation type="unfinished"/>
+        <translation>Copia quantitatem</translation>
     </message>
     <message>
         <location line="-25"/>
         <source>Copy transaction ID</source>
-        <translation type="unfinished"/>
+        <translation>Copia transactionis ID</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -971,7 +980,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+37"/>
         <location line="+66"/>
         <source>(no label)</source>
-        <translation>(аты жок)</translation>
+        <translation>(nullus titulus)</translation>
     </message>
     <message>
         <location line="-9"/>
@@ -989,12 +998,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/editaddressdialog.ui" line="+14"/>
         <source>Edit Address</source>
-        <translation type="unfinished"/>
+        <translation>Muta Inscriptionem</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>&amp;Label</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Titulus</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1004,7 +1013,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>&amp;Address</source>
-        <translation>&amp;Дарек</translation>
+        <translation>&amp;Inscriptio</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1014,27 +1023,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../editaddressdialog.cpp" line="+20"/>
         <source>New receiving address</source>
-        <translation type="unfinished"/>
+        <translation>Nova inscriptio accipiendi</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>New sending address</source>
-        <translation type="unfinished"/>
+        <translation>Nova inscriptio mittendi</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Edit receiving address</source>
-        <translation type="unfinished"/>
+        <translation>Muta inscriptionem accipiendi</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Edit sending address</source>
-        <translation type="unfinished"/>
+        <translation>Muta inscriptionem mittendi</translation>
     </message>
     <message>
         <location line="+76"/>
         <source>The entered address &quot;%1&quot; is already in the address book.</source>
-        <translation type="unfinished"/>
+        <translation>Inserta inscriptio &quot;%1&quot; iam in libro inscriptionum est.</translation>
     </message>
     <message>
         <location line="-5"/>
@@ -1044,12 +1053,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+10"/>
         <source>Could not unlock wallet.</source>
-        <translation type="unfinished"/>
+        <translation>Non potuisse cassidile reserare</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>New key generation failed.</source>
-        <translation type="unfinished"/>
+        <translation>Generare novam clavem abortum est.</translation>
     </message>
 </context>
 <context>
@@ -1101,12 +1110,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/optionsdialog.ui" line="+14"/>
         <source>Options</source>
-        <translation type="unfinished"/>
+        <translation>Optiones</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>&amp;Main</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Princeps</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -1116,7 +1125,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+15"/>
         <source>Pay transaction &amp;fee</source>
-        <translation type="unfinished"/>
+        <translation>Solve &amp;mercedem transactionis</translation>
     </message>
     <message>
         <location line="+31"/>
@@ -1151,7 +1160,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+21"/>
         <source>&amp;Network</source>
-        <translation>&amp;Тармак</translation>
+        <translation>&amp;Rete</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -1161,7 +1170,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>Map port using &amp;UPnP</source>
-        <translation type="unfinished"/>
+        <translation>Designa portam utendo &amp;UPnP</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1176,7 +1185,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+9"/>
         <source>Proxy &amp;IP:</source>
-        <translation type="unfinished"/>
+        <translation>&amp;IP vicarii:</translation>
     </message>
     <message>
         <location line="+19"/>
@@ -1186,57 +1195,57 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>&amp;Port:</source>
-        <translation>&amp;Порт:</translation>
+        <translation>&amp;Porta:</translation>
     </message>
     <message>
         <location line="+19"/>
         <source>Port of the proxy (e.g. 9050)</source>
-        <translation type="unfinished"/>
+        <translation>Porta vicarii (e.g. 9050)</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>SOCKS &amp;Version:</source>
-        <translation type="unfinished"/>
+        <translation>SOCKS &amp;Versio:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>SOCKS version of the proxy (e.g. 5)</source>
-        <translation type="unfinished"/>
+        <translation>SOCKS versio vicarii (e.g. 5)</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>&amp;Window</source>
-        <translation>&amp;Терезе</translation>
+        <translation>&amp;Fenestra</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Show only a tray icon after minimizing the window.</source>
-        <translation type="unfinished"/>
+        <translation>Monstra tantum iconem in tabella systematis postquam fenestram minifactam est.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>&amp;Minimize to the tray instead of the taskbar</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Minifac in tabellam systematis potius quam applicationum</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Minimize instead of exit the application when the window is closed. When this option is enabled, the application will be closed only after selecting Quit in the menu.</source>
-        <translation type="unfinished"/>
+        <translation>Minifac potius quam exire applicatione quando fenestra clausa sit.  Si haec optio activa est, applicatio clausa erit tantum postquam selegeris Exi in menu.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>M&amp;inimize on close</source>
-        <translation type="unfinished"/>
+        <translation>M&amp;inifac ad claudendum</translation>
     </message>
     <message>
         <location line="+21"/>
         <source>&amp;Display</source>
-        <translation type="unfinished"/>
+        <translation>&amp;UI</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>User Interface &amp;language:</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Lingua monstranda utenti:</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -1246,12 +1255,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+11"/>
         <source>&amp;Unit to show amounts in:</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Unita qua quantitates monstrare:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Choose the default subdivision unit to show in the interface and when sending coins.</source>
-        <translation type="unfinished"/>
+        <translation>Selige praedefinitam unitam subdivisionis monstrare in interfacie et quando nummos mittere</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -1261,7 +1270,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>&amp;Display addresses in transaction list</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Monstra inscriptiones in enumeratione transactionum</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1276,12 +1285,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+71"/>
         <source>&amp;OK</source>
-        <translation>&amp;Жарайт</translation>
+        <translation>&amp;OK</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>&amp;Cancel</source>
-        <translation>&amp;Жокко чыгаруу</translation>
+        <translation>&amp;Cancella</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1291,7 +1300,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../optionsdialog.cpp" line="+55"/>
         <source>default</source>
-        <translation>жарыяланбаган</translation>
+        <translation>praedefinitum</translation>
     </message>
     <message>
         <location line="+149"/>
@@ -1308,7 +1317,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+29"/>
         <source>The supplied proxy address is invalid.</source>
-        <translation type="unfinished"/>
+        <translation>Inscriptio vicarii tradita non valida est.</translation>
     </message>
 </context>
 <context>
@@ -1316,7 +1325,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/overviewpage.ui" line="+14"/>
         <source>Form</source>
-        <translation type="unfinished"/>
+        <translation>Schema</translation>
     </message>
     <message>
         <location line="+33"/>
@@ -1337,7 +1346,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-107"/>
         <source>Wallet</source>
-        <translation>Капчык</translation>
+        <translation>Cassidile</translation>
     </message>
     <message>
         <location line="+49"/>
@@ -1352,12 +1361,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+71"/>
         <source>Immature:</source>
-        <translation type="unfinished"/>
+        <translation>Immatura:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Mined balance that has not yet matured</source>
-        <translation type="unfinished"/>
+        <translation>Fossum pendendum quod nondum maturum est</translation>
     </message>
     <message>
         <location line="+20"/>
@@ -1372,7 +1381,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+46"/>
         <source>&lt;b&gt;Recent transactions&lt;/b&gt;</source>
-        <translation type="unfinished"/>
+        <translation>&lt;b&gt;Recentes transactiones&lt;/b&gt;</translation>
     </message>
     <message>
         <location line="-108"/>
@@ -1388,7 +1397,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location filename="../overviewpage.cpp" line="+113"/>
         <location line="+1"/>
         <source>out of sync</source>
-        <translation>синхрондоштурулган эмес</translation>
+        <translation>non synchronizato</translation>
     </message>
 </context>
 <context>
@@ -1454,7 +1463,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/rpcconsole.ui" line="+46"/>
         <source>Client name</source>
-        <translation type="unfinished"/>
+        <translation>Nomen clientis</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -1468,37 +1477,37 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+23"/>
         <location filename="../rpcconsole.cpp" line="+348"/>
         <source>N/A</source>
-        <translation type="unfinished"/>
+        <translation>N/A</translation>
     </message>
     <message>
         <location line="-217"/>
         <source>Client version</source>
-        <translation type="unfinished"/>
+        <translation>Versio clientis</translation>
     </message>
     <message>
         <location line="-45"/>
         <source>&amp;Information</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Informatio</translation>
     </message>
     <message>
         <location line="+68"/>
         <source>Using OpenSSL version</source>
-        <translation type="unfinished"/>
+        <translation>Utens OpenSSL versione</translation>
     </message>
     <message>
         <location line="+49"/>
         <source>Startup time</source>
-        <translation type="unfinished"/>
+        <translation>Tempus initiandi</translation>
     </message>
     <message>
         <location line="+29"/>
         <source>Network</source>
-        <translation type="unfinished"/>
+        <translation>Rete</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Number of connections</source>
-        <translation type="unfinished"/>
+        <translation>Numerus conexionum</translation>
     </message>
     <message>
         <location line="+23"/>
@@ -1508,27 +1517,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+23"/>
         <source>Block chain</source>
-        <translation type="unfinished"/>
+        <translation>Catena frustorum</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Current number of blocks</source>
-        <translation type="unfinished"/>
+        <translation>Numerus frustorum iam nunc</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>Estimated total blocks</source>
-        <translation type="unfinished"/>
+        <translation>Aestimatus totalis numerus frustorum</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>Last block time</source>
-        <translation type="unfinished"/>
+        <translation>Hora postremi frusti</translation>
     </message>
     <message>
         <location line="+52"/>
         <source>&amp;Open</source>
-        <translation>&amp;Ачуу</translation>
+        <translation>&amp;Aperi</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -1548,12 +1557,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+24"/>
         <source>&amp;Console</source>
-        <translation>&amp;Консоль</translation>
+        <translation>&amp;Terminale</translation>
     </message>
     <message>
         <location line="-260"/>
         <source>Build date</source>
-        <translation type="unfinished"/>
+        <translation>Dies aedificandi</translation>
     </message>
     <message>
         <location line="-104"/>
@@ -1568,7 +1577,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+279"/>
         <source>Debug log file</source>
-        <translation type="unfinished"/>
+        <translation>Debug catalogi plica</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1578,7 +1587,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+102"/>
         <source>Clear console</source>
-        <translation>Консолду тазалоо</translation>
+        <translation>Vacuefac terminale</translation>
     </message>
     <message>
         <location filename="../rpcconsole.cpp" line="-33"/>
@@ -1588,12 +1597,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
-        <translation type="unfinished"/>
+        <translation>Utere sagittis sursum deorsumque ut per historiam naviges, et &lt;b&gt;Ctrl+L&lt;/b&gt; ut scrinium vacuefacias.</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Type &lt;b&gt;help&lt;/b&gt; for an overview of available commands.</source>
-        <translation type="unfinished"/>
+        <translation>Scribe &lt;b&gt;help&lt;/b&gt; pro summario possibilium mandatorum.</translation>
     </message>
 </context>
 <context>
@@ -1608,7 +1617,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+5"/>
         <location line="+5"/>
         <source>Send Coins</source>
-        <translation type="unfinished"/>
+        <translation>Mitte Nummos</translation>
     </message>
     <message>
         <location line="+76"/>
@@ -1649,7 +1658,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+51"/>
         <source>Amount:</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas:</translation>
     </message>
     <message>
         <location line="+22"/>
@@ -1702,12 +1711,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+106"/>
         <source>Send to multiple recipients at once</source>
-        <translation type="unfinished"/>
+        <translation>Mitte pluribus accipientibus simul</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Add &amp;Recipient</source>
-        <translation type="unfinished"/>
+        <translation>Adde &amp;Accipientem</translation>
     </message>
     <message>
         <location line="+20"/>
@@ -1717,12 +1726,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>Clear &amp;All</source>
-        <translation>&amp;Бардыгын тазалоо</translation>
+        <translation>Vacuefac &amp;Omnia</translation>
     </message>
     <message>
         <location line="+28"/>
         <source>Balance:</source>
-        <translation type="unfinished"/>
+        <translation>Pendendum:</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -1732,12 +1741,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+31"/>
         <source>Confirm the send action</source>
-        <translation type="unfinished"/>
+        <translation>Confirma actionem mittendi</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>S&amp;end</source>
-        <translation>&amp;Жөнөтүү</translation>
+        <translation>&amp;Mitte</translation>
     </message>
     <message>
         <location filename="../sendcoinsdialog.cpp" line="-173"/>
@@ -1752,7 +1761,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Copy amount</source>
-        <translation type="unfinished"/>
+        <translation>Copia quantitatem</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1792,7 +1801,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+5"/>
         <source>Confirm send coins</source>
-        <translation type="unfinished"/>
+        <translation>Confirma mittendum nummorum</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1807,27 +1816,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+29"/>
         <source>The recipient address is not valid, please recheck.</source>
-        <translation type="unfinished"/>
+        <translation>Inscriptio accipientis non est valida, sodes reproba.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The amount to pay must be larger than 0.</source>
-        <translation type="unfinished"/>
+        <translation>Oportet quantitatem ad pensandum maiorem quam 0 esse.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The amount exceeds your balance.</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas est ultra quod habes.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The total exceeds your balance when the %1 transaction fee is included.</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas est ultra quod habes cum merces transactionis %1 includitur.</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Duplicate address found, can only send to each address once per send operation.</source>
-        <translation type="unfinished"/>
+        <translation>Geminata inscriptio inventa, tantum posse mittere ad quamque inscriptionem semel singulare operatione.</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -1847,7 +1856,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+13"/>
         <source>(no label)</source>
-        <translation>(аты жок)</translation>
+        <translation>(nullus titulus)</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -1865,23 +1874,23 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+15"/>
         <source>A&amp;mount:</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Quantitas:</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>Pay &amp;To:</source>
-        <translation type="unfinished"/>
+        <translation>Pensa &amp;Ad:</translation>
     </message>
     <message>
         <location line="+24"/>
         <location filename="../sendcoinsentry.cpp" line="+25"/>
         <source>Enter a label for this address to add it to your address book</source>
-        <translation type="unfinished"/>
+        <translation>Insero titulum huic inscriptioni ut eam in tuum librum inscriptionum addas.</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>&amp;Label:</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Titulus:</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -1896,17 +1905,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+10"/>
         <source>Alt+A</source>
-        <translation type="unfinished"/>
+        <translation>Alt+A</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Paste address from clipboard</source>
-        <translation>Даректи алмашуу буферинен коюу</translation>
+        <translation>Conglutina inscriptionem ex latibulo</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Alt+P</source>
-        <translation type="unfinished"/>
+        <translation>Alt+P</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -1924,18 +1933,18 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/signverifymessagedialog.ui" line="+14"/>
         <source>Signatures - Sign / Verify a Message</source>
-        <translation type="unfinished"/>
+        <translation>Signationes - Signa / Verifica nuntium</translation>
     </message>
     <message>
         <location line="+13"/>
         <location line="+124"/>
         <source>&amp;Sign Message</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Signa Nuntium</translation>
     </message>
     <message>
         <location line="-118"/>
         <source>You can sign messages with your addresses to prove you own them. Be careful not to sign anything vague, as phishing attacks may try to trick you into signing your identity over to them. Only sign fully-detailed statements you agree to.</source>
-        <translation type="unfinished"/>
+        <translation>Potes nuntios signare inscriptionibus tuis ut demonstres te eas possidere.  Cautus es non amibiguum signare, quia impetus phiscatorum conentur te fallere ut signes identitatem tuam ad eos.  Solas signa sententias cuncte descriptas quibus convenis.</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -1952,27 +1961,27 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="-193"/>
         <location line="+203"/>
         <source>Alt+A</source>
-        <translation type="unfinished"/>
+        <translation>Alt+A</translation>
     </message>
     <message>
         <location line="-193"/>
         <source>Paste address from clipboard</source>
-        <translation>Даректи алмашуу буферинен коюу</translation>
+        <translation>Glutina inscriptionem ex latibulo</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Alt+P</source>
-        <translation type="unfinished"/>
+        <translation>Alt+P</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Enter the message you want to sign here</source>
-        <translation type="unfinished"/>
+        <translation>Insere hic nuntium quod vis signare</translation>
     </message>
     <message>
         <location line="+24"/>
         <source>Copy the current signature to the system clipboard</source>
-        <translation type="unfinished"/>
+        <translation>Copia signationem in latibulum systematis</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -1982,24 +1991,24 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+17"/>
         <source>Reset all sign message fields</source>
-        <translation type="unfinished"/>
+        <translation>Reconstitue omnes campos signandi nuntii</translation>
     </message>
     <message>
         <location line="+3"/>
         <location line="+146"/>
         <source>Clear &amp;All</source>
-        <translation>&amp;Бардыгын тазалоо</translation>
+        <translation>Vacuefac &amp;Omnia</translation>
     </message>
     <message>
         <location line="-87"/>
         <location line="+70"/>
         <source>&amp;Verify Message</source>
-        <translation type="unfinished"/>
+        <translation>&amp;Verifica Nuntium</translation>
     </message>
     <message>
         <location line="-64"/>
         <source>Enter the signing address, message (ensure you copy line breaks, spaces, tabs, etc. exactly) and signature below to verify the message. Be careful not to read more into the signature than what is in the signed message itself, to avoid being tricked by a man-in-the-middle attack.</source>
-        <translation type="unfinished"/>
+        <translation>Insere inscriptionem signantem, nuntium (cura ut copias intermissiones linearum, spatia, tabs, et cetera exacte) et signationem infra ut nuntium verifices.  Cautus esto ne magis legas in signationem quam in nuntio signato ipso est, ut vites falli ab impetu homo-in-medio.</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -2014,7 +2023,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+17"/>
         <source>Reset all verify message fields</source>
-        <translation type="unfinished"/>
+        <translation>Reconstitue omnes campos verificandi nuntii</translation>
     </message>
     <message>
         <location filename="../signverifymessagedialog.cpp" line="+27"/>
@@ -2025,7 +2034,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-2"/>
         <source>Click &quot;Sign Message&quot; to generate signature</source>
-        <translation type="unfinished"/>
+        <translation>Clicca &quot;Signa Nuntium&quot; ut signatio generetur</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -2036,7 +2045,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+82"/>
         <location line="+81"/>
         <source>The entered address is invalid.</source>
-        <translation type="unfinished"/>
+        <translation>Inscriptio inserta non valida est.</translation>
     </message>
     <message>
         <location line="-81"/>
@@ -2044,59 +2053,59 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+73"/>
         <location line="+8"/>
         <source>Please check the address and try again.</source>
-        <translation type="unfinished"/>
+        <translation>Sodes inscriptionem proba et rursus conare.</translation>
     </message>
     <message>
         <location line="-81"/>
         <location line="+81"/>
         <source>The entered address does not refer to a key.</source>
-        <translation type="unfinished"/>
+        <translation>Inserta inscriptio clavem non refert.</translation>
     </message>
     <message>
         <location line="-73"/>
         <source>Wallet unlock was cancelled.</source>
-        <translation type="unfinished"/>
+        <translation>Cassidilis reserare cancellatum est.</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Private key for the entered address is not available.</source>
-        <translation type="unfinished"/>
+        <translation>Clavis privata absens est pro inserta inscriptione.</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Message signing failed.</source>
-        <translation type="unfinished"/>
+        <translation>Nuntium signare abortum est.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Message signed.</source>
-        <translation type="unfinished"/>
+        <translation>Nuntius signatus.</translation>
     </message>
     <message>
         <location line="+59"/>
         <source>The signature could not be decoded.</source>
-        <translation type="unfinished"/>
+        <translation>Signatio decodificari non potuit.</translation>
     </message>
     <message>
         <location line="+0"/>
         <location line="+13"/>
         <source>Please check the signature and try again.</source>
-        <translation type="unfinished"/>
+        <translation>Sodes signationem proba et rursus conare.</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>The signature did not match the message digest.</source>
-        <translation type="unfinished"/>
+        <translation>Signatio non convenit digesto nuntii</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Message verification failed.</source>
-        <translation type="unfinished"/>
+        <translation>Nuntium verificare abortum est.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Message verified.</source>
-        <translation type="unfinished"/>
+        <translation>Nuntius verificatus.</translation>
     </message>
 </context>
 <context>
@@ -2104,12 +2113,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../transactiondesc.cpp" line="+19"/>
         <source>Open until %1</source>
-        <translation type="unfinished"/>
+        <translation>Apertum donec %1</translation>
     </message>
     <message numerus="yes">
         <location line="-2"/>
         <source>Open for %n block(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform></translation>
     </message>
     <message>
         <location line="+8"/>
@@ -2119,66 +2128,66 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+2"/>
         <source>%1/offline</source>
-        <translation>%1/тармакта эмес</translation>
+        <translation>%1/non conecto</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>%1/unconfirmed</source>
-        <translation type="unfinished"/>
+        <translation>%1/non confirmata</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>%1 confirmations</source>
-        <translation type="unfinished"/>
+        <translation>%1 confirmationes</translation>
     </message>
     <message>
         <location line="+18"/>
         <source>Status</source>
-        <translation type="unfinished"/>
+        <translation>Status</translation>
     </message>
     <message numerus="yes">
         <location line="+7"/>
         <source>, broadcast through %n node(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation><numerusform>, disseminatum per %n nodo</numerusform><numerusform>, disseminata per %n nodis</numerusform></translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Date</source>
-        <translation>Дата</translation>
+        <translation>Dies</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Source</source>
-        <translation type="unfinished"/>
+        <translation>Fons</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Generated</source>
-        <translation type="unfinished"/>
+        <translation>Generatum</translation>
     </message>
     <message>
         <location line="+5"/>
         <location line="+17"/>
         <source>From</source>
-        <translation type="unfinished"/>
+        <translation>Ab</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+22"/>
         <location line="+58"/>
         <source>To</source>
-        <translation type="unfinished"/>
+        <translation>Ad</translation>
     </message>
     <message>
         <location line="-77"/>
         <location line="+2"/>
         <source>own address</source>
-        <translation type="unfinished"/>
+        <translation>inscriptio propria</translation>
     </message>
     <message>
         <location line="-2"/>
         <source>label</source>
-        <translation type="unfinished"/>
+        <translation>titulus</translation>
     </message>
     <message>
         <location line="+37"/>
@@ -2187,17 +2196,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+17"/>
         <location line="+30"/>
         <source>Credit</source>
-        <translation type="unfinished"/>
+        <translation>Creditum</translation>
     </message>
     <message numerus="yes">
         <location line="-102"/>
         <source>matures in %n more block(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation><numerusform>maturum erit in %n plure frusto</numerusform><numerusform>maturum erit in %n pluribus frustis</numerusform></translation>
     </message>
     <message>
         <location line="+2"/>
         <source>not accepted</source>
-        <translation type="unfinished"/>
+        <translation>non acceptum</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -2205,32 +2214,32 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+15"/>
         <location line="+30"/>
         <source>Debit</source>
-        <translation type="unfinished"/>
+        <translation>Debitum</translation>
     </message>
     <message>
         <location line="-39"/>
         <source>Transaction fee</source>
-        <translation type="unfinished"/>
+        <translation>Transactionis merces</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>Net amount</source>
-        <translation type="unfinished"/>
+        <translation>Cuncta quantitas</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>Message</source>
-        <translation>Билдирүү</translation>
+        <translation>Nuntius</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Comment</source>
-        <translation type="unfinished"/>
+        <translation>Annotatio</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Transaction ID</source>
-        <translation type="unfinished"/>
+        <translation>ID transactionis</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -2240,42 +2249,42 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+7"/>
         <source>Debug information</source>
-        <translation type="unfinished"/>
+        <translation>Informatio de debug</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Transaction</source>
-        <translation type="unfinished"/>
+        <translation>Transactio</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Inputs</source>
-        <translation type="unfinished"/>
+        <translation>Lectenda</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>Amount</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>true</source>
-        <translation type="unfinished"/>
+        <translation>verum</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>false</source>
-        <translation type="unfinished"/>
+        <translation>falsum</translation>
     </message>
     <message>
         <location line="-211"/>
         <source>, has not been successfully broadcast yet</source>
-        <translation type="unfinished"/>
+        <translation>, nondum prospere disseminatum est</translation>
     </message>
     <message>
         <location line="+35"/>
         <source>unknown</source>
-        <translation type="unfinished"/>
+        <translation>ignotum</translation>
     </message>
 </context>
 <context>
@@ -2283,12 +2292,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../forms/transactiondescdialog.ui" line="+14"/>
         <source>Transaction details</source>
-        <translation type="unfinished"/>
+        <translation>Particularia transactionis</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>This pane shows a detailed description of the transaction</source>
-        <translation type="unfinished"/>
+        <translation>Haec tabula monstrat descriptionem verbosam transactionis</translation>
     </message>
 </context>
 <context>
@@ -2296,37 +2305,37 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location filename="../transactiontablemodel.cpp" line="+226"/>
         <source>Date</source>
-        <translation>Дата</translation>
+        <translation>Dies</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Type</source>
-        <translation type="unfinished"/>
+        <translation>Typus</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Address</source>
-        <translation>Дарек</translation>
+        <translation>Inscriptio</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Amount</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas</translation>
     </message>
     <message>
         <location line="+60"/>
         <source>Open until %1</source>
-        <translation type="unfinished"/>
+        <translation>Apertum donec %1</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Confirmed (%1 confirmations)</source>
-        <translation type="unfinished"/>
+        <translation>Confirmatum (%1 confirmationes)</translation>
     </message>
     <message numerus="yes">
         <location line="-15"/>
         <source>Open for %n more block(s)</source>
-        <translation type="unfinished"><numerusform></numerusform></translation>
+        <translation><numerusform>Aperi pro %n plure frusto</numerusform><numerusform>Aperi pro %n pluribus frustis</numerusform></translation>
     </message>
     <message>
         <location line="+6"/>
@@ -2356,67 +2365,67 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+3"/>
         <source>This block was not received by any other nodes and will probably not be accepted!</source>
-        <translation type="unfinished"/>
+        <translation>Hoc frustum non acceptum est ab ulla alia nodis et probabiliter non acceptum erit!</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Generated but not accepted</source>
-        <translation type="unfinished"/>
+        <translation>Generatum sed non acceptum</translation>
     </message>
     <message>
         <location line="+42"/>
         <source>Received with</source>
-        <translation type="unfinished"/>
+        <translation>Acceptum cum</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Received from</source>
-        <translation type="unfinished"/>
+        <translation>Acceptum ab</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Sent to</source>
-        <translation type="unfinished"/>
+        <translation>Missum ad</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Payment to yourself</source>
-        <translation type="unfinished"/>
+        <translation>Pensitatio ad te ipsum</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Mined</source>
-        <translation type="unfinished"/>
+        <translation>Fossa</translation>
     </message>
     <message>
         <location line="+38"/>
         <source>(n/a)</source>
-        <translation type="unfinished"/>
+        <translation>(n/a)</translation>
     </message>
     <message>
         <location line="+190"/>
         <source>Transaction status. Hover over this field to show number of confirmations.</source>
-        <translation type="unfinished"/>
+        <translation>Status transactionis.  Supervola cum mure ut monstretur numerus confirmationum.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Date and time that the transaction was received.</source>
-        <translation type="unfinished"/>
+        <translation>Dies et tempus quando transactio accepta est.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Type of transaction.</source>
-        <translation type="unfinished"/>
+        <translation>Typus transactionis.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Destination address of transaction.</source>
-        <translation type="unfinished"/>
+        <translation>Inscriptio destinationis transactionis.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Amount removed from or added to balance.</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas remota ex pendendo aut addita ei.</translation>
     </message>
 </context>
 <context>
@@ -2425,102 +2434,102 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location filename="../transactionview.cpp" line="+55"/>
         <location line="+16"/>
         <source>All</source>
-        <translation type="unfinished"/>
+        <translation>Omne</translation>
     </message>
     <message>
         <location line="-15"/>
         <source>Today</source>
-        <translation type="unfinished"/>
+        <translation>Hodie</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This week</source>
-        <translation type="unfinished"/>
+        <translation>Hac hebdomade</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This month</source>
-        <translation type="unfinished"/>
+        <translation>Hoc mense</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Last month</source>
-        <translation type="unfinished"/>
+        <translation>Postremo mense</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>This year</source>
-        <translation type="unfinished"/>
+        <translation>Hoc anno</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Range...</source>
-        <translation type="unfinished"/>
+        <translation>Intervallum...</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Received with</source>
-        <translation type="unfinished"/>
+        <translation>Acceptum cum</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Sent to</source>
-        <translation type="unfinished"/>
+        <translation>Missum ad</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>To yourself</source>
-        <translation type="unfinished"/>
+        <translation>Ad te ipsum</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Mined</source>
-        <translation type="unfinished"/>
+        <translation>Fossa</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Other</source>
-        <translation type="unfinished"/>
+        <translation>Alia</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Enter address or label to search</source>
-        <translation type="unfinished"/>
+        <translation>Insere inscriptionem vel titulum ut quaeras</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Min amount</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas minima</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>Copy address</source>
-        <translation type="unfinished"/>
+        <translation>Copia inscriptionem</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy label</source>
-        <translation type="unfinished"/>
+        <translation>Copia titulum</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy amount</source>
-        <translation type="unfinished"/>
+        <translation>Copia quantitatem</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Copy transaction ID</source>
-        <translation type="unfinished"/>
+        <translation>Copia transactionis ID</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Edit label</source>
-        <translation type="unfinished"/>
+        <translation>Muta titulum</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Show transaction details</source>
-        <translation type="unfinished"/>
+        <translation>Monstra particularia transactionis</translation>
     </message>
     <message>
         <location line="+144"/>
@@ -2530,42 +2539,42 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Comma separated file (*.csv)</source>
-        <translation type="unfinished"/>
+        <translation>Comma Separata Plica (*.csv)</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Confirmed</source>
-        <translation type="unfinished"/>
+        <translation>Confirmatum</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Date</source>
-        <translation>Дата</translation>
+        <translation>Dies</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Type</source>
-        <translation type="unfinished"/>
+        <translation>Typus</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Label</source>
-        <translation type="unfinished"/>
+        <translation>Titulus</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Address</source>
-        <translation>Дарек</translation>
+        <translation>Inscriptio</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Amount</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>ID</source>
-        <translation type="unfinished"/>
+        <translation>ID</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -2580,12 +2589,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+100"/>
         <source>Range:</source>
-        <translation type="unfinished"/>
+        <translation>Intervallum:</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>to</source>
-        <translation type="unfinished"/>
+        <translation>ad</translation>
     </message>
 </context>
 <context>
@@ -2606,7 +2615,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Usage:</source>
-        <translation type="unfinished"/>
+        <translation>Usus:</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2616,17 +2625,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>List commands</source>
-        <translation type="unfinished"/>
+        <translation>Enumera mandata</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Get help for a command</source>
-        <translation type="unfinished"/>
+        <translation>Accipe auxilium pro mandato</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Options:</source>
-        <translation type="unfinished"/>
+        <translation>Optiones:</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2646,12 +2655,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-1"/>
         <source>Specify data directory</source>
-        <translation type="unfinished"/>
+        <translation>Specifica indicem datorum</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Set database cache size in megabytes (default: 25)</source>
-        <translation type="unfinished"/>
+        <translation>Constitue magnitudinem databasis cache in megabytes (praedefinitum: 25)</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2666,17 +2675,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+1"/>
         <source>Maintain at most &lt;n&gt; connections to peers (default: 125)</source>
-        <translation type="unfinished"/>
+        <translation>Manutene non plures quam &lt;n&gt; conexiones ad paria (praedefinitum: 125)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Connect to a node to retrieve peer addresses, and disconnect</source>
-        <translation type="unfinished"/>
+        <translation>Conecta ad nodum acceptare inscriptiones parium, et disconecte</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Specify your own public address</source>
-        <translation type="unfinished"/>
+        <translation>Specifica tuam propriam publicam inscriptionem</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -2691,17 +2700,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+5"/>
         <source>Threshold for disconnecting misbehaving peers (default: 100)</source>
-        <translation type="unfinished"/>
+        <translation>Limen pro disconectendo paria improba (praedefinitum: 100)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Number of seconds to keep misbehaving peers from reconnecting (default: 86400)</source>
-        <translation type="unfinished"/>
+        <translation>Numerum secundorum prohibere ne paria improba reconectant (praedefinitum: 86400)</translation>
     </message>
     <message>
         <location line="-44"/>
         <source>An error occurred while setting up the RPC port %u for listening on IPv4: %s</source>
-        <translation type="unfinished"/>
+        <translation>Error erat dum initians portam RPC %u pro auscultando in IPv4: %s</translation>
     </message>
     <message>
         <location line="+51"/>
@@ -2726,7 +2735,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-11"/>
         <source>Accept command line and JSON-RPC commands</source>
-        <translation type="unfinished"/>
+        <translation>Accipe terminalis et JSON-RPC mandata.</translation>
     </message>
     <message>
         <location line="+101"/>
@@ -2751,22 +2760,22 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-88"/>
         <source>Run in the background as a daemon and accept commands</source>
-        <translation type="unfinished"/>
+        <translation>Operare infere sicut daemon et mandata accipe</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Use the test network</source>
-        <translation type="unfinished"/>
+        <translation>Utere rete experimentale</translation>
     </message>
     <message>
         <location line="-24"/>
         <source>Accept connections from outside (default: 1 if no -proxy or -connect)</source>
-        <translation type="unfinished"/>
+        <translation>Accipe conexiones externas (praedefinitum: 1 nisi -proxy neque -connect)</translation>
     </message>
     <message>
         <location line="-38"/>
         <source>An error occurred while setting up the RPC port %u for listening on IPv6, falling back to IPv4: %s</source>
-        <translation type="unfinished"/>
+        <translation>Error erat dum initians portam RPC %u pro auscultando in IPv6, labens retrorsum ad IPv4: %s</translation>
     </message>
     <message>
         <location line="+117"/>
@@ -2781,7 +2790,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+11"/>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
-        <translation type="unfinished"/>
+        <translation>Monitio: -paytxfee constitutum valde magnum!  Hoc est merces transactionis solves si mittis transactionem.</translation>
     </message>
     <message>
         <location line="+61"/>
@@ -2791,37 +2800,37 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-31"/>
         <source>Warning: error reading wallet.dat! All keys read correctly, but transaction data or address book entries might be missing or incorrect.</source>
-        <translation type="unfinished"/>
+        <translation>Monitio: error legendo wallet.dat!  Omnes claves recte lectae, sed data transactionum vel libri inscriptionum fortasse desint vel prava sint.</translation>
     </message>
     <message>
         <location line="-18"/>
         <source>Warning: wallet.dat corrupt, data salvaged! Original wallet.dat saved as wallet.{timestamp}.bak in %s; if your balance or transactions are incorrect you should restore from a backup.</source>
-        <translation type="unfinished"/>
+        <translation>Monitio: wallet.data corrupta, data salvata!  Originalis wallet.dat salvata ut wallet.{timestamp}.bak in %s; si pendendum tuum vel transactiones pravae sunt, oportet ab conservato restituere.</translation>
     </message>
     <message>
         <location line="-30"/>
         <source>Attempt to recover private keys from a corrupt wallet.dat</source>
-        <translation type="unfinished"/>
+        <translation>Conare recipere claves privatas de corrupto wallet.dat</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Block creation options:</source>
-        <translation type="unfinished"/>
+        <translation>Optiones creandi frustorum:</translation>
     </message>
     <message>
         <location line="-62"/>
         <source>Connect only to the specified node(s)</source>
-        <translation type="unfinished"/>
+        <translation>Conecte sole ad nodos specificatos (vel nodum specificatum)</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Discover own IP address (default: 1 when listening and no -externalip)</source>
-        <translation type="unfinished"/>
+        <translation>Discooperi propriam inscriptionem IP (praedefinitum: 1 quando auscultans et nullum -externalip)</translation>
     </message>
     <message>
         <location line="+94"/>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
-        <translation type="unfinished"/>
+        <translation>Non potuisse auscultare in ulla porta.  Utere -listen=0 si hoc vis.</translation>
     </message>
     <message>
         <location line="-90"/>
@@ -2846,17 +2855,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-82"/>
         <source>Maximum per-connection receive buffer, &lt;n&gt;*1000 bytes (default: 5000)</source>
-        <translation type="unfinished"/>
+        <translation>Maxima magnitudo memoriae pro datis accipendis singulis conexionibus, &lt;n&gt;*1000 octetis/bytes (praedefinitum: 5000)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Maximum per-connection send buffer, &lt;n&gt;*1000 bytes (default: 1000)</source>
-        <translation type="unfinished"/>
+        <translation>Maxima magnitudo memoriae pro datis mittendis singulis conexionibus, &lt;n&gt;*1000 octetis/bytes (praedefinitum: 1000)</translation>
     </message>
     <message>
         <location line="-16"/>
         <source>Only connect to nodes in network &lt;net&gt; (IPv4, IPv6 or Tor)</source>
-        <translation type="unfinished"/>
+        <translation>Tantum conecte ad nodos in rete &lt;net&gt; (IPv4, IPv6 aut Tor)</translation>
     </message>
     <message>
         <location line="+28"/>
@@ -2876,7 +2885,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+35"/>
         <source>SSL options: (see the Bitcoin Wiki for SSL setup instructions)</source>
-        <translation type="unfinished"/>
+        <translation>Optiones SSL: (vide vici de Bitcoin pro instructionibus SSL configurationis)</translation>
     </message>
     <message>
         <location line="-74"/>
@@ -2886,7 +2895,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+41"/>
         <source>Send trace/debug info to console instead of debug.log file</source>
-        <translation type="unfinished"/>
+        <translation>Mitte informationem vestigii/debug ad terminale potius quam plicam debug.log</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -2901,17 +2910,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-1"/>
         <source>Set minimum block size in bytes (default: 0)</source>
-        <translation type="unfinished"/>
+        <translation>Constitue minimam magnitudinem frusti in octetis/bytes (praedefinitum: 0)</translation>
     </message>
     <message>
         <location line="-29"/>
         <source>Shrink debug.log file on client startup (default: 1 when no -debug)</source>
-        <translation type="unfinished"/>
+        <translation>Diminue plicam debug.log ad initium clientis (praedefinitum: 1 nisi -debug)</translation>
     </message>
     <message>
         <location line="-42"/>
         <source>Specify connection timeout in milliseconds (default: 5000)</source>
-        <translation type="unfinished"/>
+        <translation>Specifica tempumfati conexionis in millisecundis (praedefinitum: 5000)</translation>
     </message>
     <message>
         <location line="+109"/>
@@ -2922,12 +2931,12 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-80"/>
         <source>Use UPnP to map the listening port (default: 0)</source>
-        <translation type="unfinished"/>
+        <translation>Utere UPnP designare portam auscultandi (praedefinitum: 0)</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Use UPnP to map the listening port (default: 1 when listening)</source>
-        <translation type="unfinished"/>
+        <translation>Utere UPnP designare portam auscultandi (praedefinitum: 1 quando auscultans)</translation>
     </message>
     <message>
         <location line="-25"/>
@@ -2937,7 +2946,7 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="+42"/>
         <source>Username for JSON-RPC connections</source>
-        <translation type="unfinished"/>
+        <translation>Nomen utentis pro conexionibus JSON-RPC</translation>
     </message>
     <message>
         <location line="+47"/>
@@ -2957,17 +2966,17 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
     <message>
         <location line="-2"/>
         <source>Warning: This version is obsolete, upgrade required!</source>
-        <translation type="unfinished"/>
+        <translation>Monitio: Haec versio obsoleta est, progressio postulata!</translation>
     </message>
     <message>
         <location line="-48"/>
         <source>wallet.dat corrupt, salvage failed</source>
-        <translation type="unfinished"/>
+        <translation>wallet.dat corrupta, salvare abortum est</translation>
     </message>
     <message>
         <location line="-54"/>
         <source>Password for JSON-RPC connections</source>
-        <translation type="unfinished"/>
+        <translation>Tessera pro conexionibus JSON-RPC</translation>
     </message>
     <message>
         <location line="-84"/>
@@ -3002,22 +3011,22 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+16"/>
         <source>Allow JSON-RPC connections from specified IP address</source>
-        <translation type="unfinished"/>
+        <translation>Permitte conexionibus JSON-RPC ex inscriptione specificata</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Send commands to node running on &lt;ip&gt; (default: 127.0.0.1)</source>
-        <translation type="unfinished"/>
+        <translation>Mitte mandata nodo operanti in &lt;ip&gt; (praedefinitum: 127.0.0.1)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
-        <translation type="unfinished"/>
+        <translation>Pelle mandatum quando optissimum frustum mutat (%s in mandato substituitur ab hash frusti)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)</source>
-        <translation type="unfinished"/>
+        <translation>Facere mandatum quotiescumque cassidilis transactio mutet (%s in mandato sbstituitur ab TxID)</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -3037,17 +3046,17 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+3"/>
         <source>Upgrade wallet to latest format</source>
-        <translation type="unfinished"/>
+        <translation>Progredere cassidile ad formam recentissimam</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Set key pool size to &lt;n&gt; (default: 100)</source>
-        <translation type="unfinished"/>
+        <translation>Constitue magnitudinem stagni clavium ad &lt;n&gt; (praedefinitum: 100)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Rescan the block chain for missing wallet transactions</source>
-        <translation type="unfinished"/>
+        <translation>Iterum perlege catenam frustorum propter absentes cassidilis transactiones</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -3067,17 +3076,17 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+8"/>
         <source>Use OpenSSL (https) for JSON-RPC connections</source>
-        <translation type="unfinished"/>
+        <translation>Utere OpenSSL (https) pro conexionibus JSON-RPC</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Server certificate file (default: server.cert)</source>
-        <translation type="unfinished"/>
+        <translation>Plica certificationis daemonis moderantis (praedefinitum: server.cert)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Server private key (default: server.pem)</source>
-        <translation type="unfinished"/>
+        <translation>Clavis privata daemonis moderans (praedefinitum: server.pem)</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3097,7 +3106,7 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="-158"/>
         <source>This help message</source>
-        <translation type="unfinished"/>
+        <translation>Hic nuntius auxilii</translation>
     </message>
     <message>
         <location line="+95"/>
@@ -3117,7 +3126,7 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+140"/>
         <source>Unable to bind to %s on this computer (bind returned error %d, %s)</source>
-        <translation type="unfinished"/>
+        <translation>Non posse conglutinare ad %s in hoc computatro (conglutinare redidit errorem %d, %s)</translation>
     </message>
     <message>
         <location line="-130"/>
@@ -3127,12 +3136,12 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+3"/>
         <source>Allow DNS lookups for -addnode, -seednode and -connect</source>
-        <translation type="unfinished"/>
+        <translation>Permitte quaerenda DNS pro -addnode, -seednode, et -connect</translation>
     </message>
     <message>
         <location line="+122"/>
         <source>Loading addresses...</source>
-        <translation type="unfinished"/>
+        <translation>Legens inscriptiones...</translation>
     </message>
     <message>
         <location line="-15"/>
@@ -3142,7 +3151,7 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+2"/>
         <source>Error loading wallet.dat: Wallet corrupted</source>
-        <translation type="unfinished"/>
+        <translation>Error legendi wallet.dat: Cassidile corruptum</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -3157,37 +3166,37 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+1"/>
         <source>Error loading wallet.dat</source>
-        <translation type="unfinished"/>
+        <translation>Error legendi wallet.dat</translation>
     </message>
     <message>
         <location line="-16"/>
         <source>Invalid -proxy address: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Inscriptio -proxy non valida: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Unknown network specified in -onlynet: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Ignotum rete specificatum in -onlynet: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="-1"/>
         <source>Unknown -socks proxy version requested: %i</source>
-        <translation type="unfinished"/>
+        <translation>Ignota -socks vicarii versio postulata: %i</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Cannot resolve -bind address: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Non posse resolvere -bind inscriptonem: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Cannot resolve -externalip address: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Non posse resolvere -externalip inscriptionem: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="-24"/>
         <source>Invalid amount for -paytxfee=&lt;amount&gt;: &apos;%s&apos;</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas non valida pro -paytxfee=&lt;quantitas&gt;: &apos;%s&apos;</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -3202,22 +3211,22 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+5"/>
         <source>Invalid amount</source>
-        <translation type="unfinished"/>
+        <translation>Quantitas non valida</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Insufficient funds</source>
-        <translation type="unfinished"/>
+        <translation>Inopia nummorum</translation>
     </message>
     <message>
         <location line="-34"/>
         <source>Loading block index...</source>
-        <translation type="unfinished"/>
+        <translation>Legens indicem frustorum...</translation>
     </message>
     <message>
         <location line="-103"/>
         <source>Add a node to connect to and attempt to keep the connection open</source>
-        <translation type="unfinished"/>
+        <translation>Adice nodum cui conectere et conare sustinere conexionem apertam</translation>
     </message>
     <message>
         <location line="+122"/>
@@ -3237,12 +3246,12 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+25"/>
         <source>Loading wallet...</source>
-        <translation type="unfinished"/>
+        <translation>Legens cassidile...</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Cannot downgrade wallet</source>
-        <translation type="unfinished"/>
+        <translation>Non posse cassidile regredi</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3252,34 +3261,36 @@ for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.
     <message>
         <location line="+1"/>
         <source>Cannot write default address</source>
-        <translation type="unfinished"/>
+        <translation>Non posse scribere praedefinitam inscriptionem</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Rescanning...</source>
-        <translation type="unfinished"/>
+        <translation>Iterum perlegens...</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>Done loading</source>
-        <translation type="unfinished"/>
+        <translation>Completo lengendi</translation>
     </message>
     <message>
         <location line="-167"/>
         <source>To use the %s option</source>
-        <translation type="unfinished"/>
+        <translation>Ut utaris optione %s</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Error</source>
-        <translation>Ката</translation>
+        <translation>Error</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>You must set rpcpassword=&lt;password&gt; in the configuration file:
 %s
 If the file does not exist, create it with owner-readable-only file permissions.</source>
-        <translation type="unfinished"/>
+        <translation>Necesse est te rpcpassword=&lt;tesseram&gt; constituere in plica configurationum:
+%s
+Si plica non existat, crea eam cum permissionibus ut solus eius dominus eam legere sinatur.</translation>
     </message>
 </context>
 </TS>
