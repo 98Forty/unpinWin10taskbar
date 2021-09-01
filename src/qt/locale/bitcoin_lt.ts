@@ -2050,4 +2050,301 @@ This label turns red, if the priority is smaller than &quot;medium&quot;.
         <location line="+8"/>
         <location line="+73"/>
         <location line="+8"/>
-        <source>Please check the address and try again.<
+        <source>Please check the address and try again.</source>
+        <translation>Prašom patikrinti adresą ir bandyti iš naujo.</translation>
+    </message>
+    <message>
+        <location line="-81"/>
+        <location line="+81"/>
+        <source>The entered address does not refer to a key.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="-73"/>
+        <source>Wallet unlock was cancelled.</source>
+        <translation>Piniginės atrakinimas atšauktas.</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Private key for the entered address is not available.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Message signing failed.</source>
+        <translation>Žinutės pasirašymas nepavyko.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Message signed.</source>
+        <translation>Žinutė pasirašyta.</translation>
+    </message>
+    <message>
+        <location line="+59"/>
+        <source>The signature could not be decoded.</source>
+        <translation>Nepavyko iškoduoti parašo.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+13"/>
+        <source>Please check the signature and try again.</source>
+        <translation>Prašom patikrinti parašą ir bandyti iš naujo.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The signature did not match the message digest.</source>
+        <translation>Parašas neatitinka žinutės.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Message verification failed.</source>
+        <translation>Žinutės tikrinimas nepavyko.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Message verified.</source>
+        <translation>Žinutė patikrinta.</translation>
+    </message>
+</context>
+<context>
+    <name>TransactionDesc</name>
+    <message>
+        <location filename="../transactiondesc.cpp" line="+19"/>
+        <source>Open until %1</source>
+        <translation>Atidaryta iki %1</translation>
+    </message>
+    <message numerus="yes">
+        <location line="-2"/>
+        <source>Open for %n block(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>conflicted</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>%1/offline</source>
+        <translation>%1/neprisijungęs</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>%1/unconfirmed</source>
+        <translation>%1/nepatvirtintas</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>%1 confirmations</source>
+        <translation>%1 patvirtinimų</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Status</source>
+        <translation>Būsena</translation>
+    </message>
+    <message numerus="yes">
+        <location line="+7"/>
+        <source>, broadcast through %n node(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Date</source>
+        <translation>Data</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Source</source>
+        <translation>Šaltinis</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Generated</source>
+        <translation>Sugeneruotas</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location line="+17"/>
+        <source>From</source>
+        <translation>Nuo</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+22"/>
+        <location line="+58"/>
+        <source>To</source>
+        <translation>Kam</translation>
+    </message>
+    <message>
+        <location line="-77"/>
+        <location line="+2"/>
+        <source>own address</source>
+        <translation>savo adresas</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>label</source>
+        <translation>žymė</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <location line="+12"/>
+        <location line="+45"/>
+        <location line="+17"/>
+        <location line="+30"/>
+        <source>Credit</source>
+        <translation>Kreditas</translation>
+    </message>
+    <message numerus="yes">
+        <location line="-102"/>
+        <source>matures in %n more block(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>not accepted</source>
+        <translation>nepriimta</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <location line="+8"/>
+        <location line="+15"/>
+        <location line="+30"/>
+        <source>Debit</source>
+        <translation>Debitas</translation>
+    </message>
+    <message>
+        <location line="-39"/>
+        <source>Transaction fee</source>
+        <translation>Sandorio mokestis</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Net amount</source>
+        <translation>Neto suma</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Message</source>
+        <translation>Žinutė</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Comment</source>
+        <translation>Komentaras</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Transaction ID</source>
+        <translation>Sandorio ID</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Generated coins must mature 510 blocks before they can be spent. When you generated this block, it was broadcast to the network to be added to the block chain. If it fails to get into the chain, its state will change to &quot;not accepted&quot; and it won&apos;t be spendable. This may occasionally happen if another node generates a block within a few seconds of yours.</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Debug information</source>
+        <translation>Derinimo informacija</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Transaction</source>
+        <translation>Sandoris</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Inputs</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Amount</source>
+        <translation>Suma</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>true</source>
+        <translation>tiesa</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>false</source>
+        <translation>netiesa</translation>
+    </message>
+    <message>
+        <location line="-211"/>
+        <source>, has not been successfully broadcast yet</source>
+        <translation>, transliavimas dar nebuvo sėkmingas</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>unknown</source>
+        <translation>nežinomas</translation>
+    </message>
+</context>
+<context>
+    <name>TransactionDescDialog</name>
+    <message>
+        <location filename="../forms/transactiondescdialog.ui" line="+14"/>
+        <source>Transaction details</source>
+        <translation>Sandorio detelės</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>This pane shows a detailed description of the transaction</source>
+        <translation>Šis langas sandorio detalų aprašymą</translation>
+    </message>
+</context>
+<context>
+    <name>TransactionTableModel</name>
+    <message>
+        <location filename="../transactiontablemodel.cpp" line="+226"/>
+        <source>Date</source>
+        <translation>Data</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Type</source>
+        <translation>Tipas</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Address</source>
+        <translation>Adresas</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Amount</source>
+        <translation>Suma</translation>
+    </message>
+    <message>
+        <location line="+60"/>
+        <source>Open until %1</source>
+        <translation>Atidaryta iki %1</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Confirmed (%1 confirmations)</source>
+        <translation>Patvirtinta (%1 patvirtinimai)</translation>
+    </message>
+    <message numerus="yes">
+        <location line="-15"/>
+        <source>Open for %n more block(s)</source>
+        <translation type="unfinished"><numerusform></numerusform><numerusform></numerusform><numerusform></numerusform></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Offline</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Unconfirmed</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Confirming (%1 of %2 recommended confirmations)</sou
