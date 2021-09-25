@@ -2957,4 +2957,203 @@ Dit betekend dat een fee van %2 is vereist.</translation>
     </message>
     <message>
         <location line="-25"/>
-        <source>Use proxy to reach tor hidden services (default: same
+        <source>Use proxy to reach tor hidden services (default: same as -proxy)</source>
+        <translation>Gebruik proxy tor verborgen diensten (standaard: zelfde als -proxy)</translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>Username for JSON-RPC connections</source>
+        <translation>Gebruikersnaam voor JSON-RPC-verbindingen</translation>
+    </message>
+    <message>
+        <location line="+47"/>
+        <source>Verifying database integrity...</source>
+        <translation>Database integriteit wordt geverifieërd</translation>
+    </message>
+    <message>
+        <location line="+57"/>
+        <source>WARNING: syncronized checkpoint violation detected, but skipped!</source>
+        <translation>WAARSCHUWING: gesynchroniseerd checkpoint overtreding is geconstateerd, maar overgeslagen!</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Warning: Disk space is low!</source>
+        <translation>Waarschuwing: Hardeschijf raakt vol!</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>Warning: This version is obsolete, upgrade required!</source>
+        <translation>Waarschuwing: Deze versie is verouderd, een upgrade is vereist!</translation>
+    </message>
+    <message>
+        <location line="-48"/>
+        <source>wallet.dat corrupt, salvage failed</source>
+        <translation>wallet.dat corrupt, veiligstellen mislukt</translation>
+    </message>
+    <message>
+        <location line="-54"/>
+        <source>Password for JSON-RPC connections</source>
+        <translation>Wachtwoord voor JSON-RPC-verbindingen</translation>
+    </message>
+    <message>
+        <location line="-84"/>
+        <source>%s, you must set a rpcpassword in the configuration file:
+ %s
+It is recommended you use the following random password:
+rpcuser=xdecoinrpc
+rpcpassword=%s
+(you do not need to remember this password)
+The username and password MUST NOT be the same.
+If the file does not exist, create it with owner-readable-only file permissions.
+It is also recommended to set alertnotify so you are notified of problems;
+for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.com
+</source>
+        <translation>%s, u moet een rpcpassword instellen in het configuratiebestand: 
+%s 
+Het wordt aanbevolen de volgende willekeurig wachtwoord gebruiken: 
+rpcuser = xdecoinrpc 
+rpcpassword = %s 
+(je hoeft niet dit wachtwoord te onthouden) 
+De gebruikersnaam en het wachtwoord MAG NIET hetzelfde zijn. 
+Als het bestand niet bestaat, maakt u met leesbare-alleen-eigenaar bestandsbeheermachtigingen.  
+Het wordt ook aanbevolen om alertnotify instellen zodat u een melding van problemen;  
+bijvoorbeeld: alertnotify = echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.com </translation>
+    </message>
+    <message>
+        <location line="+51"/>
+        <source>Find peers using internet relay chat (default: 0)</source>
+        <translation>Zoek peers door gebruik van Internet Relay Chat (standaard: 1) {? 0)}</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Sync time with other nodes. Disable if time on your system is precise e.g. syncing with NTP (default: 1)</source>
+        <translation>Synchroniseer tijd met andere connecties. Uitschakelen als de tijd op uw systeem nauwkeurig is bijv. synchroniseren met NTP (standaard: 1)</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>When creating transactions, ignore inputs with value less than this (default: 0.01)</source>
+        <translation>Bij het maken van transacties, negeer ingangen met waarde minder dan dit (standaard: 0,01)</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Allow JSON-RPC connections from specified IP address</source>
+        <translation>Sta JSON-RPC verbindingen van opgegeven IP-adres toe</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Send commands to node running on &lt;ip&gt; (default: 127.0.0.1)</source>
+        <translation>Verstuur commando&apos;s naar proces dat op &lt;ip&gt; draait (standaard: 127.0.0.1)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
+        <translation>Voer commando uit zodra het beste blok verandert (%s in cmd wordt vervangen door blockhash)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)</source>
+        <translation>Voer opdracht uit zodra een portemonneetransactie verandert (%s in cmd wordt vervangen door TxID)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Require a confirmations for change (default: 0)</source>
+        <translation>Vereist een bevestiging voor verandering (standaard: 0)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Enforce transaction scripts to use canonical PUSH operators (default: 1)</source>
+        <translation>Dwing transactie scripts gebruik van canonieke PUSH operatoren (standaard: 1)</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Execute command when a relevant alert is received (%s in cmd is replaced by message)</source>
+        <translation>Voer opdracht uit zodra een relevante waarschuwing wordt ontvangen (%s in cmd wordt vervangen door bericht)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Upgrade wallet to latest format</source>
+        <translation>Vernieuw portemonnee naar nieuwste versie</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Set key pool size to &lt;n&gt; (default: 100)</source>
+        <translation>Stel sleutelpoelgrootte in op &lt;n&gt; (standaard: 100)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Rescan the block chain for missing wallet transactions</source>
+        <translation>Doorzoek de blokketen op ontbrekende portemonnee-transacties</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>How many blocks to check at startup (default: 2500, 0 = all)</source>
+        <translation>Hoeveel blokken controleren bij opstarten (standaard: 2500, 0= alles)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>How thorough the block verification is (0-6, default: 1)</source>
+        <translation>Hoe grondig het blokverificatie is (0-6, standaard: 1)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Imports blocks from external blk000?.dat file</source>
+        <translation>Importeer blokken van extern blk000?.dat bestand</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Use OpenSSL (https) for JSON-RPC connections</source>
+        <translation>Gebruik OpenSSL (https) voor JSON-RPC-verbindingen</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Server certificate file (default: server.cert)</source>
+        <translation>Certificaat-bestand voor server (standaard: server.cert)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Server private key (default: server.pem)</source>
+        <translation>Geheime sleutel voor server (standaard: server.pem)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Acceptable ciphers (default: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)</source>
+        <translation>Aanvaardbare cijfers (standaard: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)</translation>
+    </message>
+    <message>
+        <location line="+53"/>
+        <source>Error: Wallet unlocked for staking only, unable to create transaction.</source>
+        <translation>Fout: Portemonnee ontgrendeld voor alleen staking, niet in staat om de transactie te maken.</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>WARNING: Invalid checkpoint found! Displayed transactions may not be correct! You may need to upgrade, or notify Developers.</source>
+        <translation>WAARSCHUWING: Ongeldig controlepunt gevonden! Weergegeven transacties kunnen niet kloppen! Het is mogelijk dat je moet upgraden, of Developers moet waarschuwen.</translation>
+    </message>
+    <message>
+        <location line="-158"/>
+        <source>This help message</source>
+        <translation>Dit helpbericht</translation>
+    </message>
+    <message>
+        <location line="+95"/>
+        <source>Wallet %s resides outside data directory %s.</source>
+        <translation>Portemonnee %s bevindt zich buiten de datamap %s.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Cannot obtain a lock on data directory %s.  XDECoin is probably already running.</source>
+        <translation>Kan een slot op data directory %s niet verkrijgen. XDECoin wordt waarschijnlijk al uitgevoerd.</translation>
+    </message>
+    <message>
+        <location line="-98"/>
+        <source>XDECoin</source>
+        <translation>XDECoin</translation>
+    </message>
+    <message>
+        <location line="+140"/>
+        <source>Unable to bind to %s on this computer (bind returned error %d, %s)</source>
+        <translation>Niet in staat om aan %s te binden op deze computer (bind gaf error %d, %s)</translation>
+    </message>
+    <message>
+        <location line="-130"/>
+ 
