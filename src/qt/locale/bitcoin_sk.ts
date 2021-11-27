@@ -2860,4 +2860,213 @@ Sumy nižšie ako 0,546 násobok minimálneho poplatku sú zobrazené ako DUST.<
     <message>
         <location line="+83"/>
         <source>Invalid -tor address: &apos;%s&apos;</source>
-        <translation>Ne
+        <translation>Neplatná -tor adresa: &apos;%s&apos;</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Invalid amount for -reservebalance=&lt;amount&gt;</source>
+        <translation>Neplatná suma pre -reservebalance=&lt;množstvo&gt;</translation>
+    </message>
+    <message>
+        <location line="-82"/>
+        <source>Maximum per-connection receive buffer, &lt;n&gt;*1000 bytes (default: 5000)</source>
+        <translation>Maximum pre-pripojenie prijímacej vyrovnávacej pamäti, &lt;n&gt;*1000 bajtov (predvolené: 5000)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Maximum per-connection send buffer, &lt;n&gt;*1000 bytes (default: 1000)</source>
+        <translation>Maximum pre-pripojenie posielacej vyrovnávacej pamäti, &lt;n&gt;*1000 bajtov (predvolené: 1000)</translation>
+    </message>
+    <message>
+        <location line="-16"/>
+        <source>Only connect to nodes in network &lt;net&gt; (IPv4, IPv6 or Tor)</source>
+        <translation>Pripojiť len k uzlom siete &lt;net&gt; (IPv4, IPv6 alebo Tor)</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>Output extra debugging information. Implies all other -debug* options</source>
+        <translation>Výstupné ďalšie informácie o ladení. Znamená všetky -debug* možnosti</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Output extra network debugging information</source>
+        <translation>Výstupné ďalšie sieťové informácie o ladení</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Prepend debug output with timestamp</source>
+        <translation>Pred debug výstup s časovou pečiatkou</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>SSL options: (see the Bitcoin Wiki for SSL setup instructions)</source>
+        <translation>SSL možnosť: (pozrite Bitcoin Wiki pre návod na nastavenie SSL)</translation>
+    </message>
+    <message>
+        <location line="-74"/>
+        <source>Select the version of socks proxy to use (4-5, default: 5)</source>
+        <translation>Vyberte verziu SOCKS proxy pre používanie (4-5, predvolené: 5)</translation>
+    </message>
+    <message>
+        <location line="+41"/>
+        <source>Send trace/debug info to console instead of debug.log file</source>
+        <translation>Odoslať trace/debug informácie na konzolu namiesto debug.info žurnálu</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Send trace/debug info to debugger</source>
+        <translation>Poslať stopy / ladiace informácie do debuggera</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>Set maximum block size in bytes (default: 250000)</source>
+        <translation>Nastavte maximálnu veľkosť bloku v bajtoch (predvolené: 250000)</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>Set minimum block size in bytes (default: 0)</source>
+        <translation>Nastavte minimálnu veľkosť bloku v bajtoch (štandardne: 0)</translation>
+    </message>
+    <message>
+        <location line="-29"/>
+        <source>Shrink debug.log file on client startup (default: 1 when no -debug)</source>
+        <translation>Stlačiť debug.log súbor na spustenie klienta (predvolené: 1, keď nie -debug)</translation>
+    </message>
+    <message>
+        <location line="-42"/>
+        <source>Specify connection timeout in milliseconds (default: 5000)</source>
+        <translation>Určiť aut spojenia v milisekundách (predvolené: 5000)</translation>
+    </message>
+    <message>
+        <location line="+109"/>
+        <source>Unable to sign checkpoint, wrong checkpointkey?
+</source>
+        <translation>Nemožno podpísať kontrolný bod, zlý checkpointkey?
+</translation>
+    </message>
+    <message>
+        <location line="-80"/>
+        <source>Use UPnP to map the listening port (default: 0)</source>
+        <translation>Skúsiť použiť UPnP pre mapovanie počúvajúceho portu (default: 0)</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>Use UPnP to map the listening port (default: 1 when listening)</source>
+        <translation>Skúsiť použiť UPnP pre mapovanie počúvajúceho portu (default: 1 when listening)</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>Use proxy to reach tor hidden services (default: same as -proxy)</source>
+        <translation>Použiť proxy server k získaniu Tor skrytých služieb (predvolené: rovnaká ako -proxy)</translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>Username for JSON-RPC connections</source>
+        <translation>Užívateľské meno pre JSON-RPC spojenia</translation>
+    </message>
+    <message>
+        <location line="+47"/>
+        <source>Verifying database integrity...</source>
+        <translation>Overenie integrity databázy ...</translation>
+    </message>
+    <message>
+        <location line="+57"/>
+        <source>WARNING: syncronized checkpoint violation detected, but skipped!</source>
+        <translation>VAROVANIE: synchronizovaný porušený checkpoint detekovaný, ale preskočený!</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Warning: Disk space is low!</source>
+        <translation>Upozornenie: Miesto na disku je nízke!</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>Warning: This version is obsolete, upgrade required!</source>
+        <translation>Upozornenie: Táto verzia je zastaraná, vyžaduje sa aktualizácia!</translation>
+    </message>
+    <message>
+        <location line="-48"/>
+        <source>wallet.dat corrupt, salvage failed</source>
+        <translation>wallet.dat je poškodený, záchrana zlyhala</translation>
+    </message>
+    <message>
+        <location line="-54"/>
+        <source>Password for JSON-RPC connections</source>
+        <translation>Heslo pre JSON-rPC spojenia</translation>
+    </message>
+    <message>
+        <location line="-84"/>
+        <source>%s, you must set a rpcpassword in the configuration file:
+ %s
+It is recommended you use the following random password:
+rpcuser=xdecoinrpc
+rpcpassword=%s
+(you do not need to remember this password)
+The username and password MUST NOT be the same.
+If the file does not exist, create it with owner-readable-only file permissions.
+It is also recommended to set alertnotify so you are notified of problems;
+for example: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.com
+</source>
+        <translation>%s, musíte nastaviť rpcpassword v konfiguračnom súbore:
+ %s
+Je odporúčané použiť nasledujúce náhodné heslo:
+rpcuser=xdecoinrpc
+rpcpassword=%s
+(Nemusíte si pamätať toto heslo)
+Užívateľské meno a heslo nesmú byť rovnaké. 
+Ak súbor neexistuje, vytvorte ho s oprávneniami súborov vlastníkov iba na čítatanie.
+Odporúča sa tiež nastaviť alertnotify, takže budete upozornení na problémy;
+napríklad: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.com</translation>
+    </message>
+    <message>
+        <location line="+51"/>
+        <source>Find peers using internet relay chat (default: 0)</source>
+        <translation>Nájsť peerov pomocou Internet Relay Chat (predvolené: 1)  {0)?}</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Sync time with other nodes. Disable if time on your system is precise e.g. syncing with NTP (default: 1)</source>
+        <translation>Synchronizácia času s ostatnými uzlami. Zakázať ak čas na vašom systéme je presný, napr synchronizáciu s NTP (predvolené: 1)</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>When creating transactions, ignore inputs with value less than this (default: 0.01)</source>
+        <translation>Pri vytváraní transakcií, ignorovať vstupy s hodnotou nižšou než táto (predvolené: 0.01)</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Allow JSON-RPC connections from specified IP address</source>
+        <translation>Povoliť JSON-RPC spojenia z určenej IP adresy.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Send commands to node running on &lt;ip&gt; (default: 127.0.0.1)</source>
+        <translation>Poslať príkaz nóde bežiacej na &lt;ip&gt; (predvolené: 127.0.0.1)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Execute command when the best block changes (%s in cmd is replaced by block hash)</source>
+        <translation>Vykonaj príkaz, ak zmeny v najlepšom bloku (%s v príkaze nahradí blok hash)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)</source>
+        <translation>Spustiť príkaz ak sa zmení transakcia v peňaženke (%s v cmd sa nahrádza TxID)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Require a confirmations for change (default: 0)</source>
+        <translation>Požadovať potvrdenie pre zmenu (predvolené: 0)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Enforce transaction scripts to use canonical PUSH operators (default: 1)</source>
+        <translation>Presadzovať transakčné skripty k používaniu kanonických PUSH operátorov (predvolené: 1)</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Execute command when a relevant alert is received (%s in cmd is replaced by message)</source>
+        <translation>Spustiť príkaz, keď je prijaté príslušné upozornenie (%s v cmd je nahradený správou)</translation>
+    </message>
+    <message>
+        <location line="+3"/
