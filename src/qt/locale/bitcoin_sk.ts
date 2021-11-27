@@ -3069,4 +3069,231 @@ napríklad: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.c
         <translation>Spustiť príkaz, keď je prijaté príslušné upozornenie (%s v cmd je nahradený správou)</translation>
     </message>
     <message>
-        <location line="+3"/
+        <location line="+3"/>
+        <source>Upgrade wallet to latest format</source>
+        <translation>Aktualizuj peňaženku na najnovší formát.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Set key pool size to &lt;n&gt; (default: 100)</source>
+        <translation>Nastaviť zásobu adries na &lt;n&gt; (predvolené: 100)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Rescan the block chain for missing wallet transactions</source>
+        <translation>Znovu skenovať reťaz blokov pre chýbajúce transakcie</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>How many blocks to check at startup (default: 2500, 0 = all)</source>
+        <translation>Koľko blokov na kontrolu pri štarte (predvolené: 2500, 0 = všetky)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>How thorough the block verification is (0-6, default: 1)</source>
+        <translation>Ako dôkladné overenie bloku je (0-6, predvolené: 1)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Imports blocks from external blk000?.dat file</source>
+        <translation>Importovať bloky z externého blk000?.dat súbora</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Use OpenSSL (https) for JSON-RPC connections</source>
+        <translation>Použiť OpenSSL (https) pre JSON-RPC spojenia</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Server certificate file (default: server.cert)</source>
+        <translation>Súbor s certifikátom servra (predvolené: server.cert)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Server private key (default: server.pem)</source>
+        <translation>Súkromný kľúč servra (predvolené: server.pem)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Acceptable ciphers (default: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)</source>
+        <translation>Akceptovateľné ciphers (predvolené: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)</translation>
+    </message>
+    <message>
+        <location line="+53"/>
+        <source>Error: Wallet unlocked for staking only, unable to create transaction.</source>
+        <translation>Chyba: Peňaženka odomknuté len pre stávkovanie, nemožné vytvoriť transakciu.</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>WARNING: Invalid checkpoint found! Displayed transactions may not be correct! You may need to upgrade, or notify Developers.</source>
+        <translation>VAROVANIE: Neplatný checkpoint nájdený! Uvedené transakcie nemusia byť správne! Možno budete musieť upgradovať, alebo oznámiť vývojárov.</translation>
+    </message>
+    <message>
+        <location line="-158"/>
+        <source>This help message</source>
+        <translation>Táto pomocná správa</translation>
+    </message>
+    <message>
+        <location line="+95"/>
+        <source>Wallet %s resides outside data directory %s.</source>
+        <translation>Peňaženka %s bydlisko mimo dátový adresár %s.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Cannot obtain a lock on data directory %s.  XDECoin is probably already running.</source>
+        <translation>Nemožno získať zámok na dátový adresár %s. XDECoin už pravdepodobne beží.</translation>
+    </message>
+    <message>
+        <location line="-98"/>
+        <source>XDECoin</source>
+        <translation>XDECoin</translation>
+    </message>
+    <message>
+        <location line="+140"/>
+        <source>Unable to bind to %s on this computer (bind returned error %d, %s)</source>
+        <translation>Nemôžem sa pripojiť k %s na tomto počítači (bind vrátil chybu %d, %s)</translation>
+    </message>
+    <message>
+        <location line="-130"/>
+        <source>Connect through socks proxy</source>
+        <translation>Pripojenie cez SOCKS proxy</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Allow DNS lookups for -addnode, -seednode and -connect</source>
+        <translation>Povoliť vyhľadávanie DNS pre pridanie nódy a spojenie</translation>
+    </message>
+    <message>
+        <location line="+122"/>
+        <source>Loading addresses...</source>
+        <translation>Načítavanie adries...</translation>
+    </message>
+    <message>
+        <location line="-15"/>
+        <source>Error loading blkindex.dat</source>
+        <translation>Chyba pri načítaní blkindex.dat</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Error loading wallet.dat: Wallet corrupted</source>
+        <translation>Chyba načítania wallet.dat: Peňaženka je poškodená</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Error loading wallet.dat: Wallet requires newer version of XDECoin</source>
+        <translation>Chyba pri načítaní wallet.dat: Peňaženka vyžaduje novšiu verziu XDECoin</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Wallet needed to be rewritten: restart XDECoin to complete</source>
+        <translation>Peňaženka potrebuje byť prepísaná: reštartujte XDECoin k dokončeniu</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Error loading wallet.dat</source>
+        <translation>Chyba načítania wallet.dat</translation>
+    </message>
+    <message>
+        <location line="-16"/>
+        <source>Invalid -proxy address: &apos;%s&apos;</source>
+        <translation>Neplatná adresa proxy: &apos;%s&apos;</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>Unknown network specified in -onlynet: &apos;%s&apos;</source>
+        <translation>Neznámy siete je uvedené v -onlynet: &apos;%s&apos;</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>Unknown -socks proxy version requested: %i</source>
+        <translation>Neznáma požadovaná SOCKS proxy verzia:% i</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Cannot resolve -bind address: &apos;%s&apos;</source>
+        <translation>Nemožno rozložiť -bind adresu: &apos;%s&apos;</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Cannot resolve -externalip address: &apos;%s&apos;</source>
+        <translation>Nemožno rozložiť -externalip adresu: &apos;%s&apos;</translation>
+    </message>
+    <message>
+        <location line="-24"/>
+        <source>Invalid amount for -paytxfee=&lt;amount&gt;: &apos;%s&apos;</source>
+        <translation>Neplatná suma pre -paytxfee=&lt;amount&gt;: &apos;%s&apos;</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>Error: could not start node</source>
+        <translation>Chyba: nemožno spustiť uzol</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Sending...</source>
+        <translation>Posielam...</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Invalid amount</source>
+        <translation>Neplatná suma</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Insufficient funds</source>
+        <translation>Nedostatok prostriedkov</translation>
+    </message>
+    <message>
+        <location line="-34"/>
+        <source>Loading block index...</source>
+        <translation>Načítavanie zoznamu blokov...</translation>
+    </message>
+    <message>
+        <location line="-103"/>
+        <source>Add a node to connect to and attempt to keep the connection open</source>
+        <translation>Pridať nód na pripojenie a pokus o udržanie pripojenia otvoreného</translation>
+    </message>
+    <message>
+        <location line="+122"/>
+        <source>Unable to bind to %s on this computer. XDECoin is probably already running.</source>
+        <translation>Nemôžem sa pripojiť na %s na tomto počítači. XDECoin je pravdepodobne už beží.</translation>
+    </message>
+    <message>
+        <location line="-97"/>
+        <source>Fee per KB to add to transactions you send</source>
+        <translation>Poplatok za KB pridať do transakcií, ktoré odosielate</translation>
+    </message>
+    <message>
+        <location line="+55"/>
+        <source>Invalid amount for -mininput=&lt;amount&gt;: &apos;%s&apos;</source>
+        <translation>Neplatná suma pre -mininput=&lt;amount&gt;: &apos;%s&apos;</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Loading wallet...</source>
+        <translation>Načítavam peňaženku...</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Cannot downgrade wallet</source>
+        <translation>Nie je možné prejsť na nižšiu verziu peňaženky</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Cannot initialize keypool</source>
+        <translation>Nemožno inicializovať keypool</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Cannot write default address</source>
+        <translation>Nie je možné zapísať predvolenú adresu.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Rescanning...</source>
+        <translation>Nové prehľadávanie...</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Done loading</source>
+        <translation>Dokončené načítava
