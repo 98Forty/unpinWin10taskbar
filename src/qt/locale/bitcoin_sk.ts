@@ -3296,4 +3296,26 @@ napríklad: alertnotify=echo %%s | mail -s &quot;XDECoin Alert&quot; admin@foo.c
     <message>
         <location line="+5"/>
         <source>Done loading</source>
-        <translation>Dokončené načítava
+        <translation>Dokončené načítavanie</translation>
+    </message>
+    <message>
+        <location line="-167"/>
+        <source>To use the %s option</source>
+        <translation>Použiť %s možnosť.</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Error</source>
+        <translation>Chyba</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>You must set rpcpassword=&lt;password&gt; in the configuration file:
+%s
+If the file does not exist, create it with owner-readable-only file permissions.</source>
+        <translation>Musíš nastaviť rpcpassword=&lt;heslo&gt; v konfiguračnom súbore:
+%s
+Ak súbor neexistuje, vytvor ho s oprávnením pre čítanie len vlastníkom (owner-readable-only)</translation>
+    </message>
+</context>
+</TS>
