@@ -457,4 +457,245 @@ Ta proizvod vključuje softver razvit s strani projekta OpenSSL za uporabo v Ope
         <location line="+10"/>
         <source>&amp;Debug window</source>
         <translation>&amp;Razhroščevalno okno</translation>
-   
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Open debugging and diagnostic console</source>
+        <translation>Odpri razhroščevalno in diagnostično konzolo</translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>&amp;Verify message...</source>
+        <translation>%Potrdi sporočilo ...</translation>
+    </message>
+    <message>
+        <location line="-202"/>
+        <source>XDECoin</source>
+        <translation>XDECoin</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Wallet</source>
+        <translation>Denarnica</translation>
+    </message>
+    <message>
+        <location line="+180"/>
+        <source>&amp;About XDECoin</source>
+        <translation>&amp;O XDECoin</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>&amp;Show / Hide</source>
+        <translation>&amp;Prikaži / Skrij</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Unlock wallet</source>
+        <translation>Odkleni denarnico</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>&amp;Lock Wallet</source>
+        <translation>&amp;Zakleni denarnico</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Lock wallet</source>
+        <translation>Zakleni denarnico</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>&amp;File</source>
+        <translation>&amp;Datoteka</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>&amp;Settings</source>
+        <translation>&amp;Nastavitve</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>&amp;Help</source>
+        <translation>&amp;Pomoč</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Tabs toolbar</source>
+        <translation>Orodna vrstica zavihkov</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Actions toolbar</source>
+        <translation>Orodna vrsticai</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <location line="+9"/>
+        <source>[testnet]</source>
+        <translation>[testnet]</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+60"/>
+        <source>XDECoin client</source>
+        <translation>XDECoin program</translation>
+    </message>
+    <message numerus="yes">
+        <location line="+75"/>
+        <source>%n active connection(s) to XDECoin network</source>
+        <translation><numerusform>%n aktivne povezave na XDECoin omrežje</numerusform><numerusform>%n aktivnih povezav na XDECoin omrežje</numerusform><numerusform>%n aktivnih povezav na XDECoin omrežje</numerusform><numerusform>%n aktivnih povezav na XDECoin omrežje</numerusform></translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>Downloaded %1 blocks of transaction history.</source>
+        <translation>Prenešenih %1 blokov transakcijske zgodovine.</translation>
+    </message>
+    <message>
+        <location line="+413"/>
+        <source>Staking.&lt;br&gt;Your weight is %1&lt;br&gt;Network weight is %2&lt;br&gt;Expected time to earn reward is %3</source>
+        <translation>Deležeje [Staking].&lt;br&gt;Teža vašega deleženja je %1&lt;br&gt;Teža celotne mreže deleženja je %2&lt;br&gt;Pričakovan čas do prejema nagrade %3</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Not staking because wallet is locked</source>
+        <translation>Ne deležite ker je denarnica zakljenjena</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Not staking because wallet is offline</source>
+        <translation>Ne deležite ker denarnica ni povezana</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Not staking because wallet is syncing</source>
+        <translation>Ne deležite ker se denarnica sinhronizira z omrežjem</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Not staking because you don&apos;t have mature coins</source>
+        <translation>Ne deležite ker nimate zrelih kovancev. </translation>
+    </message>
+    <message numerus="yes">
+        <location line="-403"/>
+        <source>%n second(s) ago</source>
+        <translation><numerusform>pred %n sekundo</numerusform><numerusform>pred %n sekundama</numerusform><numerusform>pred %n sekundami</numerusform><numerusform>pred %n sekundami </numerusform></translation>
+    </message>
+    <message>
+        <location line="-312"/>
+        <source>About XDECoin card</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show information about XDECoin card</source>
+        <translation type="unfinished"/>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>&amp;Unlock Wallet...</source>
+        <translation>&amp;Odkleni denarnico...</translation>
+    </message>
+    <message numerus="yes">
+        <location line="+297"/>
+        <source>%n minute(s) ago</source>
+        <translation><numerusform>Pred %n minuto</numerusform><numerusform>Pred %n minutama</numerusform><numerusform>Pred %n minutami</numerusform><numerusform>Pred %n minutami</numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n hour(s) ago</source>
+        <translation><numerusform>Pred %n uro.</numerusform><numerusform>Pred %n urama.</numerusform><numerusform>Pred %n urami.</numerusform><numerusform>Pred %n urami.</numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n day(s) ago</source>
+        <translation><numerusform>Pred %n dnevom.</numerusform><numerusform>Pred %n dnevoma.</numerusform><numerusform>Pred %n dnevi.</numerusform><numerusform>Pred %n dnevi.</numerusform></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Up to date</source>
+        <translation>Posodobljeno</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Catching up...</source>
+        <translation>Pridobivanje ...</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Last received block was generated %1.</source>
+        <translation>Zadnji prejeti blok je bil ustvarjen %1.</translation>
+    </message>
+    <message>
+        <location line="+59"/>
+        <source>This transaction is over the size limit.  You can still send it for a fee of %1, which goes to the nodes that process your transaction and helps to support the network.  Do you want to pay the fee?</source>
+        <translation>Ta transakcija je prekoračila limit. Še vedno jo lahko pošljete za plačilo %1 transakcije, ki je plačano vsem delom omrežja kot deležnina in pomaga zagotavljati njegovo varnost. Ali želite plačati provizijo?</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Confirm transaction fee</source>
+        <translation>Potrdi transakcijsko provizijo</translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>Sent transaction</source>
+        <translation>Odlivi</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Incoming transaction</source>
+        <translation>Prilivi</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date: %1
+Amount: %2
+Type: %3
+Address: %4
+</source>
+        <translation>Datum: %1
+Količina: %2
+Vrsta: %3
+Naslov: %4
+</translation>
+    </message>
+    <message>
+        <location line="+100"/>
+        <location line="+15"/>
+        <source>URI handling</source>
+        <translation>Rokovanje z URI</translation>
+    </message>
+    <message>
+        <location line="-15"/>
+        <location line="+15"/>
+        <source>URI can not be parsed! This can be caused by an invalid XDECoin address or malformed URI parameters.</source>
+        <translation>URI ne more biti razčlenjen! To se lahko zgodi zaradi neveljavnega XDECoin naslova ali slabih parametrov URI.</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;unlocked&lt;/b&gt;</source>
+        <translation>Denarnica je &lt;b&gt;šifrirana&lt;/b&gt; in trenutno &lt;b&gt;odklenjena&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</source>
+        <translation>Denarnica je &lt;b&gt;šifrirana&lt;/b&gt; in trenutno &lt;b&gt;zaklenjena&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Backup Wallet</source>
+        <translation>Napravi varnostno kopijo denarnice</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Wallet Data (*.dat)</source>
+        <translation>Datoteka denarnice (*.dat)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Backup Failed</source>
+        <translation>Ustvarjanje varnostne kopije je spodeltelo </translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>There was an error trying to save the wallet data to the new location.</source>
+        <translation>Prišlo je do napake ob poskušanju shranjevanja dat
