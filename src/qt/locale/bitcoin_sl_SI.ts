@@ -698,4 +698,300 @@ Naslov: %4
     <message>
         <location line="+0"/>
         <source>There was an error trying to save the wallet data to the new location.</source>
-        <translation>Prišlo je do napake ob poskušanju shranjevanja dat
+        <translation>Prišlo je do napake ob poskušanju shranjevanja datoteke denarnice na novo lokacijo.</translation>
+    </message>
+    <message numerus="yes">
+        <location line="+76"/>
+        <source>%n second(s)</source>
+        <translation><numerusform>%n sekundo</numerusform><numerusform>%n sekundama</numerusform><numerusform>%n sekund</numerusform><numerusform>%n sekund</numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n minute(s)</source>
+        <translation><numerusform>%n minuto</numerusform><numerusform>%n minutama</numerusform><numerusform>%n minut</numerusform><numerusform>%n minut</numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n hour(s)</source>
+        <translation><numerusform>%n ura</numerusform><numerusform>%n uri</numerusform><numerusform>%n ure</numerusform><numerusform>%n ura</numerusform></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+4"/>
+        <source>%n day(s)</source>
+        <translation><numerusform>%n dan</numerusform><numerusform>%n dneva</numerusform><numerusform>%n dnevi</numerusform><numerusform>%n dni</numerusform></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Not staking</source>
+        <translation>Ne deležite</translation>
+    </message>
+    <message>
+        <location filename="../bitcoin.cpp" line="+109"/>
+        <source>A fatal error occurred. XDECoin can no longer continue safely and will quit.</source>
+        <translation>Prišlo je do usodne napake. Program XDECoin se ne more več varno nadaljevati in se bo zato zaprl. </translation>
+    </message>
+</context>
+<context>
+    <name>ClientModel</name>
+    <message>
+        <location filename="../clientmodel.cpp" line="+90"/>
+        <source>Network Alert</source>
+        <translation>Omrežno Opozorilo</translation>
+    </message>
+</context>
+<context>
+    <name>CoinControlDialog</name>
+    <message>
+        <location filename="../forms/coincontroldialog.ui" line="+14"/>
+        <source>Coin Control</source>
+        <translation>Kontrola kovancev</translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Quantity:</source>
+        <translation>Količina:</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Bytes:</source>
+        <translation>Biti:</translation>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>Amount:</source>
+        <translation>Količina:</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Priority:</source>
+        <translation>Prednostno mesto:</translation>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>Fee:</source>
+        <translation>Provizija:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Low Output:</source>
+        <translation>Nizek output:</translation>
+    </message>
+    <message>
+        <location filename="../coincontroldialog.cpp" line="+551"/>
+        <source>no</source>
+        <translation>ne</translation>
+    </message>
+    <message>
+        <location filename="../forms/coincontroldialog.ui" line="+51"/>
+        <source>After Fee:</source>
+        <translation>Po proviziji:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Change:</source>
+        <translation>Sprememba:</translation>
+    </message>
+    <message>
+        <location line="+69"/>
+        <source>(un)select all</source>
+        <translation>od/obkljukaj vse</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Tree mode</source>
+        <translation>Drevo</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>List mode</source>
+        <translation>Seznam</translation>
+    </message>
+    <message>
+        <location line="+45"/>
+        <source>Amount</source>
+        <translation>Količina</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Label</source>
+        <translation>Oznaka</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Address</source>
+        <translation>Naslov</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Date</source>
+        <translation>Datum</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Confirmations</source>
+        <translation>Potrdila</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Confirmed</source>
+        <translation>Potrjeno</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Priority</source>
+        <translation>Prednostno mesto</translation>
+    </message>
+    <message>
+        <location filename="../coincontroldialog.cpp" line="-515"/>
+        <source>Copy address</source>
+        <translation>Kopiraj naslov</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy label</source>
+        <translation>Kopiraj oznako</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+26"/>
+        <source>Copy amount</source>
+        <translation>Kopiraj količino</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>Copy transaction ID</source>
+        <translation>Kopiraj ID transakcije</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Copy quantity</source>
+        <translation>Kopiraj količino</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Copy fee</source>
+        <translation>Kopiraj provizijo</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy after fee</source>
+        <translation>Kopiraj po proviziji</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy bytes</source>
+        <translation>Kopiraj bite</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy priority</source>
+        <translation>Kopiraj prednostno mesto</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy low output</source>
+        <translation>Kopiraj nizek output:</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy change</source>
+        <translation>Kopiraj spremembo</translation>
+    </message>
+    <message>
+        <location line="+317"/>
+        <source>highest</source>
+        <translation>najvišja</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>high</source>
+        <translation>visoka</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>medium-high</source>
+        <translation>srednje visoka</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>medium</source>
+        <translation>srednje</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>low-medium</source>
+        <translation>srednje nizka</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>low</source>
+        <translation>nizka</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>lowest</source>
+        <translation>najnižja</translation>
+    </message>
+    <message>
+        <location line="+155"/>
+        <source>DUST</source>
+        <translation>PRAH</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>yes</source>
+        <translation>da</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>This label turns red, if the transaction size is bigger than 10000 bytes.
+
+ This means a fee of at least %1 per kb is required.
+
+ Can vary +/- 1 Byte per input.</source>
+        <translation>Ta oznakla se obarva rdeče, če je transakcija večja od 10000 bajtov.
+
+ To pomeni, da je zahtevana provizija vsaj %1 na kb.
+
+ Lahko variira +/- 1 Bajt na vnos.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Transactions with higher priority get more likely into a block.
+
+This label turns red, if the priority is smaller than &quot;medium&quot;.
+
+ This means a fee of at least %1 per kb is required.</source>
+        <translation>Transakcije z višjo prioriteto imajo višjo verjetnost, da so vključene v blok.
+
+Ta oznaka se obarva rdeče, če je prioriteta manjša kot &quot;srednja&quot;.
+
+ To pomeni, da je zahtevana provizija vsaj %1 na kb.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This label turns red, if any recipient receives an amount smaller than %1.
+
+ This means a fee of at least %2 is required. 
+
+ Amounts below 0.546 times the minimum relay fee are shown as DUST.</source>
+        <translation>Ta oznaka se obarva rdeče, če prejemnik dobi količino manjšo od %1.
+
+ To pomeni, da je potrebna vsaj %2 provizija.  
+
+ Zneski pod 0.546 krat minimalna transakcijska provizija so prikazani kot PRAH.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This label turns red, if the change is smaller than %1.
+
+ This means a fee of at least %2 is required.</source>
+        <translation>Ta oznakla se obarva rdeče, če je sprememba manjša od %1.
+
+ To pomeni, da je zahtevana provizija vsaj %2.</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <location line="+66"/>
+        <source>(no label)</source>
+        <translation>(ni oznake)</translation>
