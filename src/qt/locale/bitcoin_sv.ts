@@ -193,4 +193,240 @@ Denna produkten innehåller mjukvara utvecklad av OpenSSL Project för användni
     <message>
         <location filename="../askpassphrasedialog.cpp" line="+35"/>
         <source>Enter the new passphrase to the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;10 or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
-        <translation>Ange plånbokens nya lösenord. &lt;br/&gt; Använd ett lösenord på &lt;b
+        <translation>Ange plånbokens nya lösenord. &lt;br/&gt; Använd ett lösenord på &lt;b&gt;10 eller fler slumpmässiga tecken,&lt;/b&gt; eller &lt;b&gt;åtta eller fler ord.&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Encrypt wallet</source>
+        <translation>Kryptera plånbok</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>This operation needs your wallet passphrase to unlock the wallet.</source>
+        <translation>Denna operation behöver din plånboks lösenord för att låsa upp plånboken.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Unlock wallet</source>
+        <translation>Lås upp plånbok</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>This operation needs your wallet passphrase to decrypt the wallet.</source>
+        <translation>Denna operation behöver din plånboks lösenord för att dekryptera plånboken.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Decrypt wallet</source>
+        <translation>Dekryptera plånbok</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Change passphrase</source>
+        <translation>Ändra lösenord</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Enter the old and new passphrase to the wallet.</source>
+        <translation>Ange plånbokens gamla och nya lösenord.</translation>
+    </message>
+    <message>
+        <location line="+46"/>
+        <source>Confirm wallet encryption</source>
+        <translation>Bekräfta kryptering av plånbok</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR COINS&lt;/b&gt;!</source>
+        <translation>Varning: Om du krypterar plånboken och glömmer lösenordet, kommer du att &lt;b&gt;FÖRLORA ALLA COINS&lt;/b&gt;!</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Are you sure you wish to encrypt your wallet?</source>
+        <translation>Är du säker på att du vill kryptera din plånbok?</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
+        <translation>VIKTIGT: Alla tidigare säkerhetskopior du har gjort av plånbokens fil ska ersättas med den nya genererade, krypterade plånboks filen. Av säkerhetsskäl kommer tidigare säkerhetskopior av den okrypterade plånboks filen blir oanvändbara när du börjar använda en ny, krypterad plånbok.</translation>
+    </message>
+    <message>
+        <location line="+103"/>
+        <location line="+24"/>
+        <source>Warning: The Caps Lock key is on!</source>
+        <translation>Varning: Caps Lock är påslaget!</translation>
+    </message>
+    <message>
+        <location line="-133"/>
+        <location line="+60"/>
+        <source>Wallet encrypted</source>
+        <translation>Plånboken är krypterad</translation>
+    </message>
+    <message>
+        <location line="-58"/>
+        <source>XDECoin will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your coins from being stolen by malware infecting your computer.</source>
+        <translation>XDECoin plånboken kommer nu att stängas för att slutföra krypteringen: Kom ihåg att även en krypterad plånboks säkerhet kan äventyras genom keyloggers eller dylika malwares.</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <location line="+7"/>
+        <location line="+44"/>
+        <location line="+6"/>
+        <source>Wallet encryption failed</source>
+        <translation>Kryptering av plånbok misslyckades</translation>
+    </message>
+    <message>
+        <location line="-56"/>
+        <source>Wallet encryption failed due to an internal error. Your wallet was not encrypted.</source>
+        <translation>Kryptering av plånbok misslyckades på grund av ett internt fel. Din plånbok blev inte krypterad.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <location line="+50"/>
+        <source>The supplied passphrases do not match.</source>
+        <translation>De angivna lösenorden överensstämmer inte.</translation>
+    </message>
+    <message>
+        <location line="-38"/>
+        <source>Wallet unlock failed</source>
+        <translation>Upplåsning av plånbok misslyckades</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+12"/>
+        <location line="+19"/>
+        <source>The passphrase entered for the wallet decryption was incorrect.</source>
+        <translation>Lösenordet för dekryptering av plånbok var felaktig.</translation>
+    </message>
+    <message>
+        <location line="-20"/>
+        <source>Wallet decryption failed</source>
+        <translation>Dekryptering av plånbok misslyckades</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Wallet passphrase was successfully changed.</source>
+        <translation>Plånbokens lösenord har ändrats.</translation>
+    </message>
+</context>
+<context>
+    <name>BitcoinGUI</name>
+    <message>
+        <location filename="../bitcoingui.cpp" line="+282"/>
+        <source>Sign &amp;message...</source>
+        <translation>Signera &amp;meddelande...</translation>
+    </message>
+    <message>
+        <location line="+251"/>
+        <source>Synchronizing with network...</source>
+        <translation>Synkroniserar med nätverk...</translation>
+    </message>
+    <message>
+        <location line="-319"/>
+        <source>&amp;Overview</source>
+        <translation>&amp;Översikt</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show general overview of wallet</source>
+        <translation>Visa översiktsvy av plånbok</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>&amp;Transactions</source>
+        <translation>&amp;Transaktioner</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Browse transaction history</source>
+        <translation>Bläddra i transaktionshistorik</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>&amp;Address Book</source>
+        <translation>&amp;Adress bok</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Edit the list of stored addresses and labels</source>
+        <translation>Editera listan över sparade adresser och deras namn</translation>
+    </message>
+    <message>
+        <location line="-13"/>
+        <source>&amp;Receive coins</source>
+        <translation>&amp;Ta emot coins</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show the list of addresses for receiving payments</source>
+        <translation>Visa adresslista för att mottaga betalningar</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>&amp;Send coins</source>
+        <translation>&amp;Skicka coins</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>E&amp;xit</source>
+        <translation>&amp;Avsluta</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Quit application</source>
+        <translation>Avsluta programmet</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Show information about XDECoin</source>
+        <translation>Visa information om XDECoin</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>About &amp;Qt</source>
+        <translation>Om &amp;Qt</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show information about Qt</source>
+        <translation>Visa information om Qt</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>&amp;Options...</source>
+        <translation>&amp;Alternativ...</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>&amp;Encrypt Wallet...</source>
+        <translation>&amp;Kryptera plånbok...</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>&amp;Backup Wallet...</source>
+        <translation>&amp;Säkerhetskopiera plånbok...</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>&amp;Change Passphrase...</source>
+        <translation>&amp;Byt Lösenord...</translation>
+    </message>
+    <message numerus="yes">
+        <location line="+259"/>
+        <source>~%n block(s) remaining</source>
+        <translation><numerusform>~%n block remaining</numerusform><numerusform>~%n block kvar</numerusform></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Downloaded %1 of %2 blocks of transaction history (%3% done).</source>
+        <translation>Laddat ner %1 av %2 block av transaktions-historiken (%3% klart)</translation>
+    </message>
+    <message>
+        <location line="-256"/>
+        <source>&amp;Export...</source>
+        <translation>&amp;Exportera...</translation>
+    </message>
+    <message>
+        <location line="-64"/>
+        <source>Send coins to a XDECoin address</source>
+        <translation>Skicka coins till en XDECoi
