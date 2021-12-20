@@ -1237,4 +1237,259 @@ Detta betyder att en avgift på minst %2 krävs.</translation>
     <message>
         <location line="+6"/>
         <source>Show only a tray icon after minimizing the window.</source>
-        <translation>Visa endast en sys
+        <translation>Visa endast en systemfältsikon vid minimering.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>&amp;Minimize to the tray instead of the taskbar</source>
+        <translation>&amp;Minimera till systemfältet istället för aktivitetsfältet</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Minimize instead of exit the application when the window is closed. When this option is enabled, the application will be closed only after selecting Quit in the menu.</source>
+        <translation>Minimera applikationen istället för att stänga ner den när fönstret stängs. Detta innebär att programmet fotrsätter att köras tills du väljer Avsluta i menyn.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>M&amp;inimize on close</source>
+        <translation>M&amp;inimera vid stängning</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>&amp;Display</source>
+        <translation>&amp;Visa</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>User Interface &amp;language:</source>
+        <translation>Användargränssnittets &amp;språk: </translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>The user interface language can be set here. This setting will take effect after restarting XDECoin.</source>
+        <translation>Användargränssnittets språk kan ställas in här. Inställningen börjar gälla efter omstart av XDECoin.</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>&amp;Unit to show amounts in:</source>
+        <translation>&amp;Måttenhet att visa belopp i: </translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Choose the default subdivision unit to show in the interface and when sending coins.</source>
+        <translation>Välj en måttenhet att visa när du skickar mynt.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Whether to show XDECoin addresses in the transaction list or not.</source>
+        <translation>Om XDECoin adresser skall visas i transaktionslistan eller inte.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>&amp;Display addresses in transaction list</source>
+        <translation>&amp;Visa adresser i transaktionslistan</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Whether to show coin control features or not.</source>
+        <translation>Om coin kontrollinställningar skall visas eller inte.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Display coin &amp;control features (experts only!)</source>
+        <translation>Visa coin kontrollinställningar (endast avancerade användare!)</translation>
+    </message>
+    <message>
+        <location line="+71"/>
+        <source>&amp;OK</source>
+        <translation>&amp;OK</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>&amp;Cancel</source>
+        <translation>&amp;Avbryt</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>&amp;Apply</source>
+        <translation>&amp;Verkställ</translation>
+    </message>
+    <message>
+        <location filename="../optionsdialog.cpp" line="+55"/>
+        <source>default</source>
+        <translation>standard</translation>
+    </message>
+    <message>
+        <location line="+149"/>
+        <location line="+9"/>
+        <source>Warning</source>
+        <translation>Varning</translation>
+    </message>
+    <message>
+        <location line="-9"/>
+        <location line="+9"/>
+        <source>This setting will take effect after restarting XDECoin.</source>
+        <translation>Inställningen börjar gälla efter omstart av XDECoin.</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>The supplied proxy address is invalid.</source>
+        <translation>Den medföljande proxy adressen är ogiltig.</translation>
+    </message>
+</context>
+<context>
+    <name>OverviewPage</name>
+    <message>
+        <location filename="../forms/overviewpage.ui" line="+14"/>
+        <source>Form</source>
+        <translation>Formulär</translation>
+    </message>
+    <message>
+        <location line="+33"/>
+        <location line="+231"/>
+        <source>The displayed information may be out of date. Your wallet automatically synchronizes with the XDECoin network after a connection is established, but this process has not completed yet.</source>
+        <translation>Den visade informationen kan vara gammal. Din plånbok synkroniseras automatiskt med XDECoin nätverket efter att en anslutning skapats, men denna process är inte klar än.</translation>
+    </message>
+    <message>
+        <location line="-160"/>
+        <source>Stake:</source>
+        <translation>Stake:</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>Unconfirmed:</source>
+        <translation>Obekräftat:</translation>
+    </message>
+    <message>
+        <location line="-107"/>
+        <source>Wallet</source>
+        <translation>Plånbok</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>Spendable:</source>
+        <translation>Spenderbart:</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Your current spendable balance</source>
+        <translation>Ditt tillgängliga saldo</translation>
+    </message>
+    <message>
+        <location line="+71"/>
+        <source>Immature:</source>
+        <translation>Omogen:</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Mined balance that has not yet matured</source>
+        <translation>Den genererade balansen som ännu inte har mognat</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Total:</source>
+        <translation>Totalt:</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Your current total balance</source>
+        <translation>Ditt nuvarande totala saldo</translation>
+    </message>
+    <message>
+        <location line="+46"/>
+        <source>&lt;b&gt;Recent transactions&lt;/b&gt;</source>
+        <translation>&lt;b&gt;Nyligen genomförda transaktioner&lt;/b&gt;</translation>
+    </message>
+    <message>
+        <location line="-108"/>
+        <source>Total of transactions that have yet to be confirmed, and do not yet count toward the current balance</source>
+        <translation>Totala antalet transaktioner inte har blivit bekräftade än och därför inte räknas mot det totala saldot</translation>
+    </message>
+    <message>
+        <location line="-29"/>
+        <source>Total of coins that was staked, and do not yet count toward the current balance</source>
+        <translation>Antal coins som var i stake-processen, och räknas ännu inte till nuvarande saldo</translation>
+    </message>
+    <message>
+        <location filename="../overviewpage.cpp" line="+113"/>
+        <location line="+1"/>
+        <source>out of sync</source>
+        <translation>osynkroniserad</translation>
+    </message>
+</context>
+<context>
+    <name>QRCodeDialog</name>
+    <message>
+        <location filename="../forms/qrcodedialog.ui" line="+14"/>
+        <source>QR Code Dialog</source>
+        <translation>QR-Kod Dialog</translation>
+    </message>
+    <message>
+        <location line="+59"/>
+        <source>Request Payment</source>
+        <translation>Begär Betalning</translation>
+    </message>
+    <message>
+        <location line="+56"/>
+        <source>Amount:</source>
+        <translation>Belopp:</translation>
+    </message>
+    <message>
+        <location line="-44"/>
+        <source>Label:</source>
+        <translation>Etikett:</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Message:</source>
+        <translation>Meddelande:</translation>
+    </message>
+    <message>
+        <location line="+71"/>
+        <source>&amp;Save As...</source>
+        <translation>&amp;Spara Som...</translation>
+    </message>
+    <message>
+        <location filename="../qrcodedialog.cpp" line="+62"/>
+        <source>Error encoding URI into QR Code.</source>
+        <translation>Fel vid skapande av QR-kod från URI.</translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>The entered amount is invalid, please check.</source>
+        <translation>Den angivna mängden är felaktig, var vänlig kontrollera.</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Resulting URI too long, try to reduce the text for label / message.</source>
+        <translation>URI:n är för lång, försök minska texten för etikett / meddelande.</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Save QR Code</source>
+        <translation>Spara QR-kod</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>PNG Images (*.png)</source>
+        <translation>PNG Bilder (*.png)</translation>
+    </message>
+</context>
+<context>
+    <name>RPCConsole</name>
+    <message>
+        <location filename="../forms/rpcconsole.ui" line="+46"/>
+        <source>Client name</source>
+        <translation>Klientnamn</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <location line="+23"/>
+        <location line="+26"/>
+        <location line="+23"/>
+        <location line="+23"/>
+        <location line="+36"/>
+        <location line="+53"/>
+        <location line="+23"/>
+        <location line="+23"/>
+        <location filename="../rpccons
