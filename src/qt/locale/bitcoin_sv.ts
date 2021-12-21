@@ -1492,4 +1492,299 @@ Detta betyder att en avgift på minst %2 krävs.</translation>
         <location line="+53"/>
         <location line="+23"/>
         <location line="+23"/>
-        <location filename="../rpccons
+        <location filename="../rpcconsole.cpp" line="+348"/>
+        <source>N/A</source>
+        <translation>ej tillgänglig</translation>
+    </message>
+    <message>
+        <location line="-217"/>
+        <source>Client version</source>
+        <translation>Klient-version</translation>
+    </message>
+    <message>
+        <location line="-45"/>
+        <source>&amp;Information</source>
+        <translation>&amp;Information</translation>
+    </message>
+    <message>
+        <location line="+68"/>
+        <source>Using OpenSSL version</source>
+        <translation>Använder OpenSSL version</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>Startup time</source>
+        <translation>Uppstartstid</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>Network</source>
+        <translation>Nätverk</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Number of connections</source>
+        <translation>Antalet anslutningar</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>On testnet</source>
+        <translation>På testnet</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Block chain</source>
+        <translation>Blockkedja</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Current number of blocks</source>
+        <translation>Aktuellt antal block</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Estimated total blocks</source>
+        <translation>Beräknade totala block</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Last block time</source>
+        <translation>Sista blocktid</translation>
+    </message>
+    <message>
+        <location line="+52"/>
+        <source>&amp;Open</source>
+        <translation>&amp;Öppna</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Command-line options</source>
+        <translation>Kommandoradsalternativ</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Show the XDECoin-Qt help message to get a list with possible XDECoin command-line options.</source>
+        <translation>Visa XDECoin-Qt hjälp meddelandet för att få en lista över möjliga XDECoin kommandoradsalternativ.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>&amp;Show</source>
+        <translation>&amp;Visa</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>&amp;Console</source>
+        <translation>&amp;Konsol</translation>
+    </message>
+    <message>
+        <location line="-260"/>
+        <source>Build date</source>
+        <translation>Kompileringsdatum</translation>
+    </message>
+    <message>
+        <location line="-104"/>
+        <source>XDECoin - Debug window</source>
+        <translation>XDECoin - Felsökningsfönster</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>XDECoin Core</source>
+        <translation>XDECoin Core</translation>
+    </message>
+    <message>
+        <location line="+279"/>
+        <source>Debug log file</source>
+        <translation>Debugloggfil</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Open the XDECoin debug log file from the current data directory. This can take a few seconds for large log files.</source>
+        <translation>Öppna XDECoin felsöknings-loggfilen från nuvarande data mapp. Detta kan kan ta ett par minuter för stora log filer.</translation>
+    </message>
+    <message>
+        <location line="+102"/>
+        <source>Clear console</source>
+        <translation>Rensa konsollen</translation>
+    </message>
+    <message>
+        <location filename="../rpcconsole.cpp" line="-33"/>
+        <source>Welcome to the XDECoin RPC console.</source>
+        <translation>Välkommen till XDECoin RPC konsoll.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
+        <translation>Använd upp- och ner-pilarna för att navigera i historiken, och &lt;b&gt;Ctrl-L&lt;/b&gt; för att rensa skärmen.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Type &lt;b&gt;help&lt;/b&gt; for an overview of available commands.</source>
+        <translation>Skriv &lt;b&gt;help&lt;/b&gt; för en översikt av alla kommandon.</translation>
+    </message>
+</context>
+<context>
+    <name>SendCoinsDialog</name>
+    <message>
+        <location filename="../forms/sendcoinsdialog.ui" line="+14"/>
+        <location filename="../sendcoinsdialog.cpp" line="+182"/>
+        <location line="+5"/>
+        <location line="+5"/>
+        <location line="+5"/>
+        <location line="+6"/>
+        <location line="+5"/>
+        <location line="+5"/>
+        <source>Send Coins</source>
+        <translation>Skicka pengar</translation>
+    </message>
+    <message>
+        <location line="+76"/>
+        <source>Coin Control Features</source>
+        <translation>Coin kontrollinställningar</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Inputs...</source>
+        <translation>Ingångar...</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>automatically selected</source>
+        <translation>automatiskt vald</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Insufficient funds!</source>
+        <translation>Otillräckligt saldo!</translation>
+    </message>
+    <message>
+        <location line="+77"/>
+        <source>Quantity:</source>
+        <translation>Antal:</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <location line="+35"/>
+        <source>0</source>
+        <translation>0</translation>
+    </message>
+    <message>
+        <location line="-19"/>
+        <source>Bytes:</source>
+        <translation>Bytes:</translation>
+    </message>
+    <message>
+        <location line="+51"/>
+        <source>Amount:</source>
+        <translation>Belopp:</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <location line="+86"/>
+        <location line="+86"/>
+        <location line="+32"/>
+        <source>0.00 XDE</source>
+        <translation>123.456 XDE {0.00 ?}</translation>
+    </message>
+    <message>
+        <location line="-191"/>
+        <source>Priority:</source>
+        <translation>Prioritet:</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>medium</source>
+        <translation>mellan</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Fee:</source>
+        <translation>Avgift:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Low Output:</source>
+        <translation>Låg utmatning:</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>no</source>
+        <translation>nej</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>After Fee:</source>
+        <translation>Efter avgift:</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Change</source>
+        <translation>Ändra</translation>
+    </message>
+    <message>
+        <location line="+50"/>
+        <source>custom change address</source>
+        <translation>egen ändringsadress</translation>
+    </message>
+    <message>
+        <location line="+106"/>
+        <source>Send to multiple recipients at once</source>
+        <translation>Skicka till flera mottagare samtidigt</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Add &amp;Recipient</source>
+        <translation>Lägg till &amp;mottagare</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Remove all transaction fields</source>
+        <translation>Ta bort alla transaktionsfält</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Clear &amp;All</source>
+        <translation>Rensa &amp;alla</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>Balance:</source>
+        <translation>Balans:</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>123.456 XDE</source>
+        <translation>123.456 XDE</translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Confirm the send action</source>
+        <translation>Bekräfta sändordern</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>S&amp;end</source>
+        <translation>&amp;Skicka</translation>
+    </message>
+    <message>
+        <location filename="../sendcoinsdialog.cpp" line="-173"/>
+        <source>Enter a XDECoin address (e.g. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</source>
+        <translation>Fyll i en XDECoin adress (t.ex. XCtNxrMDU7MN5EsPxuDtUhnSkRSFjd5hpT)</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Copy quantity</source>
+        <translation>Kopiera antal</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy amount</source>
+        <translation>Kopiera belopp</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy fee</source>
+        <translation>Kopiera avgift</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Copy after fe
