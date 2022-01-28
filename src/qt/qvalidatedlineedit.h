@@ -14,4 +14,16 @@ public:
     void clear();
 
 protected:
-    v
+    void focusInEvent(QFocusEvent *evt);
+
+private:
+    bool valid;
+
+public slots:
+    void setValid(bool valid);
+
+private slots:
+    void markValid();
+};
+
+#endif // QVALIDATEDLINEEDIT_H
