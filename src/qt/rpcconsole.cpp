@@ -277,4 +277,161 @@ void RPCConsole::setClientModel(ClientModel *model)
 
 static QString categoryClass(int category)
 {
-    switch(ca
+    switch(category)
+    {
+    case RPCConsole::CMD_REQUEST:  return "cmd-request"; break;
+    case RPCConsole::CMD_REPLY:    return "cmd-reply"; break;
+    case RPCConsole::CMD_ERROR:    return "cmd-error"; break;
+    default:                       return "misc";
+    }
+}
+
+void RPCConsole::clear()
+{
+    ui->messagesWidget->clear();
+    ui->lineEdit->clear();
+    ui->lineEdit->setFocus();
+
+    // Add smoothly scaled icon images.
+    // (when using width/height on an img, Qt uses nearest instead of linear interpolation)
+    for(int i=0; ICON_MAPPING[i].url; ++i)
+    {
+        ui->messagesWidget->document()->addResource(
+                    QTextDocument::ImageResource,
+                    QUrl(ICON_MAPPING[i].url),
+                    QImage(ICON_MAPPING[i].source).scaled(ICON_SIZE, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+    }
+
+    // Set default style sheet
+    ui->messagesWidget->document()->setDefaultStyleSheet(
+                "table { }"
+                "td.time { color: #808080; padding-top: 3px; } "
+                "td.message { font-family: Monospace; font-size: 12px; } "
+                "td.cmd-request { color: #006060; } "
+                "td.cmd-error { color: red; } "
+                "b { color: #006060; } "
+                );
+
+    message(CMD_REPLY, (tr("Welcome to the XDECoin RPC console.") + "<br>" +
+                        tr("Use up and down arrows to navigate history, and <b>Ctrl-L</b> to clear screen.") + "<br>" +
+                        tr("Type <b>help</b> for an overview of available commands.")), true);
+}
+
+void RPCConsole::message(int category, const QString &message, bool html)
+{
+    QTime time = QTime::currentTime();
+    QString timeString = time.toString();
+    QString out;
+    out += "<table><tr><td class=\"time\" width=\"65\">" + timeString + "</td>";
+    out += "<td class=\"icon\" width=\"32\"><img src=\"" + categoryClass(category) + "\"></td>";
+    out += "<td class=\"message " + categoryClass(category) + "\" valign=\"middle\">";
+    if(html)
+        out += message;
+    else
+        out += GUIUtil::HtmlEscape(message, true);
+    out += "</td></tr></table>";
+    ui->messagesWidget->append(out);
+}
+
+void RPCConsole::setNumConnections(int count)
+{
+    ui->numberOfConnections->setText(QString::number(count));
+}
+
+void RPCConsole::setNumBlocks(int count, int countOfPeers)
+{
+    ui->numberOfBlocks->setText(QString::number(count));
+    ui->totalBlocks->setText(QString::number(countOfPeers));
+    if(clientModel)
+    {
+        // If there is no current number available display N/A instead of 0, which can't ever be true
+        ui->totalBlocks->setText(clientModel->getNumBlocksOfPeers() == 0 ? tr("N/A") : QString::number(clientModel->getNumBlocksOfPeers()));
+        ui->lastBlockTime->setText(clientModel->getLastBlockDate().toString());
+    }
+}
+
+void RPCConsole::on_lineEdit_returnPressed()
+{
+    QString cmd = ui->lineEdit->text();
+    ui->lineEdit->clear();
+
+    if(!cmd.isEmpty())
+    {
+        message(CMD_REQUEST, cmd);
+        emit cmdRequest(cmd);
+        // Truncate history from current position
+        history.erase(history.begin() + historyPtr, history.end());
+        // Append command to history
+        history.append(cmd);
+        // Enforce maximum history size
+        while(history.size() > CONSOLE_HISTORY)
+            history.removeFirst();
+        // Set pointer to end of history
+        historyPtr = history.size();
+        // Scroll console view to end
+        scrollToEnd();
+    }
+}
+
+void RPCConsole::browseHistory(int offset)
+{
+    historyPtr += offset;
+    if(historyPtr < 0)
+        historyPtr = 0;
+    if(historyPtr > history.size())
+        historyPtr = history.size();
+    QString cmd;
+    if(historyPtr < history.size())
+        cmd = history.at(historyPtr);
+    ui->lineEdit->setText(cmd);
+}
+
+void RPCConsole::startExecutor()
+{
+    QThread* thread = new QThread;
+    RPCExecutor *executor = new RPCExecutor();
+    executor->moveToThread(thread);
+
+    // Notify executor when thread started (in executor thread)
+    connect(thread, SIGNAL(started()), executor, SLOT(start()));
+    // Replies from executor object must go to this object
+    connect(executor, SIGNAL(reply(int,QString)), this, SLOT(message(int,QString)));
+    // Requests from this object must go to executor
+    connect(this, SIGNAL(cmdRequest(QString)), executor, SLOT(request(QString)));
+    // On stopExecutor signal
+    // - queue executor for deletion (in execution thread)
+    // - quit the Qt event loop in the execution thread
+    connect(this, SIGNAL(stopExecutor()), executor, SLOT(deleteLater()));
+    connect(this, SIGNAL(stopExecutor()), thread, SLOT(quit()));
+    // Queue the thread for deletion (in this thread) when it is finished
+    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+
+    // Default implementation of QThread::run() simply spins up an event loop in the thread,
+    // which is what we want.
+    thread->start();
+}
+
+void RPCConsole::on_tabWidget_currentChanged(int index)
+{
+    if(ui->tabWidget->widget(index) == ui->tab_console)
+    {
+        ui->lineEdit->setFocus();
+    }
+}
+
+void RPCConsole::on_openDebugLogfileButton_clicked()
+{
+    GUIUtil::openDebugLogfile();
+}
+
+void RPCConsole::scrollToEnd()
+{
+    QScrollBar *scrollbar = ui->messagesWidget->verticalScrollBar();
+    scrollbar->setValue(scrollbar->maximum());
+}
+
+void RPCConsole::on_showCLOptionsButton_clicked()
+{
+    GUIUtil::HelpMessageBox help;
+    help.exec();
+}
