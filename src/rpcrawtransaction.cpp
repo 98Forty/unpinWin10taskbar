@@ -539,4 +539,26 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     uint256 hashTx = tx.GetHash();
 
     // See if the transaction is already in a block
-    // or in 
+    // or in the memory pool:
+    CTransaction existingTx;
+    uint256 hashBlock = 0;
+    if (GetTransaction(hashTx, existingTx, hashBlock))
+    {
+        if (hashBlock != 0)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("transaction already in block ")+hashBlock.GetHex());
+        // Not in block, but already in the memory pool; will drop
+        // through to re-relay it.
+    }
+    else
+    {
+        // push to local node
+        CTxDB txdb("r");
+        if (!tx.AcceptToMemoryPool(txdb))
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX rejected");
+
+        SyncWithWallets(tx, NULL, true);
+    }
+    RelayTransaction(tx, hashTx);
+
+    return hashTx.GetHex();
+}
