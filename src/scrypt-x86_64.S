@@ -749,4 +749,111 @@ xmm_scrypt_core_loop2:
 	pshufd	$0x39, %xmm8, %xmm8
 	pshufd	$0x39, %xmm9, %xmm9
 	pshufd	$0x39, %xmm10, %xmm10
-	
+	pshufd	$0x39, %xmm11, %xmm11
+	movl	%eax, 0(%rdi)
+	movl	%edx, 48(%rdi)
+	movl	%ecx, 32(%rdi)
+	movl	%ebx, 16(%rdi)
+	movd	%xmm8, %ebx
+	movd	%xmm9, %eax
+	movd	%xmm10, %edx
+	movd	%xmm11, %ecx
+	pshufd	$0x39, %xmm8, %xmm8
+	pshufd	$0x39, %xmm9, %xmm9
+	pshufd	$0x39, %xmm10, %xmm10
+	pshufd	$0x39, %xmm11, %xmm11
+	movl	%ebx, 20(%rdi)
+	movl	%eax, 4(%rdi)
+	movl	%edx, 52(%rdi)
+	movl	%ecx, 36(%rdi)
+	movd	%xmm8, %ecx
+	movd	%xmm9, %ebx
+	movd	%xmm10, %eax
+	movd	%xmm11, %edx
+	pshufd	$0x39, %xmm8, %xmm8
+	pshufd	$0x39, %xmm9, %xmm9
+	pshufd	$0x39, %xmm10, %xmm10
+	pshufd	$0x39, %xmm11, %xmm11
+	movl	%ecx, 40(%rdi)
+	movl	%ebx, 24(%rdi)
+	movl	%eax, 8(%rdi)
+	movl	%edx, 56(%rdi)
+	movd	%xmm8, %edx
+	movd	%xmm9, %ecx
+	movd	%xmm10, %ebx
+	movd	%xmm11, %eax
+	movl	%edx, 60(%rdi)
+	movl	%ecx, 44(%rdi)
+	movl	%ebx, 28(%rdi)
+	movl	%eax, 12(%rdi)
+
+	# re-shuffle 2nd block back
+	movd	%xmm12, %eax
+	movd	%xmm13, %edx
+	movd	%xmm14, %ecx
+	movd	%xmm15, %ebx
+	pshufd	$0x39, %xmm12, %xmm12
+	pshufd	$0x39, %xmm13, %xmm13
+	pshufd	$0x39, %xmm14, %xmm14
+	pshufd	$0x39, %xmm15, %xmm15
+	movl	%eax, 64(%rdi)
+	movl	%edx, 112(%rdi)
+	movl	%ecx, 96(%rdi)
+	movl	%ebx, 80(%rdi)
+	movd	%xmm12, %ebx
+	movd	%xmm13, %eax
+	movd	%xmm14, %edx
+	movd	%xmm15, %ecx
+	pshufd	$0x39, %xmm12, %xmm12
+	pshufd	$0x39, %xmm13, %xmm13
+	pshufd	$0x39, %xmm14, %xmm14
+	pshufd	$0x39, %xmm15, %xmm15
+	movl	%ebx, 84(%rdi)
+	movl	%eax, 68(%rdi)
+	movl	%edx, 116(%rdi)
+	movl	%ecx, 100(%rdi)
+	movd	%xmm12, %ecx
+	movd	%xmm13, %ebx
+	movd	%xmm14, %eax
+	movd	%xmm15, %edx
+	pshufd	$0x39, %xmm12, %xmm12
+	pshufd	$0x39, %xmm13, %xmm13
+	pshufd	$0x39, %xmm14, %xmm14
+	pshufd	$0x39, %xmm15, %xmm15
+	movl	%ecx, 104(%rdi)
+	movl	%ebx, 88(%rdi)
+	movl	%eax, 72(%rdi)
+	movl	%edx, 120(%rdi)
+	movd	%xmm12, %edx
+	movd	%xmm13, %ecx
+	movd	%xmm14, %ebx
+	movd	%xmm15, %eax
+	movl	%edx, 124(%rdi)
+	movl	%ecx, 108(%rdi)
+	movl	%ebx, 92(%rdi)
+	movl	%eax, 76(%rdi)
+
+	scrypt_core_cleanup()
+	ret
+
+	addq	$392, %rsp
+#if defined(WIN64)
+	popq	%rsi
+	popq	%rdi
+	movdqa	8(%rsp), %xmm6
+	movdqa	24(%rsp), %xmm7
+	movdqa	40(%rsp), %xmm8
+	movdqa	56(%rsp), %xmm9
+	movdqa	72(%rsp), %xmm10
+	movdqa	88(%rsp), %xmm11
+	movdqa	104(%rsp), %xmm12
+	movdqa	120(%rsp), %xmm13
+	movdqa	136(%rsp), %xmm14
+	movdqa	152(%rsp), %xmm15
+	addq	$176, %rsp
+#endif
+	popq	%rbp
+	popq	%rbx
+	ret
+
+#endif
