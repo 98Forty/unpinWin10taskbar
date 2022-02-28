@@ -49,3 +49,34 @@ void sph_fugue224_addbits_and_close(
 	void *cc, unsigned ub, unsigned n, void *dst);
 
 void sph_fugue256_init(void *cc);
+
+void sph_fugue256(void *cc, const void *data, size_t len);
+
+void sph_fugue256_close(void *cc, void *dst);
+
+void sph_fugue256_addbits_and_close(
+	void *cc, unsigned ub, unsigned n, void *dst);
+
+void sph_fugue384_init(void *cc);
+
+void sph_fugue384(void *cc, const void *data, size_t len);
+
+void sph_fugue384_close(void *cc, void *dst);
+
+void sph_fugue384_addbits_and_close(
+	void *cc, unsigned ub, unsigned n, void *dst);
+
+void sph_fugue512_init(void *cc);
+
+void sph_fugue512(void *cc, const void *data, size_t len);
+
+void sph_fugue512_close(void *cc, void *dst);
+
+void sph_fugue512_addbits_and_close(
+	void *cc, unsigned ub, unsigned n, void *dst);
+
+#ifdef __cplusplus
+}
+#endif	
+	
+#endif
