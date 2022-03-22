@@ -94,4 +94,30 @@ BOOST_AUTO_TEST_CASE(acc_orderupgrade)
     BOOST_CHECK(0 == vpwtx[2]->nOrderPos);
     BOOST_CHECK(results[1].nTime == 1333333333);
     BOOST_CHECK(2 == vpwtx[0]->nOrderPos);
-    BOOST_CHECK(results[3].nTime == 13333333
+    BOOST_CHECK(results[3].nTime == 1333333336);
+    BOOST_CHECK(results[4].nTime == 1333333330);
+    BOOST_CHECK(results[4].strComment.empty());
+    BOOST_CHECK(5 == vpwtx[1]->nOrderPos);
+
+
+    ae.nTime = 1333333334;
+    ae.strOtherAccount = "e";
+    ae.nOrderPos = -1;
+    walletdb.WriteAccountingEntry(ae);
+
+    GetResults(walletdb, results);
+
+    BOOST_CHECK(results.size() == 4);
+    BOOST_CHECK(pwalletMain->nOrderPosNext == 7);
+    BOOST_CHECK(0 == vpwtx[2]->nOrderPos);
+    BOOST_CHECK(results[1].nTime == 1333333333);
+    BOOST_CHECK(2 == vpwtx[0]->nOrderPos);
+    BOOST_CHECK(results[3].nTime == 1333333336);
+    BOOST_CHECK(results[3].strComment.empty());
+    BOOST_CHECK(results[4].nTime == 1333333330);
+    BOOST_CHECK(results[4].strComment.empty());
+    BOOST_CHECK(results[5].nTime == 1333333334);
+    BOOST_CHECK(6 == vpwtx[1]->nOrderPos);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
