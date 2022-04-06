@@ -305,4 +305,305 @@ tor_addr_lookup(const char *name, uint16_t family, tor_addr_t *addr)
 #ifdef _WIN32
     return (err == WSATRY_AGAIN) ? 1 : -1;
 #else
-    return (err == TRY_AGAIN) ? 1 
+    return (err == TRY_AGAIN) ? 1 : -1;
+#endif
+#endif
+  }
+}
+
+/** Return true iff <b>ip</b> is an IP reserved to localhost or local networks
+ * in RFC1918 or RFC4193 or RFC4291. (fec0::/10, deprecated by RFC3879, is
+ * also treated as internal for now.)
+ */
+int
+tor_addr_is_internal_(const tor_addr_t *addr, int for_listening,
+                      const char *filename, int lineno)
+{
+  uint32_t iph4 = 0;
+  uint32_t iph6[4];
+  sa_family_t v_family;
+  v_family = tor_addr_family(addr);
+
+  if (v_family == AF_INET) {
+    iph4 = tor_addr_to_ipv4h(addr);
+  } else if (v_family == AF_INET6) {
+    if (tor_addr_is_v4(addr)) { /* v4-mapped */
+      v_family = AF_INET;
+      iph4 = ntohl(tor_addr_to_in6_addr32(addr)[3]);
+    }
+  }
+
+  if (v_family == AF_INET6) {
+    const uint32_t *a32 = tor_addr_to_in6_addr32(addr);
+    iph6[0] = ntohl(a32[0]);
+    iph6[1] = ntohl(a32[1]);
+    iph6[2] = ntohl(a32[2]);
+    iph6[3] = ntohl(a32[3]);
+    if (for_listening && !iph6[0] && !iph6[1] && !iph6[2] && !iph6[3]) /* :: */
+      return 0;
+
+    if (((iph6[0] & 0xfe000000) == 0xfc000000) || /* fc00/7  - RFC4193 */
+        ((iph6[0] & 0xffc00000) == 0xfe800000) || /* fe80/10 - RFC4291 */
+        ((iph6[0] & 0xffc00000) == 0xfec00000))   /* fec0/10 D- RFC3879 */
+      return 1;
+
+    if (!iph6[0] && !iph6[1] && !iph6[2] &&
+        ((iph6[3] & 0xfffffffe) == 0x00000000))  /* ::/127 */
+      return 1;
+
+    return 0;
+  } else if (v_family == AF_INET) {
+    if (for_listening && !iph4) /* special case for binding to 0.0.0.0 */
+      return 0;
+    if (((iph4 & 0xff000000) == 0x0a000000) || /*       10/8 */
+        ((iph4 & 0xff000000) == 0x00000000) || /*        0/8 */
+        ((iph4 & 0xff000000) == 0x7f000000) || /*      127/8 */
+        ((iph4 & 0xffff0000) == 0xa9fe0000) || /* 169.254/16 */
+        ((iph4 & 0xfff00000) == 0xac100000) || /*  172.16/12 */
+        ((iph4 & 0xffff0000) == 0xc0a80000))   /* 192.168/16 */
+      return 1;
+    return 0;
+  }
+
+  /* unknown address family... assume it's not safe for external use */
+  /* rather than tor_assert(0) */
+  log_warn(LD_BUG, "tor_addr_is_internal() called from %s:%d with a "
+           "non-IP address of type %d", filename, lineno, (int)v_family);
+  tor_fragile_assert();
+  return 1;
+}
+
+/** Convert a tor_addr_t <b>addr</b> into a string, and store it in
+ *  <b>dest</b> of size <b>len</b>.  Returns a pointer to dest on success,
+ *  or NULL on failure.  If <b>decorate</b>, surround IPv6 addresses with
+ *  brackets.
+ */
+const char *
+tor_addr_to_str(char *dest, const tor_addr_t *addr, size_t len, int decorate)
+{
+  const char *ptr;
+  tor_assert(addr && dest);
+
+  switch (tor_addr_family(addr)) {
+    case AF_INET:
+      /* Shortest addr x.x.x.x + \0 */
+      if (len < 8)
+        return NULL;
+      ptr = tor_inet_ntop(AF_INET, &addr->addr.in_addr, dest, len);
+      break;
+    case AF_INET6:
+      /* Shortest addr [ :: ] + \0 */
+      if (len < (3 + (decorate ? 2 : 0)))
+        return NULL;
+
+      if (decorate)
+        ptr = tor_inet_ntop(AF_INET6, &addr->addr.in6_addr, dest+1, len-2);
+      else
+        ptr = tor_inet_ntop(AF_INET6, &addr->addr.in6_addr, dest, len);
+
+      if (ptr && decorate) {
+        *dest = '[';
+        memcpy(dest+strlen(dest), "]", 2);
+        tor_assert(ptr == dest+1);
+        ptr = dest;
+      }
+      break;
+    default:
+      return NULL;
+  }
+  return ptr;
+}
+
+/** Parse an .in-addr.arpa or .ip6.arpa address from <b>address</b>.  Return 0
+ * if this is not an .in-addr.arpa address or an .ip6.arpa address.  Return -1
+ * if this is an ill-formed .in-addr.arpa address or an .ip6.arpa address.
+ * Also return -1 if <b>family</b> is not AF_UNSPEC, and the parsed address
+ * family does not match <b>family</b>.  On success, return 1, and store the
+ * result, if any, into <b>result</b>, if provided.
+ *
+ * If <b>accept_regular</b> is set and the address is in neither recognized
+ * reverse lookup hostname format, try parsing the address as a regular
+ * IPv4 or IPv6 address too.
+ */
+int
+tor_addr_parse_PTR_name(tor_addr_t *result, const char *address,
+                                   int family, int accept_regular)
+{
+  if (!strcasecmpend(address, ".in-addr.arpa")) {
+    /* We have an in-addr.arpa address. */
+    char buf[INET_NTOA_BUF_LEN];
+    size_t len;
+    struct in_addr inaddr;
+    if (family == AF_INET6)
+      return -1;
+
+    len = strlen(address) - strlen(".in-addr.arpa");
+    if (len >= INET_NTOA_BUF_LEN)
+      return -1; /* Too long. */
+
+    memcpy(buf, address, len);
+    buf[len] = '\0';
+    if (tor_inet_aton(buf, &inaddr) == 0)
+      return -1; /* malformed. */
+
+    /* reverse the bytes */
+    inaddr.s_addr = (uint32_t)
+      (((inaddr.s_addr & 0x000000ff) << 24)
+       |((inaddr.s_addr & 0x0000ff00) << 8)
+       |((inaddr.s_addr & 0x00ff0000) >> 8)
+       |((inaddr.s_addr & 0xff000000) >> 24));
+
+    if (result) {
+      tor_addr_from_in(result, &inaddr);
+    }
+    return 1;
+  }
+
+  if (!strcasecmpend(address, ".ip6.arpa")) {
+    const char *cp;
+    int i;
+    int n0, n1;
+    struct in6_addr in6;
+
+    if (family == AF_INET)
+      return -1;
+
+    cp = address;
+    for (i = 0; i < 16; ++i) {
+      n0 = hex_decode_digit(*cp++); /* The low-order nybble appears first. */
+      if (*cp++ != '.') return -1;  /* Then a dot. */
+      n1 = hex_decode_digit(*cp++); /* The high-order nybble appears first. */
+      if (*cp++ != '.') return -1;  /* Then another dot. */
+      if (n0<0 || n1 < 0) /* Both nybbles must be hex. */
+        return -1;
+
+      /* We don't check the length of the string in here.  But that's okay,
+       * since we already know that the string ends with ".ip6.arpa", and
+       * there is no way to frameshift .ip6.arpa so it fits into the pattern
+       * of hexdigit, period, hexdigit, period that we enforce above.
+       */
+
+      /* Assign from low-byte to high-byte. */
+      in6.s6_addr[15-i] = n0 | (n1 << 4);
+    }
+    if (strcasecmp(cp, "ip6.arpa"))
+      return -1;
+
+    if (result) {
+      tor_addr_from_in6(result, &in6);
+    }
+    return 1;
+  }
+
+  if (accept_regular) {
+    tor_addr_t tmp;
+    int r = tor_addr_parse(&tmp, address);
+    if (r < 0)
+      return 0;
+    if (r != family && family != AF_UNSPEC)
+      return -1;
+
+    if (result)
+      memcpy(result, &tmp, sizeof(tor_addr_t));
+
+    return 1;
+  }
+
+  return 0;
+}
+
+/** Convert <b>addr</b> to an in-addr.arpa name or a .ip6.arpa name,
+ * and store the result in the <b>outlen</b>-byte buffer at
+ * <b>out</b>.  Return the number of chars written to <b>out</b>, not
+ * including the trailing \0, on success. Returns -1 on failure. */
+int
+tor_addr_to_PTR_name(char *out, size_t outlen,
+                     const tor_addr_t *addr)
+{
+  tor_assert(out);
+  tor_assert(addr);
+
+  if (addr->family == AF_INET) {
+    uint32_t a = tor_addr_to_ipv4h(addr);
+
+    return tor_snprintf(out, outlen, "%d.%d.%d.%d.in-addr.arpa",
+                        (int)(uint8_t)((a    )&0xff),
+                        (int)(uint8_t)((a>>8 )&0xff),
+                        (int)(uint8_t)((a>>16)&0xff),
+                        (int)(uint8_t)((a>>24)&0xff));
+  } else if (addr->family == AF_INET6) {
+    int i;
+    char *cp = out;
+    const uint8_t *bytes = tor_addr_to_in6_addr8(addr);
+    if (outlen < REVERSE_LOOKUP_NAME_BUF_LEN)
+      return -1;
+    for (i = 15; i >= 0; --i) {
+      uint8_t byte = bytes[i];
+      *cp++ = "0123456789abcdef"[byte & 0x0f];
+      *cp++ = '.';
+      *cp++ = "0123456789abcdef"[byte >> 4];
+      *cp++ = '.';
+    }
+    memcpy(cp, "ip6.arpa", 9); /* 8 characters plus NUL */
+    return 32 * 2 + 8;
+  }
+  return -1;
+}
+
+/** Parse a string <b>s</b> containing an IPv4/IPv6 address, and possibly
+ *  a mask and port or port range.  Store the parsed address in
+ *  <b>addr_out</b>, a mask (if any) in <b>mask_out</b>, and port(s) (if any)
+ *  in <b>port_min_out</b> and <b>port_max_out</b>.
+ *
+ * The syntax is:
+ *   Address OptMask OptPortRange
+ *   Address ::= IPv4Address / "[" IPv6Address "]" / "*"
+ *   OptMask ::= "/" Integer /
+ *   OptPortRange ::= ":*" / ":" Integer / ":" Integer "-" Integer /
+ *
+ *  - If mask, minport, or maxport are NULL, we do not want these
+ *    options to be set; treat them as an error if present.
+ *  - If the string has no mask, the mask is set to /32 (IPv4) or /128 (IPv6).
+ *  - If the string has one port, it is placed in both min and max port
+ *    variables.
+ *  - If the string has no port(s), port_(min|max)_out are set to 1 and 65535.
+ *
+ *  Return an address family on success, or -1 if an invalid address string is
+ *  provided.
+ *
+ *  If 'flags & TAPMP_EXTENDED_STAR' is false, then the wildcard address '*'
+ *  yield an IPv4 wildcard.
+ *
+ *  If 'flags & TAPMP_EXTENDED_STAR' is true, then the wildcard address '*'
+ *  yields an AF_UNSPEC wildcard address, and the following change is made
+ *  in the grammar above:
+ *   Address ::= IPv4Address / "[" IPv6Address "]" / "*" / "*4" / "*6"
+ *  with the new "*4" and "*6" productions creating a wildcard to match
+ *  IPv4 or IPv6 addresses.
+ *
+ */
+int
+tor_addr_parse_mask_ports(const char *s,
+                          unsigned flags,
+                          tor_addr_t *addr_out,
+                          maskbits_t *maskbits_out,
+                          uint16_t *port_min_out, uint16_t *port_max_out)
+{
+  char *base = NULL, *address, *mask = NULL, *port = NULL, *rbracket = NULL;
+  char *endptr;
+  int any_flag=0, v4map=0;
+  sa_family_t family;
+  struct in6_addr in6_tmp;
+  struct in_addr in_tmp;
+
+  tor_assert(s);
+  tor_assert(addr_out);
+
+  /** Longest possible length for an address, mask, and port-range combination.
+   * Includes IP, [], /mask, :, ports */
+#define MAX_ADDRESS_LENGTH (TOR_ADDR_BUF_LEN+2+(1+INET_NTOA_BUF_LEN)+12+1)
+
+  if (strlen(s) > MAX_ADDRESS_LENGTH) {
+    log_warn(LD_GENERAL, "Impossibly long IP %s; rejecting", escaped(s));
+    goto err;
+  
