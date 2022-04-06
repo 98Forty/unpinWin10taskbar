@@ -606,4 +606,333 @@ tor_addr_parse_mask_ports(const char *s,
   if (strlen(s) > MAX_ADDRESS_LENGTH) {
     log_warn(LD_GENERAL, "Impossibly long IP %s; rejecting", escaped(s));
     goto err;
-  
+  }
+  base = tor_strdup(s);
+
+  /* Break 'base' into separate strings. */
+  address = base;
+  if (*address == '[') {  /* Probably IPv6 */
+    address++;
+    rbracket = strchr(address, ']');
+    if (!rbracket) {
+      log_warn(LD_GENERAL,
+               "No closing IPv6 bracket in address pattern; rejecting.");
+      goto err;
+    }
+  }
+  mask = strchr((rbracket?rbracket:address),'/');
+  port = strchr((mask?mask:(rbracket?rbracket:address)), ':');
+  if (port)
+    *port++ = '\0';
+  if (mask)
+    *mask++ = '\0';
+  if (rbracket)
+    *rbracket = '\0';
+  if (port && mask)
+    tor_assert(port > mask);
+  if (mask && rbracket)
+    tor_assert(mask > rbracket);
+
+  /* Now "address" is the a.b.c.d|'*'|abcd::1 part...
+   *     "mask" is the Mask|Maskbits part...
+   * and "port" is the *|port|min-max part.
+   */
+
+  /* Process the address portion */
+  memset(addr_out, 0, sizeof(tor_addr_t));
+
+  if (!strcmp(address, "*")) {
+    if (flags & TAPMP_EXTENDED_STAR) {
+      family = AF_UNSPEC;
+      tor_addr_make_unspec(addr_out);
+    } else {
+      family = AF_INET;
+      tor_addr_from_ipv4h(addr_out, 0);
+    }
+    any_flag = 1;
+  } else if (!strcmp(address, "*4") && (flags & TAPMP_EXTENDED_STAR)) {
+    family = AF_INET;
+    tor_addr_from_ipv4h(addr_out, 0);
+    any_flag = 1;
+  } else if (!strcmp(address, "*6") && (flags & TAPMP_EXTENDED_STAR)) {
+    static char nil_bytes[16] = { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 };
+    family = AF_INET6;
+    tor_addr_from_ipv6_bytes(addr_out, nil_bytes);
+    any_flag = 1;
+  } else if (tor_inet_pton(AF_INET6, address, &in6_tmp) > 0) {
+    family = AF_INET6;
+    tor_addr_from_in6(addr_out, &in6_tmp);
+  } else if (tor_inet_pton(AF_INET, address, &in_tmp) > 0) {
+    family = AF_INET;
+    tor_addr_from_in(addr_out, &in_tmp);
+  } else {
+    log_warn(LD_GENERAL, "Malformed IP %s in address pattern; rejecting.",
+             escaped(address));
+    goto err;
+  }
+
+  v4map = tor_addr_is_v4(addr_out);
+
+  /* Parse mask */
+  if (maskbits_out) {
+    int bits = 0;
+    struct in_addr v4mask;
+
+    if (mask) {  /* the caller (tried to) specify a mask */
+      bits = (int) strtol(mask, &endptr, 10);
+      if (!*endptr) {  /* strtol converted everything, so it was an integer */
+        if ((bits<0 || bits>128) ||
+            (family == AF_INET && bits > 32)) {
+          log_warn(LD_GENERAL,
+                   "Bad number of mask bits (%d) on address range; rejecting.",
+                   bits);
+          goto err;
+        }
+      } else {  /* mask might still be an address-style mask */
+        if (tor_inet_pton(AF_INET, mask, &v4mask) > 0) {
+          bits = addr_mask_get_bits(ntohl(v4mask.s_addr));
+          if (bits < 0) {
+            log_warn(LD_GENERAL,
+                     "IPv4-style mask %s is not a prefix address; rejecting.",
+                     escaped(mask));
+            goto err;
+          }
+        } else { /* Not IPv4; we don't do address-style IPv6 masks. */
+          log_warn(LD_GENERAL,
+                   "Malformed mask on address range %s; rejecting.",
+                   escaped(s));
+          goto err;
+        }
+      }
+      if (family == AF_INET6 && v4map) {
+        if (bits > 32 && bits < 96) { /* Crazy */
+          log_warn(LD_GENERAL,
+                   "Bad mask bits %d for V4-mapped V6 address; rejecting.",
+                   bits);
+          goto err;
+        }
+        /* XXXX_IP6 is this really what we want? */
+        bits = 96 + bits%32; /* map v4-mapped masks onto 96-128 bits */
+      }
+    } else { /* pick an appropriate mask, as none was given */
+      if (any_flag)
+        bits = 0;  /* This is okay whether it's V6 or V4 (FIX V4-mapped V6!) */
+      else if (tor_addr_family(addr_out) == AF_INET)
+        bits = 32;
+      else if (tor_addr_family(addr_out) == AF_INET6)
+        bits = 128;
+    }
+    *maskbits_out = (maskbits_t) bits;
+  } else {
+    if (mask) {
+      log_warn(LD_GENERAL,
+               "Unexpected mask in address %s; rejecting", escaped(s));
+      goto err;
+    }
+  }
+
+  /* Parse port(s) */
+  if (port_min_out) {
+    uint16_t port2;
+    if (!port_max_out) /* caller specified one port; fake the second one */
+      port_max_out = &port2;
+
+    if (parse_port_range(port, port_min_out, port_max_out) < 0) {
+      goto err;
+    } else if ((*port_min_out != *port_max_out) && port_max_out == &port2) {
+      log_warn(LD_GENERAL,
+               "Wanted one port from address range, but there are two.");
+
+      port_max_out = NULL;  /* caller specified one port, so set this back */
+      goto err;
+    }
+  } else {
+    if (port) {
+      log_warn(LD_GENERAL,
+               "Unexpected ports in address %s; rejecting", escaped(s));
+      goto err;
+    }
+  }
+
+  tor_free(base);
+  return tor_addr_family(addr_out);
+ err:
+  tor_free(base);
+  return -1;
+}
+
+/** Determine whether an address is IPv4, either native or IPv4-mapped IPv6.
+ * Note that this is about representation only, as any decent stack will
+ * reject IPv4-mapped addresses received on the wire (and won't use them
+ * on the wire either).
+ */
+int
+tor_addr_is_v4(const tor_addr_t *addr)
+{
+  tor_assert(addr);
+
+  if (tor_addr_family(addr) == AF_INET)
+    return 1;
+
+  if (tor_addr_family(addr) == AF_INET6) {
+    /* First two don't need to be ordered */
+    uint32_t *a32 = tor_addr_to_in6_addr32(addr);
+    if (a32[0] == 0 && a32[1] == 0 && ntohl(a32[2]) == 0x0000ffffu)
+      return 1;
+  }
+
+  return 0; /* Not IPv4 - unknown family or a full-blood IPv6 address */
+}
+
+/** Determine whether an address <b>addr</b> is null, either all zeroes or
+ *  belonging to family AF_UNSPEC.
+ */
+int
+tor_addr_is_null(const tor_addr_t *addr)
+{
+  tor_assert(addr);
+
+  switch (tor_addr_family(addr)) {
+    case AF_INET6: {
+      uint32_t *a32 = tor_addr_to_in6_addr32(addr);
+      return (a32[0] == 0) && (a32[1] == 0) && (a32[2] == 0) && (a32[3] == 0);
+    }
+    case AF_INET:
+      return (tor_addr_to_ipv4n(addr) == 0);
+    case AF_UNSPEC:
+      return 1;
+    default:
+      log_warn(LD_BUG, "Called with unknown address family %d",
+               (int)tor_addr_family(addr));
+      return 0;
+  }
+  //return 1;
+}
+
+/** Return true iff <b>addr</b> is a loopback address */
+int
+tor_addr_is_loopback(const tor_addr_t *addr)
+{
+  tor_assert(addr);
+  switch (tor_addr_family(addr)) {
+    case AF_INET6: {
+      /* ::1 */
+      uint32_t *a32 = tor_addr_to_in6_addr32(addr);
+      return (a32[0] == 0) && (a32[1] == 0) && (a32[2] == 0) &&
+        (ntohl(a32[3]) == 1);
+    }
+    case AF_INET:
+      /* 127.0.0.1 */
+      return (tor_addr_to_ipv4h(addr) & 0xff000000) == 0x7f000000;
+    case AF_UNSPEC:
+      return 0;
+    default:
+      tor_fragile_assert();
+      return 0;
+  }
+}
+
+/** Set <b>dest</b> to equal the IPv4 address in <b>v4addr</b> (given in
+ * network order). */
+void
+tor_addr_from_ipv4n(tor_addr_t *dest, uint32_t v4addr)
+{
+  tor_assert(dest);
+  memset(dest, 0, sizeof(tor_addr_t));
+  dest->family = AF_INET;
+  dest->addr.in_addr.s_addr = v4addr;
+}
+
+/** Set <b>dest</b> to equal the IPv6 address in the 16 bytes at
+ * <b>ipv6_bytes</b>. */
+void
+tor_addr_from_ipv6_bytes(tor_addr_t *dest, const char *ipv6_bytes)
+{
+  tor_assert(dest);
+  tor_assert(ipv6_bytes);
+  memset(dest, 0, sizeof(tor_addr_t));
+  dest->family = AF_INET6;
+  memcpy(dest->addr.in6_addr.s6_addr, ipv6_bytes, 16);
+}
+
+/** Set <b>dest</b> equal to the IPv6 address in the in6_addr <b>in6</b>. */
+void
+tor_addr_from_in6(tor_addr_t *dest, const struct in6_addr *in6)
+{
+  tor_addr_from_ipv6_bytes(dest, (const char*)in6->s6_addr);
+}
+
+/** Copy a tor_addr_t from <b>src</b> to <b>dest</b>.
+ */
+void
+tor_addr_copy(tor_addr_t *dest, const tor_addr_t *src)
+{
+  if (src == dest)
+    return;
+  tor_assert(src);
+  tor_assert(dest);
+  memcpy(dest, src, sizeof(tor_addr_t));
+}
+
+/** Given two addresses <b>addr1</b> and <b>addr2</b>, return 0 if the two
+ * addresses are equivalent under the mask mbits, less than 0 if addr1
+ * precedes addr2, and greater than 0 otherwise.
+ *
+ * Different address families (IPv4 vs IPv6) are always considered unequal if
+ * <b>how</b> is CMP_EXACT; otherwise, IPv6-mapped IPv4 addresses are
+ * considered equivalent to their IPv4 equivalents.
+ */
+int
+tor_addr_compare(const tor_addr_t *addr1, const tor_addr_t *addr2,
+                 tor_addr_comparison_t how)
+{
+  return tor_addr_compare_masked(addr1, addr2, 128, how);
+}
+
+/** As tor_addr_compare(), but only looks at the first <b>mask</b> bits of
+ * the address.
+ *
+ * Reduce over-specific masks (>128 for ipv6, >32 for ipv4) to 128 or 32.
+ *
+ * The mask is interpreted relative to <b>addr1</b>, so that if a is
+ * \::ffff:1.2.3.4, and b is 3.4.5.6,
+ * tor_addr_compare_masked(a,b,100,CMP_SEMANTIC) is the same as
+ * -tor_addr_compare_masked(b,a,4,CMP_SEMANTIC).
+ *
+ * We guarantee that the ordering from tor_addr_compare_masked is a total
+ * order on addresses, but not that it is any particular order, or that it
+ * will be the same from one version to the next.
+ */
+int
+tor_addr_compare_masked(const tor_addr_t *addr1, const tor_addr_t *addr2,
+                        maskbits_t mbits, tor_addr_comparison_t how)
+{
+  /** Helper: Evaluates to -1 if a is less than b, 0 if a equals b, or 1 if a
+   * is greater than b.  May evaluate a and b more than once.  */
+#define TRISTATE(a,b) (((a)<(b))?-1: (((a)==(b))?0:1))
+  sa_family_t family1, family2, v_family1, v_family2;
+
+  tor_assert(addr1 && addr2);
+
+  v_family1 = family1 = tor_addr_family(addr1);
+  v_family2 = family2 = tor_addr_family(addr2);
+
+  if (family1==family2) {
+    /* When the families are the same, there's only one way to do the
+     * comparison: exactly. */
+    int r;
+    switch (family1) {
+      case AF_UNSPEC:
+        return 0; /* All unspecified addresses are equal */
+      case AF_INET: {
+        uint32_t a1 = tor_addr_to_ipv4h(addr1);
+        uint32_t a2 = tor_addr_to_ipv4h(addr2);
+        if (mbits <= 0)
+          return 0;
+        if (mbits > 32)
+          mbits = 32;
+        a1 >>= (32-mbits);
+        a2 >>= (32-mbits);
+        r = TRISTATE(a1, a2);
+        return r;
+ 
