@@ -1275,4 +1275,344 @@ get_interface_addresses_raw(int severity)
   fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (fd < 0) {
     tor_log(severity, LD_NET, "socket failed: %s", strerror(errno));
- 
+    goto done;
+  }
+  /* Guess how much space we need. */
+  ifc.ifc_len = sz = 15*1024;
+  ifc.ifc_ifcu.ifcu_req = tor_malloc(sz);
+  if (ioctl(fd, SIOCGIFCONF, &ifc) < 0) {
+    tor_log(severity, LD_NET, "ioctl failed: %s", strerror(errno));
+    close(fd);
+    goto done;
+  }
+  close(fd);
+  result = smartlist_new();
+  if (ifc.ifc_len < sz)
+    sz = ifc.ifc_len;
+  n = sz / sizeof(struct ifreq);
+  for (i = 0; i < n ; ++i) {
+    struct ifreq *r = &ifc.ifc_ifcu.ifcu_req[i];
+    struct sockaddr *sa = &r->ifr_addr;
+    tor_addr_t tmp;
+    if (sa->sa_family != AF_INET && sa->sa_family != AF_INET6)
+      continue; /* should be impossible */
+    if (tor_addr_from_sockaddr(&tmp, sa, NULL) < 0)
+      continue;
+    smartlist_add(result, tor_memdup(&tmp, sizeof(tmp)));
+  }
+ done:
+  tor_free(ifc.ifc_ifcu.ifcu_req);
+  return result;
+#else
+  (void) severity;
+  return NULL;
+#endif
+}
+
+/** Return true iff <b>a</b> is a multicast address.  */
+static int
+tor_addr_is_multicast(const tor_addr_t *a)
+{
+  sa_family_t family = tor_addr_family(a);
+  if (family == AF_INET) {
+    uint32_t ipv4h = tor_addr_to_ipv4h(a);
+    if ((ipv4h >> 24) == 0xe0)
+      return 1; /* Multicast */
+  } else if (family == AF_INET6) {
+    const uint8_t *a32 = tor_addr_to_in6_addr8(a);
+    if (a32[0] == 0xff)
+      return 1;
+  }
+  return 0;
+}
+
+/** Set *<b>addr</b> to the IP address (if any) of whatever interface
+ * connects to the Internet.  This address should only be used in checking
+ * whether our address has changed.  Return 0 on success, -1 on failure.
+ */
+int
+get_interface_address6(int severity, sa_family_t family, tor_addr_t *addr)
+{
+  /* XXX really, this function should yield a smartlist of addresses. */
+  smartlist_t *addrs;
+  int sock=-1, r=-1;
+  struct sockaddr_storage my_addr, target_addr;
+  socklen_t addr_len;
+  tor_assert(addr);
+
+  /* Try to do this the smart way if possible. */
+  if ((addrs = get_interface_addresses_raw(severity))) {
+    int rv = -1;
+    SMARTLIST_FOREACH_BEGIN(addrs, tor_addr_t *, a) {
+      if (family != AF_UNSPEC && family != tor_addr_family(a))
+        continue;
+      if (tor_addr_is_loopback(a) ||
+          tor_addr_is_multicast(a))
+        continue;
+
+      tor_addr_copy(addr, a);
+      rv = 0;
+
+      /* If we found a non-internal address, declare success.  Otherwise,
+       * keep looking. */
+      if (!tor_addr_is_internal(a, 0))
+        break;
+    } SMARTLIST_FOREACH_END(a);
+
+    SMARTLIST_FOREACH(addrs, tor_addr_t *, a, tor_free(a));
+    smartlist_free(addrs);
+    return rv;
+  }
+
+  /* Okay, the smart way is out. */
+  memset(addr, 0, sizeof(tor_addr_t));
+  memset(&target_addr, 0, sizeof(target_addr));
+  /* Don't worry: no packets are sent. We just need to use a real address
+   * on the actual Internet. */
+  if (family == AF_INET6) {
+    struct sockaddr_in6 *sin6 = (struct sockaddr_in6*)&target_addr;
+    /* Use the "discard" service port */
+    sin6->sin6_port = htons(9);
+    sock = tor_open_socket(PF_INET6,SOCK_DGRAM,IPPROTO_UDP);
+    addr_len = (socklen_t)sizeof(struct sockaddr_in6);
+    sin6->sin6_family = AF_INET6;
+    S6_ADDR16(sin6->sin6_addr)[0] = htons(0x2002); /* 2002:: */
+  } else if (family == AF_INET) {
+    struct sockaddr_in *sin = (struct sockaddr_in*)&target_addr;
+    /* Use the "discard" service port */
+    sin->sin_port = htons(9);
+    sock = tor_open_socket(PF_INET,SOCK_DGRAM,IPPROTO_UDP);
+    addr_len = (socklen_t)sizeof(struct sockaddr_in);
+    sin->sin_family = AF_INET;
+    sin->sin_addr.s_addr = htonl(0x12000001); /* 18.0.0.1 */
+  } else {
+    return -1;
+  }
+  if (sock < 0) {
+    int e = tor_socket_errno(-1);
+    log_fn(severity, LD_NET, "unable to create socket: %s",
+           tor_socket_strerror(e));
+    goto err;
+  }
+
+  if (connect(sock,(struct sockaddr *)&target_addr, addr_len) < 0) {
+    int e = tor_socket_errno(sock);
+    log_fn(severity, LD_NET, "connect() failed: %s", tor_socket_strerror(e));
+    goto err;
+  }
+
+  if (getsockname(sock,(struct sockaddr*)&my_addr, &addr_len)) {
+    int e = tor_socket_errno(sock);
+    log_fn(severity, LD_NET, "getsockname() to determine interface failed: %s",
+           tor_socket_strerror(e));
+    goto err;
+  }
+
+  tor_addr_from_sockaddr(addr, (struct sockaddr*)&my_addr, NULL);
+  r=0;
+ err:
+  if (sock >= 0)
+    tor_close_socket(sock);
+  return r;
+}
+
+/* ======
+ * IPv4 helpers
+ * XXXX024 IPv6 deprecate some of these.
+ */
+
+/** Return true iff <b>ip</b> (in host order) is an IP reserved to localhost,
+ * or reserved for local networks by RFC 1918.
+ */
+int
+is_internal_IP(uint32_t ip, int for_listening)
+{
+  tor_addr_t myaddr;
+  myaddr.family = AF_INET;
+  myaddr.addr.in_addr.s_addr = htonl(ip);
+
+  return tor_addr_is_internal(&myaddr, for_listening);
+}
+
+/** Given an address of the form "ip:port", try to divide it into its
+ * ip and port portions, setting *<b>address_out</b> to a newly
+ * allocated string holding the address portion and *<b>port_out</b>
+ * to the port.
+ *
+ * Don't do DNS lookups and don't allow domain names in the <ip> field.
+ * Don't accept <b>addrport</b> of the form "<ip>" or "<ip>:0".
+ *
+ * Return 0 on success, -1 on failure. */
+int
+tor_addr_port_parse(int severity, const char *addrport,
+                    tor_addr_t *address_out, uint16_t *port_out)
+{
+  int retval = -1;
+  int r;
+  char *addr_tmp = NULL;
+
+  tor_assert(addrport);
+  tor_assert(address_out);
+  tor_assert(port_out);
+
+  r = tor_addr_port_split(severity, addrport, &addr_tmp, port_out);
+  if (r < 0)
+    goto done;
+
+  if (!*port_out)
+    goto done;
+
+  /* make sure that address_out is an IP address */
+  if (tor_addr_parse(address_out, addr_tmp) < 0)
+    goto done;
+
+  retval = 0;
+
+ done:
+  tor_free(addr_tmp);
+  return retval;
+}
+
+/** Given an address of the form "host[:port]", try to divide it into its host
+ * ane port portions, setting *<b>address_out</b> to a newly allocated string
+ * holding the address portion and *<b>port_out</b> to the port (or 0 if no
+ * port is given).  Return 0 on success, -1 on failure. */
+int
+tor_addr_port_split(int severity, const char *addrport,
+                    char **address_out, uint16_t *port_out)
+{
+  tor_assert(addrport);
+  tor_assert(address_out);
+  tor_assert(port_out);
+  return addr_port_lookup(severity, addrport, address_out, NULL, port_out);
+}
+
+/** Parse a string of the form "host[:port]" from <b>addrport</b>.  If
+ * <b>address</b> is provided, set *<b>address</b> to a copy of the
+ * host portion of the string.  If <b>addr</b> is provided, try to
+ * resolve the host portion of the string and store it into
+ * *<b>addr</b> (in host byte order).  If <b>port_out</b> is provided,
+ * store the port number into *<b>port_out</b>, or 0 if no port is given.
+ * If <b>port_out</b> is NULL, then there must be no port number in
+ * <b>addrport</b>.
+ * Return 0 on success, -1 on failure.
+ */
+int
+addr_port_lookup(int severity, const char *addrport, char **address,
+                uint32_t *addr, uint16_t *port_out)
+{
+  const char *colon;
+  char *address_ = NULL;
+  int port_;
+  int ok = 1;
+
+  tor_assert(addrport);
+
+  colon = strrchr(addrport, ':');
+  if (colon) {
+    address_ = tor_strndup(addrport, colon-addrport);
+    port_ = (int) tor_parse_long(colon+1,10,1,65535,NULL,NULL);
+    if (!port_) {
+      log_fn(severity, LD_GENERAL, "Port %s out of range", escaped(colon+1));
+      ok = 0;
+    }
+    if (!port_out) {
+      char *esc_addrport = esc_for_log(addrport);
+      log_fn(severity, LD_GENERAL,
+             "Port %s given on %s when not required",
+             escaped(colon+1), esc_addrport);
+      tor_free(esc_addrport);
+      ok = 0;
+    }
+  } else {
+    address_ = tor_strdup(addrport);
+    port_ = 0;
+  }
+
+  if (addr) {
+    /* There's an addr pointer, so we need to resolve the hostname. */
+    if (tor_lookup_hostname(address_,addr)) {
+      log_fn(severity, LD_NET, "Couldn't look up %s", escaped(address_));
+      ok = 0;
+      *addr = 0;
+    }
+  }
+
+  if (address && ok) {
+    *address = address_;
+  } else {
+    if (address)
+      *address = NULL;
+    tor_free(address_);
+  }
+  if (port_out)
+    *port_out = ok ? ((uint16_t) port_) : 0;
+
+  return ok ? 0 : -1;
+}
+
+/** If <b>mask</b> is an address mask for a bit-prefix, return the number of
+ * bits.  Otherwise, return -1. */
+int
+addr_mask_get_bits(uint32_t mask)
+{
+  int i;
+  if (mask == 0)
+    return 0;
+  if (mask == 0xFFFFFFFFu)
+    return 32;
+  for (i=0; i<=32; ++i) {
+    if (mask == (uint32_t) ~((1u<<(32-i))-1)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/** Parse a string <b>s</b> in the format of (*|port(-maxport)?)?, setting the
+ * various *out pointers as appropriate.  Return 0 on success, -1 on failure.
+ */
+int
+parse_port_range(const char *port, uint16_t *port_min_out,
+                 uint16_t *port_max_out)
+{
+  int port_min, port_max, ok;
+  tor_assert(port_min_out);
+  tor_assert(port_max_out);
+
+  if (!port || *port == '\0' || strcmp(port, "*") == 0) {
+    port_min = 1;
+    port_max = 65535;
+  } else {
+    char *endptr = NULL;
+    port_min = (int)tor_parse_long(port, 10, 0, 65535, &ok, &endptr);
+    if (!ok) {
+      log_warn(LD_GENERAL,
+               "Malformed port %s on address range; rejecting.",
+               escaped(port));
+      return -1;
+    } else if (endptr && *endptr == '-') {
+      port = endptr+1;
+      endptr = NULL;
+      port_max = (int)tor_parse_long(port, 10, 1, 65535, &ok, &endptr);
+      if (!ok) {
+        log_warn(LD_GENERAL,
+                 "Malformed port %s on address range; rejecting.",
+                 escaped(port));
+        return -1;
+      }
+    } else {
+      port_max = port_min;
+    }
+    if (port_min > port_max) {
+      log_warn(LD_GENERAL, "Insane port range on address policy; rejecting.");
+      return -1;
+    }
+  }
+
+  if (port_min < 1)
+    port_min = 1;
+  if (port_max > 65535)
+    port_max = 65535;
+
+  *port_min_out = (uint16_t) port_min;
