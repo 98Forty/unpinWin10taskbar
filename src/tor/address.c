@@ -1616,3 +1616,77 @@ parse_port_range(const char *port, uint16_t *port_min_out,
     port_max = 65535;
 
   *port_min_out = (uint16_t) port_min;
+  *port_max_out = (uint16_t) port_max;
+
+  return 0;
+}
+
+/** Given an IPv4 in_addr struct *<b>in</b> (in network order, as usual),
+ *  write it as a string into the <b>buf_len</b>-byte buffer in
+ *  <b>buf</b>.
+ */
+int
+tor_inet_ntoa(const struct in_addr *in, char *buf, size_t buf_len)
+{
+  uint32_t a = ntohl(in->s_addr);
+  return tor_snprintf(buf, buf_len, "%d.%d.%d.%d",
+                      (int)(uint8_t)((a>>24)&0xff),
+                      (int)(uint8_t)((a>>16)&0xff),
+                      (int)(uint8_t)((a>>8 )&0xff),
+                      (int)(uint8_t)((a    )&0xff));
+}
+
+/** Given a host-order <b>addr</b>, call tor_inet_ntop() on it
+ *  and return a strdup of the resulting address.
+ */
+char *
+tor_dup_ip(uint32_t addr)
+{
+  char buf[TOR_ADDR_BUF_LEN];
+  struct in_addr in;
+
+  in.s_addr = htonl(addr);
+  tor_inet_ntop(AF_INET, &in, buf, sizeof(buf));
+  return tor_strdup(buf);
+}
+
+/**
+ * Set *<b>addr</b> to the host-order IPv4 address (if any) of whatever
+ * interface connects to the Internet.  This address should only be used in
+ * checking whether our address has changed.  Return 0 on success, -1 on
+ * failure.
+ */
+int
+get_interface_address(int severity, uint32_t *addr)
+{
+  tor_addr_t local_addr;
+  int r;
+
+  r = get_interface_address6(severity, AF_INET, &local_addr);
+  if (r>=0)
+    *addr = tor_addr_to_ipv4h(&local_addr);
+  return r;
+}
+
+/** Return true if we can tell that <b>name</b> is a canonical name for the
+ * loopback address. */
+int
+tor_addr_hostname_is_local(const char *name)
+{
+  return !strcasecmp(name, "localhost") ||
+    !strcasecmp(name, "local") ||
+    !strcasecmpend(name, ".local");
+}
+
+/** Return a newly allocated tor_addr_port_t with <b>addr</b> and
+    <b>port</b> filled in. */
+tor_addr_port_t *
+tor_addr_port_new(const tor_addr_t *addr, uint16_t port)
+{
+  tor_addr_port_t *ap = tor_malloc_zero(sizeof(tor_addr_port_t));
+  if (addr)
+    tor_addr_copy(&ap->addr, addr);
+  ap->port = port;
+  return ap;
+}
+
