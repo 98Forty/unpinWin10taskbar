@@ -544,4 +544,302 @@ addressmap_register(const char *address, char *new_address, time_t expires,
     if (address_is_in_virtual_range(ent->new_address) &&
         expires != 2) {
       /* XXX This isn't the perfect test; we want to avoid removing
-       * mappings set
+       * mappings set from the control interface _as virtual mapping */
+      addressmap_virtaddress_remove(address, ent);
+    }
+    tor_free(ent->new_address);
+  } /* else { we have an in-progress resolve with no mapping. } */
+
+  ent->new_address = new_address;
+  ent->expires = expires==2 ? 1 : expires;
+  ent->num_resolve_failures = 0;
+  ent->source = source;
+  ent->src_wildcard = wildcard_addr ? 1 : 0;
+  ent->dst_wildcard = wildcard_new_addr ? 1 : 0;
+
+  log_info(LD_CONFIG, "Addressmap: (re)mapped '%s' to '%s'",
+           safe_str_client(address),
+           safe_str_client(ent->new_address));
+  control_event_address_mapped(address, ent->new_address, expires, NULL, 1);
+}
+
+/** An attempt to resolve <b>address</b> failed at some OR.
+ * Increment the number of resolve failures we have on record
+ * for it, and then return that number.
+ */
+int
+client_dns_incr_failures(const char *address)
+{
+  addressmap_entry_t *ent = strmap_get(addressmap, address);
+  if (!ent) {
+    ent = tor_malloc_zero(sizeof(addressmap_entry_t));
+    ent->expires = time(NULL) + MAX_DNS_ENTRY_AGE;
+    strmap_set(addressmap,address,ent);
+  }
+  if (ent->num_resolve_failures < SHORT_MAX)
+    ++ent->num_resolve_failures; /* don't overflow */
+  log_info(LD_APP, "Address %s now has %d resolve failures.",
+           safe_str_client(address),
+           ent->num_resolve_failures);
+  return ent->num_resolve_failures;
+}
+
+/** If <b>address</b> is in the client DNS addressmap, reset
+ * the number of resolve failures we have on record for it.
+ * This is used when we fail a stream because it won't resolve:
+ * otherwise future attempts on that address will only try once.
+ */
+void
+client_dns_clear_failures(const char *address)
+{
+  addressmap_entry_t *ent = strmap_get(addressmap, address);
+  if (ent)
+    ent->num_resolve_failures = 0;
+}
+
+/** Record the fact that <b>address</b> resolved to <b>name</b>.
+ * We can now use this in subsequent streams via addressmap_rewrite()
+ * so we can more correctly choose an exit that will allow <b>address</b>.
+ *
+ * If <b>exitname</b> is defined, then append the addresses with
+ * ".exitname.exit" before registering the mapping.
+ *
+ * If <b>ttl</b> is nonnegative, the mapping will be valid for
+ * <b>ttl</b>seconds; otherwise, we use the default.
+ */
+static void
+client_dns_set_addressmap_impl(entry_connection_t *for_conn,
+                               const char *address, const char *name,
+                               const char *exitname,
+                               int ttl)
+{
+  char *extendedaddress=NULL, *extendedval=NULL;
+  (void)for_conn;
+
+  tor_assert(address);
+  tor_assert(name);
+
+  if (ttl<0)
+    ttl = DEFAULT_DNS_TTL;
+  else
+    ttl = dns_clip_ttl(ttl);
+
+  if (exitname) {
+    /* XXXX fails to ever get attempts to get an exit address of
+     * google.com.digest[=~]nickname.exit; we need a syntax for this that
+     * won't make strict RFC952-compliant applications (like us) barf. */
+    tor_asprintf(&extendedaddress,
+                 "%s.%s.exit", address, exitname);
+    tor_asprintf(&extendedval,
+                 "%s.%s.exit", name, exitname);
+  } else {
+    tor_asprintf(&extendedaddress,
+                 "%s", address);
+    tor_asprintf(&extendedval,
+                 "%s", name);
+  }
+  addressmap_register(extendedaddress, extendedval,
+                      time(NULL) + ttl, ADDRMAPSRC_DNS, 0, 0);
+  tor_free(extendedaddress);
+}
+
+/** Record the fact that <b>address</b> resolved to <b>val</b>.
+ * We can now use this in subsequent streams via addressmap_rewrite()
+ * so we can more correctly choose an exit that will allow <b>address</b>.
+ *
+ * If <b>exitname</b> is defined, then append the addresses with
+ * ".exitname.exit" before registering the mapping.
+ *
+ * If <b>ttl</b> is nonnegative, the mapping will be valid for
+ * <b>ttl</b>seconds; otherwise, we use the default.
+ */
+void
+client_dns_set_addressmap(entry_connection_t *for_conn,
+                          const char *address,
+                          const tor_addr_t *val,
+                          const char *exitname,
+                          int ttl)
+{
+  tor_addr_t addr_tmp;
+  char valbuf[TOR_ADDR_BUF_LEN];
+
+  tor_assert(address);
+  tor_assert(val);
+
+  if (tor_addr_parse(&addr_tmp, address) >= 0)
+    return; /* If address was an IP address already, don't add a mapping. */
+
+  if (tor_addr_family(val) == AF_INET) {
+    if (! for_conn->cache_ipv4_answers)
+      return;
+  } else if (tor_addr_family(val) == AF_INET6) {
+    if (! for_conn->cache_ipv6_answers)
+      return;
+  }
+
+  if (! tor_addr_to_str(valbuf, val, sizeof(valbuf), 1))
+    return;
+
+  client_dns_set_addressmap_impl(for_conn, address, valbuf, exitname, ttl);
+}
+
+/** Add a cache entry noting that <b>address</b> (ordinarily a dotted quad)
+ * resolved via a RESOLVE_PTR request to the hostname <b>v</b>.
+ *
+ * If <b>exitname</b> is defined, then append the addresses with
+ * ".exitname.exit" before registering the mapping.
+ *
+ * If <b>ttl</b> is nonnegative, the mapping will be valid for
+ * <b>ttl</b>seconds; otherwise, we use the default.
+ */
+void
+client_dns_set_reverse_addressmap(entry_connection_t *for_conn,
+                                  const char *address, const char *v,
+                                  const char *exitname,
+                                  int ttl)
+{
+  char *s = NULL;
+  {
+    tor_addr_t tmp_addr;
+    sa_family_t f = tor_addr_parse(&tmp_addr, address);
+    if ((f == AF_INET && ! for_conn->cache_ipv4_answers) ||
+        (f == AF_INET6 && ! for_conn->cache_ipv6_answers))
+      return;
+  }
+  tor_asprintf(&s, "REVERSE[%s]", address);
+  client_dns_set_addressmap_impl(for_conn, s, v, exitname, ttl);
+  tor_free(s);
+}
+
+/* By default, we hand out 127.192.0.1 through 127.254.254.254.
+ * These addresses should map to localhost, so even if the
+ * application accidentally tried to connect to them directly (not
+ * via Tor), it wouldn't get too far astray.
+ *
+ * These options are configured by parse_virtual_addr_network().
+ */
+
+static virtual_addr_conf_t virtaddr_conf_ipv4;
+static virtual_addr_conf_t virtaddr_conf_ipv6;
+
+/** Read a netmask of the form 127.192.0.0/10 from "val", and check whether
+ * it's a valid set of virtual addresses to hand out in response to MAPADDRESS
+ * requests.  Return 0 on success; set *msg (if provided) to a newly allocated
+ * string and return -1 on failure.  If validate_only is false, sets the
+ * actual virtual address range to the parsed value. */
+int
+parse_virtual_addr_network(const char *val, sa_family_t family,
+                           int validate_only,
+                           char **msg)
+{
+  const int ipv6 = (family == AF_INET6);
+  tor_addr_t addr;
+  maskbits_t bits;
+  const int max_bits = ipv6 ? 40 : 16;
+  virtual_addr_conf_t *conf = ipv6 ? &virtaddr_conf_ipv6 : &virtaddr_conf_ipv4;
+
+  if (tor_addr_parse_mask_ports(val, 0, &addr, &bits, NULL, NULL) < 0) {
+    if (msg)
+      tor_asprintf(msg, "Error parsing VirtualAddressNetwork%s %s",
+                   ipv6?"IPv6":"", val);
+    return -1;
+  }
+  if (tor_addr_family(&addr) != family) {
+    if (msg)
+      tor_asprintf(msg, "Incorrect address type for VirtualAddressNetwork%s",
+                   ipv6?"IPv6":"");
+    return -1;
+  }
+#if 0
+  if (port_min != 1 || port_max != 65535) {
+    if (msg)
+      tor_asprintf(msg, "Can't specify ports on VirtualAddressNetwork%s",
+                   ipv6?"IPv6":"");
+    return -1;
+  }
+#endif
+
+  if (bits > max_bits) {
+    if (msg)
+      tor_asprintf(msg, "VirtualAddressNetwork%s expects a /%d "
+                   "network or larger",ipv6?"IPv6":"", max_bits);
+    return -1;
+  }
+
+  if (validate_only)
+    return 0;
+
+  tor_addr_copy(&conf->addr, &addr);
+  conf->bits = bits;
+
+  return 0;
+}
+
+/**
+ * Return true iff <b>addr</b> is likely to have been returned by
+ * client_dns_get_unused_address.
+ **/
+int
+address_is_in_virtual_range(const char *address)
+{
+  tor_addr_t addr;
+  tor_assert(address);
+  if (!strcasecmpend(address, ".virtual")) {
+    return 1;
+  } else if (tor_addr_parse(&addr, address) >= 0) {
+    const virtual_addr_conf_t *conf = (tor_addr_family(&addr) == AF_INET6) ?
+      &virtaddr_conf_ipv6 : &virtaddr_conf_ipv4;
+    if (tor_addr_compare_masked(&addr, &conf->addr, conf->bits, CMP_EXACT)==0)
+      return 1;
+  }
+  return 0;
+}
+
+/** Return a random address conforming to the virtual address configuration
+ * in <b>conf</b>.
+ */
+STATIC void
+get_random_virtual_addr(const virtual_addr_conf_t *conf, tor_addr_t *addr_out)
+{
+  uint8_t tmp[4];
+  const uint8_t *addr_bytes;
+  uint8_t bytes[16];
+  const int ipv6 = tor_addr_family(&conf->addr) == AF_INET6;
+  const int total_bytes = ipv6 ? 16 : 4;
+
+  tor_assert(conf->bits <= total_bytes * 8);
+
+  /* Set addr_bytes to the bytes of the virtual network, in host order */
+  if (ipv6) {
+    addr_bytes = tor_addr_to_in6_addr8(&conf->addr);
+  } else {
+    set_uint32(tmp, tor_addr_to_ipv4n(&conf->addr));
+    addr_bytes = tmp;
+  }
+
+  /* Get an appropriate number of random bytes. */
+  crypto_rand((char*)bytes, total_bytes);
+
+  /* Now replace the first "conf->bits" bits of 'bytes' with addr_bytes*/
+  if (conf->bits >= 8)
+    memcpy(bytes, addr_bytes, conf->bits / 8);
+  if (conf->bits & 7) {
+    uint8_t mask = 0xff >> (conf->bits & 7);
+    bytes[conf->bits/8] &= mask;
+    bytes[conf->bits/8] |= addr_bytes[conf->bits/8] & ~mask;
+  }
+
+  if (ipv6)
+    tor_addr_from_ipv6_bytes(addr_out, (char*) bytes);
+  else
+    tor_addr_from_ipv4n(addr_out, get_uint32(bytes));
+
+  tor_assert(tor_addr_compare_masked(addr_out, &conf->addr,
+                                     conf->bits, CMP_EXACT)==0);
+}
+
+/** Return a newly allocated string holding an address of <b>type</b>
+ * (one of RESOLVED_TYPE_{IPV4|HOSTNAME}) that has not yet been mapped,
+ * and that is very unlikely to be the address of any real host.
+ *
+ * May return NULL if we have run out of vi
