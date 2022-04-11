@@ -236,4 +236,352 @@ chunk_grow(chunk_t *chunk, size_t sz)
   offset = chunk->data - chunk->mem;
   chunk = tor_realloc(chunk, CHUNK_ALLOC_SIZE(sz));
   chunk->memlen = sz;
-  chunk-
+  chunk->data = chunk->mem + offset;
+  return chunk;
+}
+
+/** If a read onto the end of a chunk would be smaller than this number, then
+ * just start a new chunk. */
+#define MIN_READ_LEN 8
+/** Every chunk should take up at least this many bytes. */
+#define MIN_CHUNK_ALLOC 256
+/** No chunk should take up more than this many bytes. */
+#define MAX_CHUNK_ALLOC 65536
+
+/** Return the allocation size we'd like to use to hold <b>target</b>
+ * bytes. */
+static INLINE size_t
+preferred_chunk_size(size_t target)
+{
+  size_t sz = MIN_CHUNK_ALLOC;
+  while (CHUNK_SIZE_WITH_ALLOC(sz) < target) {
+    sz <<= 1;
+  }
+  return sz;
+}
+
+/** Remove from the freelists most chunks that have not been used since the
+ * last call to buf_shrink_freelists(). */
+void
+buf_shrink_freelists(int free_all)
+{
+#ifdef ENABLE_BUF_FREELISTS
+  int i;
+  disable_control_logging();
+  for (i = 0; freelists[i].alloc_size; ++i) {
+    int slack = freelists[i].slack;
+    assert_freelist_ok(&freelists[i]);
+    if (free_all || freelists[i].lowest_length > slack) {
+      int n_to_free = free_all ? freelists[i].cur_length :
+        (freelists[i].lowest_length - slack);
+      int n_to_skip = freelists[i].cur_length - n_to_free;
+      int orig_length = freelists[i].cur_length;
+      int orig_n_to_free = n_to_free, n_freed=0;
+      int orig_n_to_skip = n_to_skip;
+      int new_length = n_to_skip;
+      chunk_t **chp = &freelists[i].head;
+      chunk_t *chunk;
+      while (n_to_skip) {
+        if (! (*chp)->next) {
+          log_warn(LD_BUG, "I wanted to skip %d chunks in the freelist for "
+                   "%d-byte chunks, but only found %d. (Length %d)",
+                   orig_n_to_skip, (int)freelists[i].alloc_size,
+                   orig_n_to_skip-n_to_skip, freelists[i].cur_length);
+          assert_freelist_ok(&freelists[i]);
+          goto done;
+        }
+        // tor_assert((*chp)->next);
+        chp = &(*chp)->next;
+        --n_to_skip;
+      }
+      chunk = *chp;
+      *chp = NULL;
+      while (chunk) {
+        chunk_t *next = chunk->next;
+        tor_free(chunk);
+        chunk = next;
+        --n_to_free;
+        ++n_freed;
+        ++freelists[i].n_free;
+      }
+      if (n_to_free) {
+        log_warn(LD_BUG, "Freelist length for %d-byte chunks may have been "
+                 "messed up somehow.", (int)freelists[i].alloc_size);
+        log_warn(LD_BUG, "There were %d chunks at the start.  I decided to "
+                 "keep %d. I wanted to free %d.  I freed %d.  I somehow think "
+                 "I have %d left to free.",
+                 freelists[i].cur_length, n_to_skip, orig_n_to_free,
+                 n_freed, n_to_free);
+      }
+      // tor_assert(!n_to_free);
+      freelists[i].cur_length = new_length;
+      log_info(LD_MM, "Cleaned freelist for %d-byte chunks: original "
+               "length %d, kept %d, dropped %d.",
+               (int)freelists[i].alloc_size, orig_length,
+               orig_n_to_skip, orig_n_to_free);
+    }
+    freelists[i].lowest_length = freelists[i].cur_length;
+    assert_freelist_ok(&freelists[i]);
+  }
+ done:
+  enable_control_logging();
+#else
+  (void) free_all;
+#endif
+}
+
+/** Describe the current status of the freelists at log level <b>severity</b>.
+ */
+void
+buf_dump_freelist_sizes(int severity)
+{
+#ifdef ENABLE_BUF_FREELISTS
+  int i;
+  tor_log(severity, LD_MM, "====== Buffer freelists:");
+  for (i = 0; freelists[i].alloc_size; ++i) {
+    uint64_t total = ((uint64_t)freelists[i].cur_length) *
+      freelists[i].alloc_size;
+    tor_log(severity, LD_MM,
+        U64_FORMAT" bytes in %d %d-byte chunks ["U64_FORMAT
+        " misses; "U64_FORMAT" frees; "U64_FORMAT" hits]",
+        U64_PRINTF_ARG(total),
+        freelists[i].cur_length, (int)freelists[i].alloc_size,
+        U64_PRINTF_ARG(freelists[i].n_alloc),
+        U64_PRINTF_ARG(freelists[i].n_free),
+        U64_PRINTF_ARG(freelists[i].n_hit));
+  }
+  tor_log(severity, LD_MM, U64_FORMAT" allocations in non-freelist sizes",
+      U64_PRINTF_ARG(n_freelist_miss));
+#else
+  (void)severity;
+#endif
+}
+
+/** Magic value for buf_t.magic, to catch pointer errors. */
+#define BUFFER_MAGIC 0xB0FFF312u
+/** A resizeable buffer, optimized for reading and writing. */
+struct buf_t {
+  uint32_t magic; /**< Magic cookie for debugging: Must be set to
+                   *   BUFFER_MAGIC. */
+  size_t datalen; /**< How many bytes is this buffer holding right now? */
+  size_t default_chunk_size; /**< Don't allocate any chunks smaller than
+                              * this for this buffer. */
+  chunk_t *head; /**< First chunk in the list, or NULL for none. */
+  chunk_t *tail; /**< Last chunk in the list, or NULL for none. */
+};
+
+/** Collapse data from the first N chunks from <b>buf</b> into buf->head,
+ * growing it as necessary, until buf->head has the first <b>bytes</b> bytes
+ * of data from the buffer, or until buf->head has all the data in <b>buf</b>.
+ *
+ * If <b>nulterminate</b> is true, ensure that there is a 0 byte in
+ * buf->head->mem right after all the data. */
+static void
+buf_pullup(buf_t *buf, size_t bytes, int nulterminate)
+{
+  chunk_t *dest, *src;
+  size_t capacity;
+  if (!buf->head)
+    return;
+
+  check();
+  if (buf->datalen < bytes)
+    bytes = buf->datalen;
+
+  if (nulterminate) {
+    capacity = bytes + 1;
+    if (buf->head->datalen >= bytes && CHUNK_REMAINING_CAPACITY(buf->head)) {
+      *CHUNK_WRITE_PTR(buf->head) = '\0';
+      return;
+    }
+  } else {
+    capacity = bytes;
+    if (buf->head->datalen >= bytes)
+      return;
+  }
+
+  if (buf->head->memlen >= capacity) {
+    /* We don't need to grow the first chunk, but we might need to repack it.*/
+    size_t needed = capacity - buf->head->datalen;
+    if (CHUNK_REMAINING_CAPACITY(buf->head) < needed)
+      chunk_repack(buf->head);
+    tor_assert(CHUNK_REMAINING_CAPACITY(buf->head) >= needed);
+  } else {
+    chunk_t *newhead;
+    size_t newsize;
+    /* We need to grow the chunk. */
+    chunk_repack(buf->head);
+    newsize = CHUNK_SIZE_WITH_ALLOC(preferred_chunk_size(capacity));
+    newhead = chunk_grow(buf->head, newsize);
+    tor_assert(newhead->memlen >= capacity);
+    if (newhead != buf->head) {
+      if (buf->tail == buf->head)
+        buf->tail = newhead;
+      buf->head = newhead;
+    }
+  }
+
+  dest = buf->head;
+  while (dest->datalen < bytes) {
+    size_t n = bytes - dest->datalen;
+    src = dest->next;
+    tor_assert(src);
+    if (n > src->datalen) {
+      memcpy(CHUNK_WRITE_PTR(dest), src->data, src->datalen);
+      dest->datalen += src->datalen;
+      dest->next = src->next;
+      if (buf->tail == src)
+        buf->tail = dest;
+      chunk_free_unchecked(src);
+    } else {
+      memcpy(CHUNK_WRITE_PTR(dest), src->data, n);
+      dest->datalen += n;
+      src->data += n;
+      src->datalen -= n;
+      tor_assert(dest->datalen == bytes);
+    }
+  }
+
+  if (nulterminate) {
+    tor_assert(CHUNK_REMAINING_CAPACITY(buf->head));
+    *CHUNK_WRITE_PTR(buf->head) = '\0';
+  }
+
+  check();
+}
+
+/** Resize buf so it won't hold extra memory that we haven't been
+ * using lately.
+ */
+void
+buf_shrink(buf_t *buf)
+{
+  (void)buf;
+}
+
+/** Remove the first <b>n</b> bytes from buf. */
+static INLINE void
+buf_remove_from_front(buf_t *buf, size_t n)
+{
+  tor_assert(buf->datalen >= n);
+  while (n) {
+    tor_assert(buf->head);
+    if (buf->head->datalen > n) {
+      buf->head->datalen -= n;
+      buf->head->data += n;
+      buf->datalen -= n;
+      return;
+    } else {
+      chunk_t *victim = buf->head;
+      n -= victim->datalen;
+      buf->datalen -= victim->datalen;
+      buf->head = victim->next;
+      if (buf->tail == victim)
+        buf->tail = NULL;
+      chunk_free_unchecked(victim);
+    }
+  }
+  check();
+}
+
+/** Create and return a new buf with default chunk capacity <b>size</b>.
+ */
+buf_t *
+buf_new_with_capacity(size_t size)
+{
+  buf_t *b = buf_new();
+  b->default_chunk_size = preferred_chunk_size(size);
+  return b;
+}
+
+/** Allocate and return a new buffer with default capacity. */
+buf_t *
+buf_new(void)
+{
+  buf_t *buf = tor_malloc_zero(sizeof(buf_t));
+  buf->magic = BUFFER_MAGIC;
+  buf->default_chunk_size = 4096;
+  return buf;
+}
+
+/** Remove all data from <b>buf</b>. */
+void
+buf_clear(buf_t *buf)
+{
+  chunk_t *chunk, *next;
+  buf->datalen = 0;
+  for (chunk = buf->head; chunk; chunk = next) {
+    next = chunk->next;
+    chunk_free_unchecked(chunk);
+  }
+  buf->head = buf->tail = NULL;
+}
+
+/** Return the number of bytes stored in <b>buf</b> */
+size_t
+buf_datalen(const buf_t *buf)
+{
+  return buf->datalen;
+}
+
+/** Return the total length of all chunks used in <b>buf</b>. */
+size_t
+buf_allocation(const buf_t *buf)
+{
+  size_t total = 0;
+  const chunk_t *chunk;
+  for (chunk = buf->head; chunk; chunk = chunk->next) {
+    total += chunk->memlen;
+  }
+  return total;
+}
+
+/** Return the number of bytes that can be added to <b>buf</b> without
+ * performing any additional allocation. */
+size_t
+buf_slack(const buf_t *buf)
+{
+  if (!buf->tail)
+    return 0;
+  else
+    return CHUNK_REMAINING_CAPACITY(buf->tail);
+}
+
+/** Release storage held by <b>buf</b>. */
+void
+buf_free(buf_t *buf)
+{
+  if (!buf)
+    return;
+
+  buf_clear(buf);
+  buf->magic = 0xdeadbeef;
+  tor_free(buf);
+}
+
+/** Return a new copy of <b>in_chunk</b> */
+static chunk_t *
+chunk_copy(const chunk_t *in_chunk)
+{
+  chunk_t *newch = tor_memdup(in_chunk, CHUNK_ALLOC_SIZE(in_chunk->memlen));
+  newch->next = NULL;
+  if (in_chunk->data) {
+    off_t offset = in_chunk->data - in_chunk->mem;
+    newch->data = newch->mem + offset;
+  }
+  return newch;
+}
+
+/** Return a new copy of <b>buf</b> */
+buf_t *
+buf_copy(const buf_t *buf)
+{
+  chunk_t *ch;
+  buf_t *out = buf_new();
+  out->default_chunk_size = buf->default_chunk_size;
+  for (ch = buf->head; ch; ch = ch->next) {
+    chunk_t *newch = chunk_copy(ch);
+    if (out->tail) {
+      out->tail->next = newch;
+      out->tail = newch;
+    } els
