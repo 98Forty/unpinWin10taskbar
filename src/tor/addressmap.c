@@ -842,4 +842,237 @@ get_random_virtual_addr(const virtual_addr_conf_t *conf, tor_addr_t *addr_out)
  * (one of RESOLVED_TYPE_{IPV4|HOSTNAME}) that has not yet been mapped,
  * and that is very unlikely to be the address of any real host.
  *
- * May return NULL if we have run out of vi
+ * May return NULL if we have run out of virtual addresses.
+ */
+static char *
+addressmap_get_virtual_address(int type)
+{
+  char buf[64];
+  tor_assert(addressmap);
+
+  if (type == RESOLVED_TYPE_HOSTNAME) {
+    char rand[10];
+    do {
+      crypto_rand(rand, sizeof(rand));
+      base32_encode(buf,sizeof(buf),rand,sizeof(rand));
+      strlcat(buf, ".virtual", sizeof(buf));
+    } while (strmap_get(addressmap, buf));
+    return tor_strdup(buf);
+  } else if (type == RESOLVED_TYPE_IPV4 || type == RESOLVED_TYPE_IPV6) {
+    const int ipv6 = (type == RESOLVED_TYPE_IPV6);
+    const virtual_addr_conf_t *conf = ipv6 ?
+      &virtaddr_conf_ipv6 : &virtaddr_conf_ipv4;
+
+    /* Don't try more than 1000 times.  This gives us P < 1e-9 for
+     * failing to get a good address so long as the address space is
+     * less than ~97.95% full.  That's always going to be true under
+     * sensible circumstances for an IPv6 /10, and it's going to be
+     * true for an IPv4 /10 as long as we've handed out less than
+     * 4.08 million addresses. */
+    uint32_t attempts = 1000;
+
+    tor_addr_t addr;
+
+    while (attempts--) {
+      get_random_virtual_addr(conf, &addr);
+
+      if (!ipv6) {
+        /* Don't hand out any .0 or .255 address. */
+        const uint32_t a = tor_addr_to_ipv4h(&addr);
+        if ((a & 0xff) == 0 || (a & 0xff) == 0xff)
+          continue;
+      }
+
+      tor_addr_to_str(buf, &addr, sizeof(buf), 1);
+      if (!strmap_get(addressmap, buf)) {
+        /* XXXX This code is to make sure I didn't add an undecorated version
+         * by mistake. I hope it's needless. */
+        char tmp[TOR_ADDR_BUF_LEN];
+        tor_addr_to_str(buf, &addr, sizeof(tmp), 0);
+        if (strmap_get(addressmap, tmp)) {
+          log_warn(LD_BUG, "%s wasn't in the addressmap, but %s was.",
+                   buf, tmp);
+          continue;
+        }
+
+        return tor_strdup(buf);
+      }
+    }
+    log_warn(LD_CONFIG, "Ran out of virtual addresses!");
+    return NULL;
+  } else {
+    log_warn(LD_BUG, "Called with unsupported address type (%d)", type);
+    return NULL;
+  }
+}
+
+/** A controller has requested that we map some address of type
+ * <b>type</b> to the address <b>new_address</b>.  Choose an address
+ * that is unlikely to be used, and map it, and return it in a newly
+ * allocated string.  If another address of the same type is already
+ * mapped to <b>new_address</b>, try to return a copy of that address.
+ *
+ * The string in <b>new_address</b> may be freed or inserted into a map
+ * as appropriate.  May return NULL if are out of virtual addresses.
+ **/
+const char *
+addressmap_register_virtual_address(int type, char *new_address)
+{
+  char **addrp;
+  virtaddress_entry_t *vent;
+  int vent_needs_to_be_added = 0;
+
+  tor_assert(new_address);
+  tor_assert(addressmap);
+  tor_assert(virtaddress_reversemap);
+
+  vent = strmap_get(virtaddress_reversemap, new_address);
+  if (!vent) {
+    vent = tor_malloc_zero(sizeof(virtaddress_entry_t));
+    vent_needs_to_be_added = 1;
+  }
+
+  if (type == RESOLVED_TYPE_IPV4)
+    addrp = &vent->ipv4_address;
+  else if (type == RESOLVED_TYPE_IPV6)
+    addrp = &vent->ipv6_address;
+  else
+    addrp = &vent->hostname_address;
+
+  if (*addrp) {
+    addressmap_entry_t *ent = strmap_get(addressmap, *addrp);
+    if (ent && ent->new_address &&
+        !strcasecmp(new_address, ent->new_address)) {
+      tor_free(new_address);
+      tor_assert(!vent_needs_to_be_added);
+      return tor_strdup(*addrp);
+    } else {
+      log_warn(LD_BUG,
+               "Internal confusion: I thought that '%s' was mapped to by "
+               "'%s', but '%s' really maps to '%s'. This is a harmless bug.",
+               safe_str_client(new_address),
+               safe_str_client(*addrp),
+               safe_str_client(*addrp),
+               ent?safe_str_client(ent->new_address):"(nothing)");
+    }
+  }
+
+  tor_free(*addrp);
+  *addrp = addressmap_get_virtual_address(type);
+  if (!*addrp) {
+    tor_free(vent);
+    tor_free(new_address);
+    return NULL;
+  }
+  log_info(LD_APP, "Registering map from %s to %s", *addrp, new_address);
+  if (vent_needs_to_be_added)
+    strmap_set(virtaddress_reversemap, new_address, vent);
+  addressmap_register(*addrp, new_address, 2, ADDRMAPSRC_AUTOMAP, 0, 0);
+
+#if 0
+  {
+    /* Try to catch possible bugs */
+    addressmap_entry_t *ent;
+    ent = strmap_get(addressmap, *addrp);
+    tor_assert(ent);
+    tor_assert(!strcasecmp(ent->new_address,new_address));
+    vent = strmap_get(virtaddress_reversemap, new_address);
+    tor_assert(vent);
+    tor_assert(!strcasecmp(*addrp,
+                           (type == RESOLVED_TYPE_IPV4) ?
+                           vent->ipv4_address : vent->hostname_address));
+    log_info(LD_APP, "Map from %s to %s okay.",
+             safe_str_client(*addrp),
+             safe_str_client(new_address));
+  }
+#endif
+
+  return *addrp;
+}
+
+/** Return 1 if <b>address</b> has funny characters in it like colons. Return
+ * 0 if it's fine, or if we're configured to allow it anyway.  <b>client</b>
+ * should be true if we're using this address as a client; false if we're
+ * using it as a server.
+ */
+int
+address_is_invalid_destination(const char *address, int client)
+{
+  if (client) {
+    if (get_options()->AllowNonRFC953Hostnames)
+      return 0;
+  } else {
+    if (get_options()->ServerDNSAllowNonRFC953Hostnames)
+      return 0;
+  }
+
+  /* It might be an IPv6 address! */
+  {
+    tor_addr_t a;
+    if (tor_addr_parse(&a, address) >= 0)
+      return 0;
+  }
+
+  while (*address) {
+    if (TOR_ISALNUM(*address) ||
+        *address == '-' ||
+        *address == '.' ||
+        *address == '_') /* Underscore is not allowed, but Windows does it
+                          * sometimes, just to thumb its nose at the IETF. */
+      ++address;
+    else
+      return 1;
+  }
+  return 0;
+}
+
+/** Iterate over all address mappings which have expiry times between
+ * min_expires and max_expires, inclusive.  If sl is provided, add an
+ * "old-addr new-addr expiry" string to sl for each mapping, omitting
+ * the expiry time if want_expiry is false. If sl is NULL, remove the
+ * mappings.
+ */
+void
+addressmap_get_mappings(smartlist_t *sl, time_t min_expires,
+                        time_t max_expires, int want_expiry)
+{
+   strmap_iter_t *iter;
+   const char *key;
+   void *val_;
+   addressmap_entry_t *val;
+
+   if (!addressmap)
+     addressmap_init();
+
+   for (iter = strmap_iter_init(addressmap); !strmap_iter_done(iter); ) {
+     strmap_iter_get(iter, &key, &val_);
+     val = val_;
+     if (val->expires >= min_expires && val->expires <= max_expires) {
+       if (!sl) {
+         iter = strmap_iter_next_rmv(addressmap,iter);
+         addressmap_ent_remove(key, val);
+         continue;
+       } else if (val->new_address) {
+         const char *src_wc = val->src_wildcard ? "*." : "";
+         const char *dst_wc = val->dst_wildcard ? "*." : "";
+         if (want_expiry) {
+           if (val->expires < 3 || val->expires == TIME_MAX)
+             smartlist_add_asprintf(sl, "%s%s %s%s NEVER",
+                                    src_wc, key, dst_wc, val->new_address);
+           else {
+             char time[ISO_TIME_LEN+1];
+             format_iso_time(time, val->expires);
+             smartlist_add_asprintf(sl, "%s%s %s%s \"%s\"",
+                                    src_wc, key, dst_wc, val->new_address,
+                                    time);
+           }
+         } else {
+           smartlist_add_asprintf(sl, "%s%s %s%s",
+                                  src_wc, key, dst_wc, val->new_address);
+         }
+       }
+     }
+     iter = strmap_iter_next(addressmap,iter);
+   }
+}
+
