@@ -42,4 +42,21 @@ void addressmap_get_mappings(smartlist_t *sl, time_t min_expires,
                              time_t max_expires, int want_expiry);
 int address_is_in_virtual_range(const char *addr);
 void clear_trackexithost_mappings(const char *exitname);
-void client_dns_set_reverse_addressmap(entry_connection_t *for_conn
+void client_dns_set_reverse_addressmap(entry_connection_t *for_conn,
+                                       const char *address, const char *v,
+                                       const char *exitname, int ttl);
+int addressmap_address_should_automap(const char *address,
+                                      const or_options_t *options);
+
+#ifdef ADDRESSMAP_PRIVATE
+typedef struct virtual_addr_conf_t {
+  tor_addr_t addr;
+  maskbits_t bits;
+} virtual_addr_conf_t;
+
+STATIC void get_random_virtual_addr(const virtual_addr_conf_t *conf,
+                                    tor_addr_t *addr_out);
+#endif
+
+#endif
+
