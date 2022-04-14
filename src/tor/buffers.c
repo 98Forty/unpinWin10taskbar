@@ -584,4 +584,320 @@ buf_copy(const buf_t *buf)
     if (out->tail) {
       out->tail->next = newch;
       out->tail = newch;
-    } els
+    } else {
+      out->head = out->tail = newch;
+    }
+  }
+  out->datalen = buf->datalen;
+  return out;
+}
+
+/** Append a new chunk with enough capacity to hold <b>capacity</b> bytes to
+ * the tail of <b>buf</b>.  If <b>capped</b>, don't allocate a chunk bigger
+ * than MAX_CHUNK_ALLOC. */
+static chunk_t *
+buf_add_chunk_with_capacity(buf_t *buf, size_t capacity, int capped)
+{
+  chunk_t *chunk;
+  if (CHUNK_ALLOC_SIZE(capacity) < buf->default_chunk_size) {
+    chunk = chunk_new_with_alloc_size(buf->default_chunk_size);
+  } else if (capped && CHUNK_ALLOC_SIZE(capacity) > MAX_CHUNK_ALLOC) {
+    chunk = chunk_new_with_alloc_size(MAX_CHUNK_ALLOC);
+  } else {
+    chunk = chunk_new_with_alloc_size(preferred_chunk_size(capacity));
+  }
+  if (buf->tail) {
+    tor_assert(buf->head);
+    buf->tail->next = chunk;
+    buf->tail = chunk;
+  } else {
+    tor_assert(!buf->head);
+    buf->head = buf->tail = chunk;
+  }
+  check();
+  return chunk;
+}
+
+/** Read up to <b>at_most</b> bytes from the socket <b>fd</b> into
+ * <b>chunk</b> (which must be on <b>buf</b>). If we get an EOF, set
+ * *<b>reached_eof</b> to 1.  Return -1 on error, 0 on eof or blocking,
+ * and the number of bytes read otherwise. */
+static INLINE int
+read_to_chunk(buf_t *buf, chunk_t *chunk, tor_socket_t fd, size_t at_most,
+              int *reached_eof, int *socket_error)
+{
+  ssize_t read_result;
+  if (at_most > CHUNK_REMAINING_CAPACITY(chunk))
+    at_most = CHUNK_REMAINING_CAPACITY(chunk);
+  read_result = tor_socket_recv(fd, CHUNK_WRITE_PTR(chunk), at_most, 0);
+
+  if (read_result < 0) {
+    int e = tor_socket_errno(fd);
+    if (!ERRNO_IS_EAGAIN(e)) { /* it's a real error */
+#ifdef _WIN32
+      if (e == WSAENOBUFS)
+        log_warn(LD_NET,"recv() failed: WSAENOBUFS. Not enough ram?");
+#endif
+      *socket_error = e;
+      return -1;
+    }
+    return 0; /* would block. */
+  } else if (read_result == 0) {
+    log_debug(LD_NET,"Encountered eof on fd %d", (int)fd);
+    *reached_eof = 1;
+    return 0;
+  } else { /* actually got bytes. */
+    buf->datalen += read_result;
+    chunk->datalen += read_result;
+    log_debug(LD_NET,"Read %ld bytes. %d on inbuf.", (long)read_result,
+              (int)buf->datalen);
+    tor_assert(read_result < INT_MAX);
+    return (int)read_result;
+  }
+}
+
+/** As read_to_chunk(), but return (negative) error code on error, blocking,
+ * or TLS, and the number of bytes read otherwise. */
+static INLINE int
+read_to_chunk_tls(buf_t *buf, chunk_t *chunk, tor_tls_t *tls,
+                  size_t at_most)
+{
+  int read_result;
+
+  tor_assert(CHUNK_REMAINING_CAPACITY(chunk) >= at_most);
+  read_result = tor_tls_read(tls, CHUNK_WRITE_PTR(chunk), at_most);
+  if (read_result < 0)
+    return read_result;
+  buf->datalen += read_result;
+  chunk->datalen += read_result;
+  return read_result;
+}
+
+/** Read from socket <b>s</b>, writing onto end of <b>buf</b>.  Read at most
+ * <b>at_most</b> bytes, growing the buffer as necessary.  If recv() returns 0
+ * (because of EOF), set *<b>reached_eof</b> to 1 and return 0. Return -1 on
+ * error; else return the number of bytes read.
+ */
+/* XXXX024 indicate "read blocked" somehow? */
+int
+read_to_buf(tor_socket_t s, size_t at_most, buf_t *buf, int *reached_eof,
+            int *socket_error)
+{
+  /* XXXX024 It's stupid to overload the return values for these functions:
+   * "error status" and "number of bytes read" are not mutually exclusive.
+   */
+  int r = 0;
+  size_t total_read = 0;
+
+  check();
+  tor_assert(reached_eof);
+  tor_assert(SOCKET_OK(s));
+
+  while (at_most > total_read) {
+    size_t readlen = at_most - total_read;
+    chunk_t *chunk;
+    if (!buf->tail || CHUNK_REMAINING_CAPACITY(buf->tail) < MIN_READ_LEN) {
+      chunk = buf_add_chunk_with_capacity(buf, at_most, 1);
+      if (readlen > chunk->memlen)
+        readlen = chunk->memlen;
+    } else {
+      size_t cap = CHUNK_REMAINING_CAPACITY(buf->tail);
+      chunk = buf->tail;
+      if (cap < readlen)
+        readlen = cap;
+    }
+
+    r = read_to_chunk(buf, chunk, s, readlen, reached_eof, socket_error);
+    check();
+    if (r < 0)
+      return r; /* Error */
+    tor_assert(total_read+r < INT_MAX);
+    total_read += r;
+    if ((size_t)r < readlen) { /* eof, block, or no more to read. */
+      break;
+    }
+  }
+  return (int)total_read;
+}
+
+/** As read_to_buf, but reads from a TLS connection, and returns a TLS
+ * status value rather than the number of bytes read.
+ *
+ * Using TLS on OR connections complicates matters in two ways.
+ *
+ * First, a TLS stream has its own read buffer independent of the
+ * connection's read buffer.  (TLS needs to read an entire frame from
+ * the network before it can decrypt any data.  Thus, trying to read 1
+ * byte from TLS can require that several KB be read from the network
+ * and decrypted.  The extra data is stored in TLS's decrypt buffer.)
+ * Because the data hasn't been read by Tor (it's still inside the TLS),
+ * this means that sometimes a connection "has stuff to read" even when
+ * poll() didn't return POLLIN. The tor_tls_get_pending_bytes function is
+ * used in connection.c to detect TLS objects with non-empty internal
+ * buffers and read from them again.
+ *
+ * Second, the TLS stream's events do not correspond directly to network
+ * events: sometimes, before a TLS stream can read, the network must be
+ * ready to write -- or vice versa.
+ */
+int
+read_to_buf_tls(tor_tls_t *tls, size_t at_most, buf_t *buf)
+{
+  int r = 0;
+  size_t total_read = 0;
+
+  check_no_tls_errors();
+
+  check();
+
+  while (at_most > total_read) {
+    size_t readlen = at_most - total_read;
+    chunk_t *chunk;
+    if (!buf->tail || CHUNK_REMAINING_CAPACITY(buf->tail) < MIN_READ_LEN) {
+      chunk = buf_add_chunk_with_capacity(buf, at_most, 1);
+      if (readlen > chunk->memlen)
+        readlen = chunk->memlen;
+    } else {
+      size_t cap = CHUNK_REMAINING_CAPACITY(buf->tail);
+      chunk = buf->tail;
+      if (cap < readlen)
+        readlen = cap;
+    }
+
+    r = read_to_chunk_tls(buf, chunk, tls, readlen);
+    check();
+    if (r < 0)
+      return r; /* Error */
+    tor_assert(total_read+r < INT_MAX);
+     total_read += r;
+    if ((size_t)r < readlen) /* eof, block, or no more to read. */
+      break;
+  }
+  return (int)total_read;
+}
+
+/** Helper for flush_buf(): try to write <b>sz</b> bytes from chunk
+ * <b>chunk</b> of buffer <b>buf</b> onto socket <b>s</b>.  On success, deduct
+ * the bytes written from *<b>buf_flushlen</b>.  Return the number of bytes
+ * written on success, 0 on blocking, -1 on failure.
+ */
+static INLINE int
+flush_chunk(tor_socket_t s, buf_t *buf, chunk_t *chunk, size_t sz,
+            size_t *buf_flushlen)
+{
+  ssize_t write_result;
+
+  if (sz > chunk->datalen)
+    sz = chunk->datalen;
+  write_result = tor_socket_send(s, chunk->data, sz, 0);
+
+  if (write_result < 0) {
+    int e = tor_socket_errno(s);
+    if (!ERRNO_IS_EAGAIN(e)) { /* it's a real error */
+#ifdef _WIN32
+      if (e == WSAENOBUFS)
+        log_warn(LD_NET,"write() failed: WSAENOBUFS. Not enough ram?");
+#endif
+      return -1;
+    }
+    log_debug(LD_NET,"write() would block, returning.");
+    return 0;
+  } else {
+    *buf_flushlen -= write_result;
+    buf_remove_from_front(buf, write_result);
+    tor_assert(write_result < INT_MAX);
+    return (int)write_result;
+  }
+}
+
+/** Helper for flush_buf_tls(): try to write <b>sz</b> bytes from chunk
+ * <b>chunk</b> of buffer <b>buf</b> onto socket <b>s</b>.  (Tries to write
+ * more if there is a forced pending write size.)  On success, deduct the
+ * bytes written from *<b>buf_flushlen</b>.  Return the number of bytes
+ * written on success, and a TOR_TLS error code on failure or blocking.
+ */
+static INLINE int
+flush_chunk_tls(tor_tls_t *tls, buf_t *buf, chunk_t *chunk,
+                size_t sz, size_t *buf_flushlen)
+{
+  int r;
+  size_t forced;
+  char *data;
+
+  forced = tor_tls_get_forced_write_size(tls);
+  if (forced > sz)
+    sz = forced;
+  if (chunk) {
+    data = chunk->data;
+    tor_assert(sz <= chunk->datalen);
+  } else {
+    data = NULL;
+    tor_assert(sz == 0);
+  }
+  r = tor_tls_write(tls, data, sz);
+  if (r < 0)
+    return r;
+  if (*buf_flushlen > (size_t)r)
+    *buf_flushlen -= r;
+  else
+    *buf_flushlen = 0;
+  buf_remove_from_front(buf, r);
+  log_debug(LD_NET,"flushed %d bytes, %d ready to flush, %d remain.",
+            r,(int)*buf_flushlen,(int)buf->datalen);
+  return r;
+}
+
+/** Write data from <b>buf</b> to the socket <b>s</b>.  Write at most
+ * <b>sz</b> bytes, decrement *<b>buf_flushlen</b> by
+ * the number of bytes actually written, and remove the written bytes
+ * from the buffer.  Return the number of bytes written on success,
+ * -1 on failure.  Return 0 if write() would block.
+ */
+int
+flush_buf(tor_socket_t s, buf_t *buf, size_t sz, size_t *buf_flushlen)
+{
+  /* XXXX024 It's stupid to overload the return values for these functions:
+   * "error status" and "number of bytes flushed" are not mutually exclusive.
+   */
+  int r;
+  size_t flushed = 0;
+  tor_assert(buf_flushlen);
+  tor_assert(SOCKET_OK(s));
+  tor_assert(*buf_flushlen <= buf->datalen);
+  tor_assert(sz <= *buf_flushlen);
+
+  check();
+  while (sz) {
+    size_t flushlen0;
+    tor_assert(buf->head);
+    if (buf->head->datalen >= sz)
+      flushlen0 = sz;
+    else
+      flushlen0 = buf->head->datalen;
+
+    r = flush_chunk(s, buf, buf->head, flushlen0, buf_flushlen);
+    check();
+    if (r < 0)
+      return r;
+    flushed += r;
+    sz -= r;
+    if (r == 0 || (size_t)r < flushlen0) /* can't flush any more now. */
+      break;
+  }
+  tor_assert(flushed < INT_MAX);
+  return (int)flushed;
+}
+
+/** As flush_buf(), but writes data to a TLS connection.  Can write more than
+ * <b>flushlen</b> bytes.
+ */
+int
+flush_buf_tls(tor_tls_t *tls, buf_t *buf, size_t flushlen,
+              size_t *buf_flushlen)
+{
+  int r;
+  size_t flushed = 0;
+  ssize_t sz;
+  tor_assert(buf_flushlen);
+  tor_assert(*buf_flushlen <= buf->datalen);
+  tor_assert(flus
