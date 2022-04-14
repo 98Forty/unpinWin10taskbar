@@ -1236,4 +1236,302 @@ buf_find_pos_of_char(char ch, buf_pos_t *out)
     }
   }
   pos = out->pos;
-  for (chunk = out-
+  for (chunk = out->chunk; chunk; chunk = chunk->next) {
+    char *cp = memchr(chunk->data+pos, ch, chunk->datalen - pos);
+    if (cp) {
+      out->chunk = chunk;
+      tor_assert(cp - chunk->data < INT_MAX);
+      out->pos = (int)(cp - chunk->data);
+      return out->chunk_pos + out->pos;
+    } else {
+      out->chunk_pos += chunk->datalen;
+      pos = 0;
+    }
+  }
+  return -1;
+}
+
+/** Advance <b>pos</b> by a single character, if there are any more characters
+ * in the buffer.  Returns 0 on success, -1 on failure. */
+static INLINE int
+buf_pos_inc(buf_pos_t *pos)
+{
+  ++pos->pos;
+  if (pos->pos == (off_t)pos->chunk->datalen) {
+    if (!pos->chunk->next)
+      return -1;
+    pos->chunk_pos += pos->chunk->datalen;
+    pos->chunk = pos->chunk->next;
+    pos->pos = 0;
+  }
+  return 0;
+}
+
+/** Return true iff the <b>n</b>-character string in <b>s</b> appears
+ * (verbatim) at <b>pos</b>. */
+static int
+buf_matches_at_pos(const buf_pos_t *pos, const char *s, size_t n)
+{
+  buf_pos_t p;
+  if (!n)
+    return 1;
+
+  memcpy(&p, pos, sizeof(p));
+
+  while (1) {
+    char ch = p.chunk->data[p.pos];
+    if (ch != *s)
+      return 0;
+    ++s;
+    /* If we're out of characters that don't match, we match.  Check this
+     * _before_ we test incrementing pos, in case we're at the end of the
+     * string. */
+    if (--n == 0)
+      return 1;
+    if (buf_pos_inc(&p)<0)
+      return 0;
+  }
+}
+
+/** Return the first position in <b>buf</b> at which the <b>n</b>-character
+ * string <b>s</b> occurs, or -1 if it does not occur. */
+STATIC int
+buf_find_string_offset(const buf_t *buf, const char *s, size_t n)
+{
+  buf_pos_t pos;
+  buf_pos_init(buf, &pos);
+  while (buf_find_pos_of_char(*s, &pos) >= 0) {
+    if (buf_matches_at_pos(&pos, s, n)) {
+      tor_assert(pos.chunk_pos + pos.pos < INT_MAX);
+      return (int)(pos.chunk_pos + pos.pos);
+    } else {
+      if (buf_pos_inc(&pos)<0)
+        return -1;
+    }
+  }
+  return -1;
+}
+
+/** There is a (possibly incomplete) http statement on <b>buf</b>, of the
+ * form "\%s\\r\\n\\r\\n\%s", headers, body. (body may contain NULs.)
+ * If a) the headers include a Content-Length field and all bytes in
+ * the body are present, or b) there's no Content-Length field and
+ * all headers are present, then:
+ *
+ *  - strdup headers into <b>*headers_out</b>, and NUL-terminate it.
+ *  - memdup body into <b>*body_out</b>, and NUL-terminate it.
+ *  - Then remove them from <b>buf</b>, and return 1.
+ *
+ *  - If headers or body is NULL, discard that part of the buf.
+ *  - If a headers or body doesn't fit in the arg, return -1.
+ *  (We ensure that the headers or body don't exceed max len,
+ *   _even if_ we're planning to discard them.)
+ *  - If force_complete is true, then succeed even if not all of the
+ *    content has arrived.
+ *
+ * Else, change nothing and return 0.
+ */
+int
+fetch_from_buf_http(buf_t *buf,
+                    char **headers_out, size_t max_headerlen,
+                    char **body_out, size_t *body_used, size_t max_bodylen,
+                    int force_complete)
+{
+  char *headers, *p;
+  size_t headerlen, bodylen, contentlen;
+  int crlf_offset;
+
+  check();
+  if (!buf->head)
+    return 0;
+
+  crlf_offset = buf_find_string_offset(buf, "\r\n\r\n", 4);
+  if (crlf_offset > (int)max_headerlen ||
+      (crlf_offset < 0 && buf->datalen > max_headerlen)) {
+    log_debug(LD_HTTP,"headers too long.");
+    return -1;
+  } else if (crlf_offset < 0) {
+    log_debug(LD_HTTP,"headers not all here yet.");
+    return 0;
+  }
+  /* Okay, we have a full header.  Make sure it all appears in the first
+   * chunk. */
+  if ((int)buf->head->datalen < crlf_offset + 4)
+    buf_pullup(buf, crlf_offset+4, 0);
+  headerlen = crlf_offset + 4;
+
+  headers = buf->head->data;
+  bodylen = buf->datalen - headerlen;
+  log_debug(LD_HTTP,"headerlen %d, bodylen %d.", (int)headerlen, (int)bodylen);
+
+  if (max_headerlen <= headerlen) {
+    log_warn(LD_HTTP,"headerlen %d larger than %d. Failing.",
+             (int)headerlen, (int)max_headerlen-1);
+    return -1;
+  }
+  if (max_bodylen <= bodylen) {
+    log_warn(LD_HTTP,"bodylen %d larger than %d. Failing.",
+             (int)bodylen, (int)max_bodylen-1);
+    return -1;
+  }
+
+#define CONTENT_LENGTH "\r\nContent-Length: "
+  p = (char*) tor_memstr(headers, headerlen, CONTENT_LENGTH);
+  if (p) {
+    int i;
+    i = atoi(p+strlen(CONTENT_LENGTH));
+    if (i < 0) {
+      log_warn(LD_PROTOCOL, "Content-Length is less than zero; it looks like "
+               "someone is trying to crash us.");
+      return -1;
+    }
+    contentlen = i;
+    /* if content-length is malformed, then our body length is 0. fine. */
+    log_debug(LD_HTTP,"Got a contentlen of %d.",(int)contentlen);
+    if (bodylen < contentlen) {
+      if (!force_complete) {
+        log_debug(LD_HTTP,"body not all here yet.");
+        return 0; /* not all there yet */
+      }
+    }
+    if (bodylen > contentlen) {
+      bodylen = contentlen;
+      log_debug(LD_HTTP,"bodylen reduced to %d.",(int)bodylen);
+    }
+  }
+  /* all happy. copy into the appropriate places, and return 1 */
+  if (headers_out) {
+    *headers_out = tor_malloc(headerlen+1);
+    fetch_from_buf(*headers_out, headerlen, buf);
+    (*headers_out)[headerlen] = 0; /* NUL terminate it */
+  }
+  if (body_out) {
+    tor_assert(body_used);
+    *body_used = bodylen;
+    *body_out = tor_malloc(bodylen+1);
+    fetch_from_buf(*body_out, bodylen, buf);
+    (*body_out)[bodylen] = 0; /* NUL terminate it */
+  }
+  check();
+  return 1;
+}
+
+#ifdef USE_BUFFEREVENTS
+/** As fetch_from_buf_http, buf works on an evbuffer. */
+int
+fetch_from_evbuffer_http(struct evbuffer *buf,
+                    char **headers_out, size_t max_headerlen,
+                    char **body_out, size_t *body_used, size_t max_bodylen,
+                    int force_complete)
+{
+  struct evbuffer_ptr crlf, content_length;
+  size_t headerlen, bodylen, contentlen;
+
+  /* Find the first \r\n\r\n in the buffer */
+  crlf = evbuffer_search(buf, "\r\n\r\n", 4, NULL);
+  if (crlf.pos < 0) {
+    /* We didn't find one. */
+    if (evbuffer_get_length(buf) > max_headerlen)
+      return -1; /* Headers too long. */
+    return 0; /* Headers not here yet. */
+  } else if (crlf.pos > (int)max_headerlen) {
+    return -1; /* Headers too long. */
+  }
+
+  headerlen = crlf.pos + 4;  /* Skip over the \r\n\r\n */
+  bodylen = evbuffer_get_length(buf) - headerlen;
+  if (bodylen > max_bodylen)
+    return -1; /* body too long */
+
+  /* Look for the first occurrence of CONTENT_LENGTH insize buf before the
+   * crlfcrlf */
+  content_length = evbuffer_search_range(buf, CONTENT_LENGTH,
+                                         strlen(CONTENT_LENGTH), NULL, &crlf);
+
+  if (content_length.pos >= 0) {
+    /* We found a content_length: parse it and figure out if the body is here
+     * yet. */
+    struct evbuffer_ptr eol;
+    char *data = NULL;
+    int free_data = 0;
+    int n, i;
+    n = evbuffer_ptr_set(buf, &content_length, strlen(CONTENT_LENGTH),
+                         EVBUFFER_PTR_ADD);
+    tor_assert(n == 0);
+    eol = evbuffer_search_eol(buf, &content_length, NULL, EVBUFFER_EOL_CRLF);
+    tor_assert(eol.pos > content_length.pos);
+    tor_assert(eol.pos <= crlf.pos);
+    inspect_evbuffer(buf, &data, eol.pos - content_length.pos, &free_data,
+                         &content_length);
+
+    i = atoi(data);
+    if (free_data)
+      tor_free(data);
+    if (i < 0) {
+      log_warn(LD_PROTOCOL, "Content-Length is less than zero; it looks like "
+               "someone is trying to crash us.");
+      return -1;
+    }
+    contentlen = i;
+    /* if content-length is malformed, then our body length is 0. fine. */
+    log_debug(LD_HTTP,"Got a contentlen of %d.",(int)contentlen);
+    if (bodylen < contentlen) {
+      if (!force_complete) {
+        log_debug(LD_HTTP,"body not all here yet.");
+        return 0; /* not all there yet */
+      }
+    }
+    if (bodylen > contentlen) {
+      bodylen = contentlen;
+      log_debug(LD_HTTP,"bodylen reduced to %d.",(int)bodylen);
+    }
+  }
+
+  if (headers_out) {
+    *headers_out = tor_malloc(headerlen+1);
+    evbuffer_remove(buf, *headers_out, headerlen);
+    (*headers_out)[headerlen] = '\0';
+  }
+  if (body_out) {
+    tor_assert(headers_out);
+    tor_assert(body_used);
+    *body_used = bodylen;
+    *body_out = tor_malloc(bodylen+1);
+    evbuffer_remove(buf, *body_out, bodylen);
+    (*body_out)[bodylen] = '\0';
+  }
+  return 1;
+}
+#endif
+
+/**
+ * Wait this many seconds before warning the user about using SOCKS unsafely
+ * again (requires that WarnUnsafeSocks is turned on). */
+#define SOCKS_WARN_INTERVAL 5
+
+/** Warn that the user application has made an unsafe socks request using
+ * protocol <b>socks_protocol</b> on port <b>port</b>.  Don't warn more than
+ * once per SOCKS_WARN_INTERVAL, unless <b>safe_socks</b> is set. */
+static void
+log_unsafe_socks_warning(int socks_protocol, const char *address,
+                         uint16_t port, int safe_socks)
+{
+  static ratelim_t socks_ratelim = RATELIM_INIT(SOCKS_WARN_INTERVAL);
+
+  const or_options_t *options = get_options();
+  if (! options->WarnUnsafeSocks)
+    return;
+  if (safe_socks) {
+    log_fn_ratelim(&socks_ratelim, LOG_WARN, LD_APP,
+             "Your application (using socks%d to port %d) is giving "
+             "Tor only an IP address. Applications that do DNS resolves "
+             "themselves may leak information. Consider using Socks4A "
+             "(e.g. via privoxy or socat) instead. For more information, "
+             "please see https://wiki.torproject.org/TheOnionRouter/"
+             "TorFAQ#SOCKSAndDNS.%s",
+             socks_protocol,
+             (int)port,
+             safe_socks ? " Rejecting." : "");
+  }
+  control_event_client_status(LOG_WARN,
+   
