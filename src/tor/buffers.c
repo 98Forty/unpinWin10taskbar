@@ -900,4 +900,340 @@ flush_buf_tls(tor_tls_t *tls, buf_t *buf, size_t flushlen,
   ssize_t sz;
   tor_assert(buf_flushlen);
   tor_assert(*buf_flushlen <= buf->datalen);
-  tor_assert(flus
+  tor_assert(flushlen <= *buf_flushlen);
+  sz = (ssize_t) flushlen;
+
+  /* we want to let tls write even if flushlen is zero, because it might
+   * have a partial record pending */
+  check_no_tls_errors();
+
+  check();
+  do {
+    size_t flushlen0;
+    if (buf->head) {
+      if ((ssize_t)buf->head->datalen >= sz)
+        flushlen0 = sz;
+      else
+        flushlen0 = buf->head->datalen;
+    } else {
+      flushlen0 = 0;
+    }
+
+    r = flush_chunk_tls(tls, buf, buf->head, flushlen0, buf_flushlen);
+    check();
+    if (r < 0)
+      return r;
+    flushed += r;
+    sz -= r;
+    if (r == 0) /* Can't flush any more now. */
+      break;
+  } while (sz > 0);
+  tor_assert(flushed < INT_MAX);
+  return (int)flushed;
+}
+
+/** Append <b>string_len</b> bytes from <b>string</b> to the end of
+ * <b>buf</b>.
+ *
+ * Return the new length of the buffer on success, -1 on failure.
+ */
+int
+write_to_buf(const char *string, size_t string_len, buf_t *buf)
+{
+  if (!string_len)
+    return (int)buf->datalen;
+  check();
+
+  while (string_len) {
+    size_t copy;
+    if (!buf->tail || !CHUNK_REMAINING_CAPACITY(buf->tail))
+      buf_add_chunk_with_capacity(buf, string_len, 1);
+
+    copy = CHUNK_REMAINING_CAPACITY(buf->tail);
+    if (copy > string_len)
+      copy = string_len;
+    memcpy(CHUNK_WRITE_PTR(buf->tail), string, copy);
+    string_len -= copy;
+    string += copy;
+    buf->datalen += copy;
+    buf->tail->datalen += copy;
+  }
+
+  check();
+  tor_assert(buf->datalen < INT_MAX);
+  return (int)buf->datalen;
+}
+
+/** Helper: copy the first <b>string_len</b> bytes from <b>buf</b>
+ * onto <b>string</b>.
+ */
+static INLINE void
+peek_from_buf(char *string, size_t string_len, const buf_t *buf)
+{
+  chunk_t *chunk;
+
+  tor_assert(string);
+  /* make sure we don't ask for too much */
+  tor_assert(string_len <= buf->datalen);
+  /* assert_buf_ok(buf); */
+
+  chunk = buf->head;
+  while (string_len) {
+    size_t copy = string_len;
+    tor_assert(chunk);
+    if (chunk->datalen < copy)
+      copy = chunk->datalen;
+    memcpy(string, chunk->data, copy);
+    string_len -= copy;
+    string += copy;
+    chunk = chunk->next;
+  }
+}
+
+/** Remove <b>string_len</b> bytes from the front of <b>buf</b>, and store
+ * them into <b>string</b>.  Return the new buffer size.  <b>string_len</b>
+ * must be \<= the number of bytes on the buffer.
+ */
+int
+fetch_from_buf(char *string, size_t string_len, buf_t *buf)
+{
+  /* There must be string_len bytes in buf; write them onto string,
+   * then memmove buf back (that is, remove them from buf).
+   *
+   * Return the number of bytes still on the buffer. */
+
+  check();
+  peek_from_buf(string, string_len, buf);
+  buf_remove_from_front(buf, string_len);
+  check();
+  tor_assert(buf->datalen < INT_MAX);
+  return (int)buf->datalen;
+}
+
+/** True iff the cell command <b>command</b> is one that implies a
+ * variable-length cell in Tor link protocol <b>linkproto</b>. */
+static INLINE int
+cell_command_is_var_length(uint8_t command, int linkproto)
+{
+  /* If linkproto is v2 (2), CELL_VERSIONS is the only variable-length cells
+   * work as implemented here. If it's 1, there are no variable-length cells.
+   * Tor does not support other versions right now, and so can't negotiate
+   * them.
+   */
+  switch (linkproto) {
+  case 1:
+    /* Link protocol version 1 has no variable-length cells. */
+    return 0;
+  case 2:
+    /* In link protocol version 2, VERSIONS is the only variable-length cell */
+    return command == CELL_VERSIONS;
+  case 0:
+  case 3:
+  default:
+    /* In link protocol version 3 and later, and in version "unknown",
+     * commands 128 and higher indicate variable-length. VERSIONS is
+     * grandfathered in. */
+    return command == CELL_VERSIONS || command >= 128;
+  }
+}
+
+/** Check <b>buf</b> for a variable-length cell according to the rules of link
+ * protocol version <b>linkproto</b>.  If one is found, pull it off the buffer
+ * and assign a newly allocated var_cell_t to *<b>out</b>, and return 1.
+ * Return 0 if whatever is on the start of buf_t is not a variable-length
+ * cell.  Return 1 and set *<b>out</b> to NULL if there seems to be the start
+ * of a variable-length cell on <b>buf</b>, but the whole thing isn't there
+ * yet. */
+int
+fetch_var_cell_from_buf(buf_t *buf, var_cell_t **out, int linkproto)
+{
+  char hdr[VAR_CELL_MAX_HEADER_SIZE];
+  var_cell_t *result;
+  uint8_t command;
+  uint16_t length;
+  const int wide_circ_ids = linkproto >= MIN_LINK_PROTO_FOR_WIDE_CIRC_IDS;
+  const int circ_id_len = get_circ_id_size(wide_circ_ids);
+  const unsigned header_len = get_var_cell_header_size(wide_circ_ids);
+  check();
+  *out = NULL;
+  if (buf->datalen < header_len)
+    return 0;
+  peek_from_buf(hdr, header_len, buf);
+
+  command = get_uint8(hdr + circ_id_len);
+  if (!(cell_command_is_var_length(command, linkproto)))
+    return 0;
+
+  length = ntohs(get_uint16(hdr + circ_id_len + 1));
+  if (buf->datalen < (size_t)(header_len+length))
+    return 1;
+  result = var_cell_new(length);
+  result->command = command;
+  if (wide_circ_ids)
+    result->circ_id = ntohl(get_uint32(hdr));
+  else
+    result->circ_id = ntohs(get_uint16(hdr));
+
+  buf_remove_from_front(buf, header_len);
+  peek_from_buf((char*) result->payload, length, buf);
+  buf_remove_from_front(buf, length);
+  check();
+
+  *out = result;
+  return 1;
+}
+
+#ifdef USE_BUFFEREVENTS
+/** Try to read <b>n</b> bytes from <b>buf</b> at <b>pos</b> (which may be
+ * NULL for the start of the buffer), copying the data only if necessary.  Set
+ * *<b>data_out</b> to a pointer to the desired bytes.  Set <b>free_out</b>
+ * to 1 if we needed to malloc *<b>data</b> because the original bytes were
+ * noncontiguous; 0 otherwise.  Return the number of bytes actually available
+ * at *<b>data_out</b>.
+ */
+static ssize_t
+inspect_evbuffer(struct evbuffer *buf, char **data_out, size_t n,
+                 int *free_out, struct evbuffer_ptr *pos)
+{
+  int n_vecs, i;
+
+  if (evbuffer_get_length(buf) < n)
+    n = evbuffer_get_length(buf);
+  if (n == 0)
+    return 0;
+  n_vecs = evbuffer_peek(buf, n, pos, NULL, 0);
+  tor_assert(n_vecs > 0);
+  if (n_vecs == 1) {
+    struct evbuffer_iovec v;
+    i = evbuffer_peek(buf, n, pos, &v, 1);
+    tor_assert(i == 1);
+    *data_out = v.iov_base;
+    *free_out = 0;
+    return v.iov_len;
+  } else {
+    ev_ssize_t copied;
+    *data_out = tor_malloc(n);
+    *free_out = 1;
+    copied = evbuffer_copyout(buf, *data_out, n);
+    tor_assert(copied >= 0 && (size_t)copied == n);
+    return copied;
+  }
+}
+
+/** As fetch_var_cell_from_buf, buf works on an evbuffer. */
+int
+fetch_var_cell_from_evbuffer(struct evbuffer *buf, var_cell_t **out,
+                             int linkproto)
+{
+  char *hdr = NULL;
+  int free_hdr = 0;
+  size_t n;
+  size_t buf_len;
+  uint8_t command;
+  uint16_t cell_length;
+  var_cell_t *cell;
+  int result = 0;
+  const int wide_circ_ids = linkproto >= MIN_LINK_PROTO_FOR_WIDE_CIRC_IDS;
+  const int circ_id_len = get_circ_id_size(wide_circ_ids);
+  const unsigned header_len = get_var_cell_header_size(wide_circ_ids);
+
+  *out = NULL;
+  buf_len = evbuffer_get_length(buf);
+  if (buf_len < header_len)
+    return 0;
+
+  n = inspect_evbuffer(buf, &hdr, header_len, &free_hdr, NULL);
+  tor_assert(n >= header_len);
+
+  command = get_uint8(hdr + circ_id_len);
+  if (!(cell_command_is_var_length(command, linkproto))) {
+    goto done;
+  }
+
+  cell_length = ntohs(get_uint16(hdr + circ_id_len + 1));
+  if (buf_len < (size_t)(header_len+cell_length)) {
+    result = 1; /* Not all here yet. */
+    goto done;
+  }
+
+  cell = var_cell_new(cell_length);
+  cell->command = command;
+  if (wide_circ_ids)
+    cell->circ_id = ntohl(get_uint32(hdr));
+  else
+    cell->circ_id = ntohs(get_uint16(hdr));
+  evbuffer_drain(buf, header_len);
+  evbuffer_remove(buf, cell->payload, cell_length);
+  *out = cell;
+  result = 1;
+
+ done:
+  if (free_hdr && hdr)
+    tor_free(hdr);
+  return result;
+}
+#endif
+
+/** Move up to *<b>buf_flushlen</b> bytes from <b>buf_in</b> to
+ * <b>buf_out</b>, and modify *<b>buf_flushlen</b> appropriately.
+ * Return the number of bytes actually copied.
+ */
+int
+move_buf_to_buf(buf_t *buf_out, buf_t *buf_in, size_t *buf_flushlen)
+{
+  /* We can do way better here, but this doesn't turn up in any profiles. */
+  char b[4096];
+  size_t cp, len;
+  len = *buf_flushlen;
+  if (len > buf_in->datalen)
+    len = buf_in->datalen;
+
+  cp = len; /* Remember the number of bytes we intend to copy. */
+  tor_assert(cp < INT_MAX);
+  while (len) {
+    /* This isn't the most efficient implementation one could imagine, since
+     * it does two copies instead of 1, but I kinda doubt that this will be
+     * critical path. */
+    size_t n = len > sizeof(b) ? sizeof(b) : len;
+    fetch_from_buf(b, n, buf_in);
+    write_to_buf(b, n, buf_out);
+    len -= n;
+  }
+  *buf_flushlen -= cp;
+  return (int)cp;
+}
+
+/** Internal structure: represents a position in a buffer. */
+typedef struct buf_pos_t {
+  const chunk_t *chunk; /**< Which chunk are we pointing to? */
+  int pos;/**< Which character inside the chunk's data are we pointing to? */
+  size_t chunk_pos; /**< Total length of all previous chunks. */
+} buf_pos_t;
+
+/** Initialize <b>out</b> to point to the first character of <b>buf</b>.*/
+static void
+buf_pos_init(const buf_t *buf, buf_pos_t *out)
+{
+  out->chunk = buf->head;
+  out->pos = 0;
+  out->chunk_pos = 0;
+}
+
+/** Advance <b>out</b> to the first appearance of <b>ch</b> at the current
+ * position of <b>out</b>, or later.  Return -1 if no instances are found;
+ * otherwise returns the absolute position of the character. */
+static off_t
+buf_find_pos_of_char(char ch, buf_pos_t *out)
+{
+  const chunk_t *chunk;
+  int pos;
+  tor_assert(out);
+  if (out->chunk) {
+    if (out->chunk->datalen) {
+      tor_assert(out->pos < (off_t)out->chunk->datalen);
+    } else {
+      tor_assert(out->pos == 0);
+    }
+  }
+  pos = out->pos;
+  for (chunk = out-
