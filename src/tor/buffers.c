@@ -2400,4 +2400,185 @@ fetch_from_buf_line(buf_t *buf, char *data_out, size_t *data_len)
  * <b>done</b> is true, flush the data in the state and finish the
  * compression/uncompression.  Return -1 on failure, 0 on success. */
 int
-write_to_
+write_to_buf_zlib(buf_t *buf, tor_zlib_state_t *state,
+                  const char *data, size_t data_len,
+                  int done)
+{
+  char *next;
+  size_t old_avail, avail;
+  int over = 0;
+  do {
+    int need_new_chunk = 0;
+    if (!buf->tail || ! CHUNK_REMAINING_CAPACITY(buf->tail)) {
+      size_t cap = data_len / 4;
+      buf_add_chunk_with_capacity(buf, cap, 1);
+    }
+    next = CHUNK_WRITE_PTR(buf->tail);
+    avail = old_avail = CHUNK_REMAINING_CAPACITY(buf->tail);
+    switch (tor_zlib_process(state, &next, &avail, &data, &data_len, done)) {
+      case TOR_ZLIB_DONE:
+        over = 1;
+        break;
+      case TOR_ZLIB_ERR:
+        return -1;
+      case TOR_ZLIB_OK:
+        if (data_len == 0)
+          over = 1;
+        break;
+      case TOR_ZLIB_BUF_FULL:
+        if (avail) {
+          /* Zlib says we need more room (ZLIB_BUF_FULL).  Start a new chunk
+           * automatically, whether were going to or not. */
+          need_new_chunk = 1;
+        }
+        break;
+    }
+    buf->datalen += old_avail - avail;
+    buf->tail->datalen += old_avail - avail;
+    if (need_new_chunk) {
+      buf_add_chunk_with_capacity(buf, data_len/4, 1);
+    }
+
+  } while (!over);
+  check();
+  return 0;
+}
+
+#ifdef USE_BUFFEREVENTS
+int
+write_to_evbuffer_zlib(struct evbuffer *buf, tor_zlib_state_t *state,
+                       const char *data, size_t data_len,
+                       int done)
+{
+  char *next;
+  size_t old_avail, avail;
+  int over = 0, n;
+  struct evbuffer_iovec vec[1];
+  do {
+    {
+      size_t cap = data_len / 4;
+      if (cap < 128)
+        cap = 128;
+      /* XXXX NM this strategy is fragmentation-prone. We should really have
+       * two iovecs, and write first into the one, and then into the
+       * second if the first gets full. */
+      n = evbuffer_reserve_space(buf, cap, vec, 1);
+      tor_assert(n == 1);
+    }
+
+    next = vec[0].iov_base;
+    avail = old_avail = vec[0].iov_len;
+
+    switch (tor_zlib_process(state, &next, &avail, &data, &data_len, done)) {
+      case TOR_ZLIB_DONE:
+        over = 1;
+        break;
+      case TOR_ZLIB_ERR:
+        return -1;
+      case TOR_ZLIB_OK:
+        if (data_len == 0)
+          over = 1;
+        break;
+      case TOR_ZLIB_BUF_FULL:
+        if (avail) {
+          /* Zlib says we need more room (ZLIB_BUF_FULL).  Start a new chunk
+           * automatically, whether were going to or not. */
+        }
+        break;
+    }
+
+    /* XXXX possible infinite loop on BUF_FULL. */
+    vec[0].iov_len = old_avail - avail;
+    evbuffer_commit_space(buf, vec, 1);
+
+  } while (!over);
+  check();
+  return 0;
+}
+#endif
+
+/** Set *<b>output</b> to contain a copy of the data in *<b>input</b> */
+int
+generic_buffer_set_to_copy(generic_buffer_t **output,
+                           const generic_buffer_t *input)
+{
+#ifdef USE_BUFFEREVENTS
+  struct evbuffer_ptr ptr;
+  size_t remaining = evbuffer_get_length(input);
+  if (*output) {
+    evbuffer_drain(*output, evbuffer_get_length(*output));
+  } else {
+    if (!(*output = evbuffer_new()))
+      return -1;
+  }
+  evbuffer_ptr_set((struct evbuffer*)input, &ptr, 0, EVBUFFER_PTR_SET);
+  while (remaining) {
+    struct evbuffer_iovec v[4];
+    int n_used, i;
+    n_used = evbuffer_peek((struct evbuffer*)input, -1, &ptr, v, 4);
+    if (n_used < 0)
+      return -1;
+    for (i=0;i<n_used;++i) {
+      evbuffer_add(*output, v[i].iov_base, v[i].iov_len);
+      tor_assert(v[i].iov_len <= remaining);
+      remaining -= v[i].iov_len;
+      evbuffer_ptr_set((struct evbuffer*)input,
+                       &ptr, v[i].iov_len, EVBUFFER_PTR_ADD);
+    }
+  }
+#else
+  if (*output)
+    buf_free(*output);
+  *output = buf_copy(input);
+#endif
+  return 0;
+}
+
+/** Log an error and exit if <b>buf</b> is corrupted.
+ */
+void
+assert_buf_ok(buf_t *buf)
+{
+  tor_assert(buf);
+  tor_assert(buf->magic == BUFFER_MAGIC);
+
+  if (! buf->head) {
+    tor_assert(!buf->tail);
+    tor_assert(buf->datalen == 0);
+  } else {
+    chunk_t *ch;
+    size_t total = 0;
+    tor_assert(buf->tail);
+    for (ch = buf->head; ch; ch = ch->next) {
+      total += ch->datalen;
+      tor_assert(ch->datalen <= ch->memlen);
+      tor_assert(ch->data >= &ch->mem[0]);
+      tor_assert(ch->data < &ch->mem[0]+ch->memlen);
+      tor_assert(ch->data+ch->datalen <= &ch->mem[0] + ch->memlen);
+      if (!ch->next)
+        tor_assert(ch == buf->tail);
+    }
+    tor_assert(buf->datalen == total);
+  }
+}
+
+#ifdef ENABLE_BUF_FREELISTS
+/** Log an error and exit if <b>fl</b> is corrupted.
+ */
+static void
+assert_freelist_ok(chunk_freelist_t *fl)
+{
+  chunk_t *ch;
+  int n;
+  tor_assert(fl->alloc_size > 0);
+  n = 0;
+  for (ch = fl->head; ch; ch = ch->next) {
+    tor_assert(CHUNK_ALLOC_SIZE(ch->memlen) == fl->alloc_size);
+    ++n;
+  }
+  tor_assert(n == fl->cur_length);
+  tor_assert(n >= fl->lowest_length);
+  tor_assert(n <= fl->max_length);
+}
+#endif
+
