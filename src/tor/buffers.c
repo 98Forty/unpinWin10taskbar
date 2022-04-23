@@ -2070,4 +2070,334 @@ parse_socks(const char *data, size_t datalen, socks_request_t *req,
           log_notice(LD_APP,
                      "Your application (using socks4a to port %d) instructed "
                      "Tor to take care of the DNS resolution itself if "
-                     "ne
+                     "necessary. This is good.", req->port);
+      }
+      log_debug(LD_APP,"socks4: Everything is here. Success.");
+      strlcpy(req->address, startaddr ? startaddr : tmpbuf,
+              sizeof(req->address));
+      if (!tor_strisprint(req->address) || strchr(req->address,'\"')) {
+        log_warn(LD_PROTOCOL,
+                 "Your application (using socks4 to port %d) gave Tor "
+                 "a malformed hostname: %s. Rejecting the connection.",
+                 req->port, escaped(req->address));
+        return -1;
+      }
+      if (authend != authstart) {
+        req->got_auth = 1;
+        req->usernamelen = authend - authstart;
+        req->username = tor_memdup(authstart, authend - authstart);
+      }
+      /* next points to the final \0 on inbuf */
+      *drain_out = next - data + 1;
+      return 1;
+    }
+    case 'G': /* get */
+    case 'H': /* head */
+    case 'P': /* put/post */
+    case 'C': /* connect */
+      strlcpy((char*)req->reply,
+"HTTP/1.0 501 Tor is not an HTTP Proxy\r\n"
+"Content-Type: text/html; charset=iso-8859-1\r\n\r\n"
+"<html>\n"
+"<head>\n"
+"<title>Tor is not an HTTP Proxy</title>\n"
+"</head>\n"
+"<body>\n"
+"<h1>Tor is not an HTTP Proxy</h1>\n"
+"<p>\n"
+"It appears you have configured your web browser to use Tor as an HTTP proxy."
+"\n"
+"This is not correct: Tor is a SOCKS proxy, not an HTTP proxy.\n"
+"Please configure your client accordingly.\n"
+"</p>\n"
+"<p>\n"
+"See <a href=\"https://www.torproject.org/documentation.html\">"
+           "https://www.torproject.org/documentation.html</a> for more "
+           "information.\n"
+"<!-- Plus this comment, to make the body response more than 512 bytes, so "
+"     IE will be willing to display it. Comment comment comment comment "
+"     comment comment comment comment comment comment comment comment.-->\n"
+"</p>\n"
+"</body>\n"
+"</html>\n"
+             , MAX_SOCKS_REPLY_LEN);
+      req->replylen = strlen((char*)req->reply)+1;
+      /* fall through */
+    default: /* version is not socks4 or socks5 */
+      log_warn(LD_APP,
+               "Socks version %d not recognized. (Tor is not an http proxy.)",
+               *(data));
+      {
+        /* Tell the controller the first 8 bytes. */
+        char *tmp = tor_strndup(data, datalen < 8 ? datalen : 8);
+        control_event_client_status(LOG_WARN,
+                                    "SOCKS_UNKNOWN_PROTOCOL DATA=\"%s\"",
+                                    escaped(tmp));
+        tor_free(tmp);
+      }
+      return -1;
+  }
+}
+
+/** Inspect a reply from SOCKS server stored in <b>buf</b> according
+ * to <b>state</b>, removing the protocol data upon success. Return 0 on
+ * incomplete response, 1 on success and -1 on error, in which case
+ * <b>reason</b> is set to a descriptive message (free() when finished
+ * with it).
+ *
+ * As a special case, 2 is returned when user/pass is required
+ * during SOCKS5 handshake and user/pass is configured.
+ */
+int
+fetch_from_buf_socks_client(buf_t *buf, int state, char **reason)
+{
+  ssize_t drain = 0;
+  int r;
+  if (buf->datalen < 2)
+    return 0;
+
+  buf_pullup(buf, MAX_SOCKS_MESSAGE_LEN, 0);
+  tor_assert(buf->head && buf->head->datalen >= 2);
+
+  r = parse_socks_client((uint8_t*)buf->head->data, buf->head->datalen,
+                         state, reason, &drain);
+  if (drain > 0)
+    buf_remove_from_front(buf, drain);
+  else if (drain < 0)
+    buf_clear(buf);
+
+  return r;
+}
+
+#ifdef USE_BUFFEREVENTS
+/** As fetch_from_buf_socks_client, buf works on an evbuffer */
+int
+fetch_from_evbuffer_socks_client(struct evbuffer *buf, int state,
+                                 char **reason)
+{
+  ssize_t drain = 0;
+  uint8_t *data;
+  size_t datalen;
+  int r;
+
+  /* Linearize the SOCKS response in the buffer, up to 128 bytes.
+   * (parse_socks_client shouldn't need to see anything beyond that.) */
+  datalen = evbuffer_get_length(buf);
+  if (datalen > MAX_SOCKS_MESSAGE_LEN)
+    datalen = MAX_SOCKS_MESSAGE_LEN;
+  data = evbuffer_pullup(buf, datalen);
+
+  r = parse_socks_client(data, datalen, state, reason, &drain);
+  if (drain > 0)
+    evbuffer_drain(buf, drain);
+  else if (drain < 0)
+    evbuffer_drain(buf, evbuffer_get_length(buf));
+
+  return r;
+}
+#endif
+
+/** Implementation logic for fetch_from_*_socks_client. */
+static int
+parse_socks_client(const uint8_t *data, size_t datalen,
+                   int state, char **reason,
+                   ssize_t *drain_out)
+{
+  unsigned int addrlen;
+  *drain_out = 0;
+  if (datalen < 2)
+    return 0;
+
+  switch (state) {
+    case PROXY_SOCKS4_WANT_CONNECT_OK:
+      /* Wait for the complete response */
+      if (datalen < 8)
+        return 0;
+
+      if (data[1] != 0x5a) {
+        *reason = tor_strdup(socks4_response_code_to_string(data[1]));
+        return -1;
+      }
+
+      /* Success */
+      *drain_out = 8;
+      return 1;
+
+    case PROXY_SOCKS5_WANT_AUTH_METHOD_NONE:
+      /* we don't have any credentials */
+      if (data[1] != 0x00) {
+        *reason = tor_strdup("server doesn't support any of our "
+                             "available authentication methods");
+        return -1;
+      }
+
+      log_info(LD_NET, "SOCKS 5 client: continuing without authentication");
+      *drain_out = -1;
+      return 1;
+
+    case PROXY_SOCKS5_WANT_AUTH_METHOD_RFC1929:
+      /* we have a username and password. return 1 if we can proceed without
+       * providing authentication, or 2 otherwise. */
+      switch (data[1]) {
+        case 0x00:
+          log_info(LD_NET, "SOCKS 5 client: we have auth details but server "
+                            "doesn't require authentication.");
+          *drain_out = -1;
+          return 1;
+        case 0x02:
+          log_info(LD_NET, "SOCKS 5 client: need authentication.");
+          *drain_out = -1;
+          return 2;
+        /* fall through */
+      }
+
+      *reason = tor_strdup("server doesn't support any of our available "
+                           "authentication methods");
+      return -1;
+
+    case PROXY_SOCKS5_WANT_AUTH_RFC1929_OK:
+      /* handle server reply to rfc1929 authentication */
+      if (data[1] != 0x00) {
+        *reason = tor_strdup("authentication failed");
+        return -1;
+      }
+
+      log_info(LD_NET, "SOCKS 5 client: authentication successful.");
+      *drain_out = -1;
+      return 1;
+
+    case PROXY_SOCKS5_WANT_CONNECT_OK:
+      /* response is variable length. BND.ADDR, etc, isn't needed
+       * (don't bother with buf_pullup()), but make sure to eat all
+       * the data used */
+
+      /* wait for address type field to arrive */
+      if (datalen < 4)
+        return 0;
+
+      switch (data[3]) {
+        case 0x01: /* ip4 */
+          addrlen = 4;
+          break;
+        case 0x04: /* ip6 */
+          addrlen = 16;
+          break;
+        case 0x03: /* fqdn (can this happen here?) */
+          if (datalen < 5)
+            return 0;
+          addrlen = 1 + data[4];
+          break;
+        default:
+          *reason = tor_strdup("invalid response to connect request");
+          return -1;
+      }
+
+      /* wait for address and port */
+      if (datalen < 6 + addrlen)
+        return 0;
+
+      if (data[1] != 0x00) {
+        *reason = tor_strdup(socks5_response_code_to_string(data[1]));
+        return -1;
+      }
+
+      *drain_out = 6 + addrlen;
+      return 1;
+  }
+
+  /* shouldn't get here... */
+  tor_assert(0);
+
+  return -1;
+}
+
+/** Return 1 iff buf looks more like it has an (obsolete) v0 controller
+ * command on it than any valid v1 controller command. */
+int
+peek_buf_has_control0_command(buf_t *buf)
+{
+  if (buf->datalen >= 4) {
+    char header[4];
+    uint16_t cmd;
+    peek_from_buf(header, sizeof(header), buf);
+    cmd = ntohs(get_uint16(header+2));
+    if (cmd <= 0x14)
+      return 1; /* This is definitely not a v1 control command. */
+  }
+  return 0;
+}
+
+#ifdef USE_BUFFEREVENTS
+int
+peek_evbuffer_has_control0_command(struct evbuffer *buf)
+{
+  int result = 0;
+  if (evbuffer_get_length(buf) >= 4) {
+    int free_out = 0;
+    char *data = NULL;
+    size_t n = inspect_evbuffer(buf, &data, 4, &free_out, NULL);
+    uint16_t cmd;
+    tor_assert(n >= 4);
+    cmd = ntohs(get_uint16(data+2));
+    if (cmd <= 0x14)
+      result = 1;
+    if (free_out)
+      tor_free(data);
+  }
+  return result;
+}
+#endif
+
+/** Return the index within <b>buf</b> at which <b>ch</b> first appears,
+ * or -1 if <b>ch</b> does not appear on buf. */
+static off_t
+buf_find_offset_of_char(buf_t *buf, char ch)
+{
+  chunk_t *chunk;
+  off_t offset = 0;
+  for (chunk = buf->head; chunk; chunk = chunk->next) {
+    char *cp = memchr(chunk->data, ch, chunk->datalen);
+    if (cp)
+      return offset + (cp - chunk->data);
+    else
+      offset += chunk->datalen;
+  }
+  return -1;
+}
+
+/** Try to read a single LF-terminated line from <b>buf</b>, and write it
+ * (including the LF), NUL-terminated, into the *<b>data_len</b> byte buffer
+ * at <b>data_out</b>.  Set *<b>data_len</b> to the number of bytes in the
+ * line, not counting the terminating NUL.  Return 1 if we read a whole line,
+ * return 0 if we don't have a whole line yet, and return -1 if the line
+ * length exceeds *<b>data_len</b>.
+ */
+int
+fetch_from_buf_line(buf_t *buf, char *data_out, size_t *data_len)
+{
+  size_t sz;
+  off_t offset;
+
+  if (!buf->head)
+    return 0;
+
+  offset = buf_find_offset_of_char(buf, '\n');
+  if (offset < 0)
+    return 0;
+  sz = (size_t) offset;
+  if (sz+2 > *data_len) {
+    *data_len = sz + 2;
+    return -1;
+  }
+  fetch_from_buf(data_out, sz+1, buf);
+  data_out[sz+1] = '\0';
+  *data_len = sz+1;
+  return 1;
+}
+
+/** Compress on uncompress the <b>data_len</b> bytes in <b>data</b> using the
+ * zlib state <b>state</b>, appending the result to <b>buf</b>.  If
+ * <b>done</b> is true, flush the data in the state and finish the
+ * compression/uncompression.  Return -1 on failure, 0 on success. */
+int
+write_to_
