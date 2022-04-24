@@ -1499,3 +1499,380 @@ circuit_mark_for_close_(circuit_t *circ, int reason, int line,
       smartlist_remove(circuits_pending_chans, circ);
   }
   if (CIRCUIT_IS_ORIGIN(circ)) {
+    control_event_circuit_status(TO_ORIGIN_CIRCUIT(circ),
+     (circ->state == CIRCUIT_STATE_OPEN)?CIRC_EVENT_CLOSED:CIRC_EVENT_FAILED,
+     orig_reason);
+  }
+  if (circ->purpose == CIRCUIT_PURPOSE_C_INTRODUCE_ACK_WAIT) {
+    origin_circuit_t *ocirc = TO_ORIGIN_CIRCUIT(circ);
+    int timed_out = (reason == END_CIRC_REASON_TIMEOUT);
+    tor_assert(circ->state == CIRCUIT_STATE_OPEN);
+    tor_assert(ocirc->build_state->chosen_exit);
+    tor_assert(ocirc->rend_data);
+    /* treat this like getting a nack from it */
+    log_info(LD_REND, "Failed intro circ %s to %s (awaiting ack). %s",
+           safe_str_client(ocirc->rend_data->onion_address),
+           safe_str_client(build_state_get_exit_nickname(ocirc->build_state)),
+           timed_out ? "Recording timeout." : "Removing from descriptor.");
+    rend_client_report_intro_point_failure(ocirc->build_state->chosen_exit,
+                                           ocirc->rend_data,
+                                           timed_out ?
+                                           INTRO_POINT_FAILURE_TIMEOUT :
+                                           INTRO_POINT_FAILURE_GENERIC);
+  } else if (circ->purpose == CIRCUIT_PURPOSE_C_INTRODUCING &&
+             reason != END_CIRC_REASON_TIMEOUT) {
+    origin_circuit_t *ocirc = TO_ORIGIN_CIRCUIT(circ);
+    if (ocirc->build_state->chosen_exit && ocirc->rend_data) {
+      log_info(LD_REND, "Failed intro circ %s to %s "
+               "(building circuit to intro point). "
+               "Marking intro point as possibly unreachable.",
+               safe_str_client(ocirc->rend_data->onion_address),
+           safe_str_client(build_state_get_exit_nickname(ocirc->build_state)));
+      rend_client_report_intro_point_failure(ocirc->build_state->chosen_exit,
+                                             ocirc->rend_data,
+                                             INTRO_POINT_FAILURE_UNREACHABLE);
+    }
+  }
+  if (circ->n_chan) {
+    circuit_clear_cell_queue(circ, circ->n_chan);
+    /* Only send destroy if the channel isn't closing anyway */
+    if (!(circ->n_chan->state == CHANNEL_STATE_CLOSING ||
+          circ->n_chan->state == CHANNEL_STATE_CLOSED ||
+          circ->n_chan->state == CHANNEL_STATE_ERROR)) {
+      channel_send_destroy(circ->n_circ_id, circ->n_chan, reason);
+    }
+    circuitmux_detach_circuit(circ->n_chan->cmux, circ);
+  }
+
+  if (! CIRCUIT_IS_ORIGIN(circ)) {
+    or_circuit_t *or_circ = TO_OR_CIRCUIT(circ);
+    edge_connection_t *conn;
+    for (conn=or_circ->n_streams; conn; conn=conn->next_stream)
+      connection_edge_destroy(or_circ->p_circ_id, conn);
+    or_circ->n_streams = NULL;
+
+    while (or_circ->resolving_streams) {
+      conn = or_circ->resolving_streams;
+      or_circ->resolving_streams = conn->next_stream;
+      if (!conn->base_.marked_for_close) {
+        /* The client will see a DESTROY, and infer that the connections
+         * are closing because the circuit is getting torn down.  No need
+         * to send an end cell. */
+        conn->edge_has_sent_end = 1;
+        conn->end_reason = END_STREAM_REASON_DESTROY;
+        conn->end_reason |= END_STREAM_REASON_FLAG_ALREADY_SENT_CLOSED;
+        connection_mark_for_close(TO_CONN(conn));
+      }
+      conn->on_circuit = NULL;
+    }
+
+    if (or_circ->p_chan) {
+      circuit_clear_cell_queue(circ, or_circ->p_chan);
+      /* Only send destroy if the channel isn't closing anyway */
+      if (!(or_circ->p_chan->state == CHANNEL_STATE_CLOSING ||
+            or_circ->p_chan->state == CHANNEL_STATE_CLOSED ||
+            or_circ->p_chan->state == CHANNEL_STATE_ERROR)) {
+        channel_send_destroy(or_circ->p_circ_id, or_circ->p_chan, reason);
+      }
+      circuitmux_detach_circuit(or_circ->p_chan->cmux, circ);
+    }
+  } else {
+    origin_circuit_t *ocirc = TO_ORIGIN_CIRCUIT(circ);
+    edge_connection_t *conn;
+    for (conn=ocirc->p_streams; conn; conn=conn->next_stream)
+      connection_edge_destroy(circ->n_circ_id, conn);
+    ocirc->p_streams = NULL;
+  }
+
+  circ->marked_for_close = line;
+  circ->marked_for_close_file = file;
+
+  if (!CIRCUIT_IS_ORIGIN(circ)) {
+    or_circuit_t *or_circ = TO_OR_CIRCUIT(circ);
+    if (or_circ->rend_splice) {
+      if (!or_circ->rend_splice->base_.marked_for_close) {
+        /* do this after marking this circuit, to avoid infinite recursion. */
+        circuit_mark_for_close(TO_CIRCUIT(or_circ->rend_splice), reason);
+      }
+      or_circ->rend_splice = NULL;
+    }
+  }
+}
+
+/** Given a marked circuit <b>circ</b>, aggressively free its cell queues to
+ * recover memory. */
+static void
+marked_circuit_free_cells(circuit_t *circ)
+{
+  if (!circ->marked_for_close) {
+    log_warn(LD_BUG, "Called on non-marked circuit");
+    return;
+  }
+  cell_queue_clear(&circ->n_chan_cells);
+  if (! CIRCUIT_IS_ORIGIN(circ))
+    cell_queue_clear(& TO_OR_CIRCUIT(circ)->p_chan_cells);
+}
+
+/** Return the number of cells used by the circuit <b>c</b>'s cell queues. */
+STATIC size_t
+n_cells_in_circ_queues(const circuit_t *c)
+{
+  size_t n = c->n_chan_cells.n;
+  if (! CIRCUIT_IS_ORIGIN(c)) {
+    circuit_t *cc = (circuit_t *) c;
+    n += TO_OR_CIRCUIT(cc)->p_chan_cells.n;
+  }
+  return n;
+}
+
+/**
+ * Return the age of the oldest cell queued on <b>c</b>, in milliseconds.
+ * Return 0 if there are no cells queued on c.  Requires that <b>now</b> be
+ * the current time in milliseconds since the epoch, truncated.
+ *
+ * This function will return incorrect results if the oldest cell queued on
+ * the circuit is older than 2**32 msec (about 49 days) old.
+ */
+static uint32_t
+circuit_max_queued_cell_age(const circuit_t *c, uint32_t now)
+{
+  uint32_t age = 0;
+  packed_cell_t *cell;
+
+  if (NULL != (cell = TOR_SIMPLEQ_FIRST(&c->n_chan_cells.head)))
+    age = now - cell->inserted_time;
+
+  if (! CIRCUIT_IS_ORIGIN(c)) {
+    const or_circuit_t *orcirc = TO_OR_CIRCUIT((circuit_t*)c);
+    if (NULL != (cell = TOR_SIMPLEQ_FIRST(&orcirc->p_chan_cells.head))) {
+      uint32_t age2 = now - cell->inserted_time;
+      if (age2 > age)
+        return age2;
+    }
+  }
+  return age;
+}
+
+/** Temporary variable for circuits_compare_by_oldest_queued_cell_ This is a
+ * kludge to work around the fact that qsort doesn't provide a way for
+ * comparison functions to take an extra argument. */
+static uint32_t circcomp_now_tmp;
+
+/** Helper to sort a list of circuit_t by age of oldest cell, in descending
+ * order. Requires that circcomp_now_tmp is set correctly. */
+static int
+circuits_compare_by_oldest_queued_cell_(const void **a_, const void **b_)
+{
+  const circuit_t *a = *a_;
+  const circuit_t *b = *b_;
+  uint32_t age_a = circuit_max_queued_cell_age(a, circcomp_now_tmp);
+  uint32_t age_b = circuit_max_queued_cell_age(b, circcomp_now_tmp);
+
+  if (age_a < age_b)
+    return 1;
+  else if (age_a == age_b)
+    return 0;
+  else
+    return -1;
+}
+
+#define FRACTION_OF_CELLS_TO_RETAIN_ON_OOM 0.90
+
+/** We're out of memory for cells, having allocated <b>current_allocation</b>
+ * bytes' worth.  Kill the 'worst' circuits until we're under
+ * FRACTION_OF_CIRCS_TO_RETAIN_ON_OOM of our maximum usage. */
+void
+circuits_handle_oom(size_t current_allocation)
+{
+  /* Let's hope there's enough slack space for this allocation here... */
+  smartlist_t *circlist = smartlist_new();
+  circuit_t *circ;
+  size_t n_cells_removed=0, n_cells_to_remove;
+  int n_circuits_killed=0;
+  struct timeval now;
+  log_notice(LD_GENERAL, "We're low on memory.  Killing circuits with "
+             "over-long queues. (This behavior is controlled by "
+             "MaxMemInCellQueues.)");
+
+  {
+    size_t mem_target = (size_t)(get_options()->MaxMemInCellQueues *
+                                 FRACTION_OF_CELLS_TO_RETAIN_ON_OOM);
+    size_t mem_to_recover;
+    if (current_allocation <= mem_target)
+      return;
+    mem_to_recover = current_allocation - mem_target;
+    n_cells_to_remove = CEIL_DIV(mem_to_recover, packed_cell_mem_cost());
+  }
+
+  /* This algorithm itself assumes that you've got enough memory slack
+   * to actually run it. */
+  TOR_LIST_FOREACH(circ, &global_circuitlist, head)
+    smartlist_add(circlist, circ);
+
+  /* Set circcomp_now_tmp so that the sort can work. */
+  tor_gettimeofday_cached(&now);
+  circcomp_now_tmp = (uint32_t)tv_to_msec(&now);
+
+  /* This is O(n log n); there are faster algorithms we could use instead.
+   * Let's hope this doesn't happen enough to be in the critical path. */
+  smartlist_sort(circlist, circuits_compare_by_oldest_queued_cell_);
+
+  /* Okay, now the worst circuits are at the front of the list. Let's mark
+   * them, and reclaim their storage aggressively. */
+  SMARTLIST_FOREACH_BEGIN(circlist, circuit_t *, circ) {
+    size_t n = n_cells_in_circ_queues(circ);
+    if (! circ->marked_for_close) {
+      circuit_mark_for_close(circ, END_CIRC_REASON_RESOURCELIMIT);
+    }
+    marked_circuit_free_cells(circ);
+
+    ++n_circuits_killed;
+    n_cells_removed += n;
+    if (n_cells_removed >= n_cells_to_remove)
+      break;
+  } SMARTLIST_FOREACH_END(circ);
+
+  clean_cell_pool(); /* In case this helps. */
+
+  log_notice(LD_GENERAL, "Removed "U64_FORMAT" bytes by killing %d circuits.",
+             U64_PRINTF_ARG(n_cells_removed * packed_cell_mem_cost()),
+             n_circuits_killed);
+
+  smartlist_free(circlist);
+}
+
+/** Verify that cpath layer <b>cp</b> has all of its invariants
+ * correct. Trigger an assert if anything is invalid.
+ */
+void
+assert_cpath_layer_ok(const crypt_path_t *cp)
+{
+//  tor_assert(cp->addr); /* these are zero for rendezvous extra-hops */
+//  tor_assert(cp->port);
+  tor_assert(cp);
+  tor_assert(cp->magic == CRYPT_PATH_MAGIC);
+  switch (cp->state)
+    {
+    case CPATH_STATE_OPEN:
+      tor_assert(cp->f_crypto);
+      tor_assert(cp->b_crypto);
+      /* fall through */
+    case CPATH_STATE_CLOSED:
+      /*XXXX Assert that there's no handshake_state either. */
+      tor_assert(!cp->rend_dh_handshake_state);
+      break;
+    case CPATH_STATE_AWAITING_KEYS:
+      /* tor_assert(cp->dh_handshake_state); */
+      break;
+    default:
+      log_fn(LOG_ERR, LD_BUG, "Unexpected state %d", cp->state);
+      tor_assert(0);
+    }
+  tor_assert(cp->package_window >= 0);
+  tor_assert(cp->deliver_window >= 0);
+}
+
+/** Verify that cpath <b>cp</b> has all of its invariants
+ * correct. Trigger an assert if anything is invalid.
+ */
+static void
+assert_cpath_ok(const crypt_path_t *cp)
+{
+  const crypt_path_t *start = cp;
+
+  do {
+    assert_cpath_layer_ok(cp);
+    /* layers must be in sequence of: "open* awaiting? closed*" */
+    if (cp != start) {
+      if (cp->state == CPATH_STATE_AWAITING_KEYS) {
+        tor_assert(cp->prev->state == CPATH_STATE_OPEN);
+      } else if (cp->state == CPATH_STATE_OPEN) {
+        tor_assert(cp->prev->state == CPATH_STATE_OPEN);
+      }
+    }
+    cp = cp->next;
+    tor_assert(cp);
+  } while (cp != start);
+}
+
+/** Verify that circuit <b>c</b> has all of its invariants
+ * correct. Trigger an assert if anything is invalid.
+ */
+void
+assert_circuit_ok(const circuit_t *c)
+{
+  edge_connection_t *conn;
+  const or_circuit_t *or_circ = NULL;
+  const origin_circuit_t *origin_circ = NULL;
+
+  tor_assert(c);
+  tor_assert(c->magic == ORIGIN_CIRCUIT_MAGIC || c->magic == OR_CIRCUIT_MAGIC);
+  tor_assert(c->purpose >= CIRCUIT_PURPOSE_MIN_ &&
+             c->purpose <= CIRCUIT_PURPOSE_MAX_);
+
+  {
+    /* Having a separate variable for this pleases GCC 4.2 in ways I hope I
+     * never understand. -NM. */
+    circuit_t *nonconst_circ = (circuit_t*) c;
+    if (CIRCUIT_IS_ORIGIN(c))
+      origin_circ = TO_ORIGIN_CIRCUIT(nonconst_circ);
+    else
+      or_circ = TO_OR_CIRCUIT(nonconst_circ);
+  }
+
+  if (c->n_chan) {
+    tor_assert(!c->n_hop);
+
+    if (c->n_circ_id) {
+      /* We use the _impl variant here to make sure we don't fail on marked
+       * circuits, which would not be returned by the regular function. */
+      circuit_t *c2 = circuit_get_by_circid_channel_impl(c->n_circ_id,
+                                                         c->n_chan, NULL);
+      tor_assert(c == c2);
+    }
+  }
+  if (or_circ && or_circ->p_chan) {
+    if (or_circ->p_circ_id) {
+      /* ibid */
+      circuit_t *c2 =
+        circuit_get_by_circid_channel_impl(or_circ->p_circ_id,
+                                           or_circ->p_chan, NULL);
+      tor_assert(c == c2);
+    }
+  }
+  if (or_circ)
+    for (conn = or_circ->n_streams; conn; conn = conn->next_stream)
+      tor_assert(conn->base_.type == CONN_TYPE_EXIT);
+
+  tor_assert(c->deliver_window >= 0);
+  tor_assert(c->package_window >= 0);
+  if (c->state == CIRCUIT_STATE_OPEN) {
+    tor_assert(!c->n_chan_create_cell);
+    if (or_circ) {
+      tor_assert(or_circ->n_crypto);
+      tor_assert(or_circ->p_crypto);
+      tor_assert(or_circ->n_digest);
+      tor_assert(or_circ->p_digest);
+    }
+  }
+  if (c->state == CIRCUIT_STATE_CHAN_WAIT && !c->marked_for_close) {
+    tor_assert(circuits_pending_chans &&
+               smartlist_contains(circuits_pending_chans, c));
+  } else {
+    tor_assert(!circuits_pending_chans ||
+               !smartlist_contains(circuits_pending_chans, c));
+  }
+  if (origin_circ && origin_circ->cpath) {
+    assert_cpath_ok(origin_circ->cpath);
+  }
+  if (c->purpose == CIRCUIT_PURPOSE_REND_ESTABLISHED) {
+    tor_assert(or_circ);
+    if (!c->marked_for_close) {
+      tor_assert(or_circ->rend_splice);
+      tor_assert(or_circ->rend_splice->rend_splice == or_circ);
+    }
+    tor_assert(or_circ->rend_splice != or_circ);
+  } else {
+    tor_assert(!or_circ || !or_circ->rend_splice);
+  }
+}
