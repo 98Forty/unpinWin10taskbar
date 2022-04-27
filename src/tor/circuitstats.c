@@ -139,4 +139,297 @@ circuit_build_times_max_timeouts(void)
 }
 
 /**
- * Retrieve and bounds-chec
+ * Retrieve and bounds-check the cbtnummodes consensus paramter.
+ *
+ * Effect: This value governs how many modes to use in the weighted
+ * average calculation of Pareto parameter Xm. A value of 3 introduces
+ * some bias (2-5% of CDF) under ideal conditions, but allows for better
+ * performance in the event that a client chooses guard nodes of radically
+ * different performance characteristics.
+ */
+static int32_t
+circuit_build_times_default_num_xm_modes(void)
+{
+  int32_t num = networkstatus_get_param(NULL, "cbtnummodes",
+                                        CBT_DEFAULT_NUM_XM_MODES,
+                                        CBT_MIN_NUM_XM_MODES,
+                                        CBT_MAX_NUM_XM_MODES);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_default_num_xm_modes() called, cbtnummodes"
+              " is %d",
+              num);
+  }
+
+  return num;
+}
+
+/**
+ * Retrieve and bounds-check the cbtmincircs consensus paramter.
+ *
+ * Effect: This is the minimum number of circuits to build before
+ * computing a timeout.
+ */
+static int32_t
+circuit_build_times_min_circs_to_observe(void)
+{
+  int32_t num = networkstatus_get_param(NULL, "cbtmincircs",
+                                        CBT_DEFAULT_MIN_CIRCUITS_TO_OBSERVE,
+                                        CBT_MIN_MIN_CIRCUITS_TO_OBSERVE,
+                                        CBT_MAX_MIN_CIRCUITS_TO_OBSERVE);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_min_circs_to_observe() called, cbtmincircs"
+              " is %d",
+              num);
+  }
+
+  return num;
+}
+
+/** Return true iff <b>cbt</b> has recorded enough build times that we
+ * want to start acting on the timeout it implies. */
+int
+circuit_build_times_enough_to_compute(const circuit_build_times_t *cbt)
+{
+  return cbt->total_build_times >= circuit_build_times_min_circs_to_observe();
+}
+
+/**
+ * Retrieve and bounds-check the cbtquantile consensus paramter.
+ *
+ * Effect: This is the position on the quantile curve to use to set the
+ * timeout value. It is a percent (10-99).
+ */
+double
+circuit_build_times_quantile_cutoff(void)
+{
+  int32_t num = networkstatus_get_param(NULL, "cbtquantile",
+                                        CBT_DEFAULT_QUANTILE_CUTOFF,
+                                        CBT_MIN_QUANTILE_CUTOFF,
+                                        CBT_MAX_QUANTILE_CUTOFF);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_quantile_cutoff() called, cbtquantile"
+              " is %d",
+              num);
+  }
+
+  return num/100.0;
+}
+
+/**
+ * Retrieve and bounds-check the cbtclosequantile consensus paramter.
+ *
+ * Effect: This is the position on the quantile curve to use to set the
+ * timeout value to use to actually close circuits. It is a percent
+ * (0-99).
+ */
+static double
+circuit_build_times_close_quantile(void)
+{
+  int32_t param;
+  /* Cast is safe - circuit_build_times_quantile_cutoff() is capped */
+  int32_t min = (int)tor_lround(100*circuit_build_times_quantile_cutoff());
+  param = networkstatus_get_param(NULL, "cbtclosequantile",
+             CBT_DEFAULT_CLOSE_QUANTILE,
+             CBT_MIN_CLOSE_QUANTILE,
+             CBT_MAX_CLOSE_QUANTILE);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_close_quantile() called, cbtclosequantile"
+              " is %d", param);
+  }
+
+  if (param < min) {
+    log_warn(LD_DIR, "Consensus parameter cbtclosequantile is "
+             "too small, raising to %d", min);
+    param = min;
+  }
+  return param / 100.0;
+}
+
+/**
+ * Retrieve and bounds-check the cbttestfreq consensus paramter.
+ *
+ * Effect: Describes how often in seconds to build a test circuit to
+ * gather timeout values. Only applies if less than 'cbtmincircs'
+ * have been recorded.
+ */
+static int32_t
+circuit_build_times_test_frequency(void)
+{
+  int32_t num = networkstatus_get_param(NULL, "cbttestfreq",
+                                        CBT_DEFAULT_TEST_FREQUENCY,
+                                        CBT_MIN_TEST_FREQUENCY,
+                                        CBT_MAX_TEST_FREQUENCY);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_test_frequency() called, cbttestfreq is %d",
+              num);
+  }
+
+  return num;
+}
+
+/**
+ * Retrieve and bounds-check the cbtmintimeout consensus parameter.
+ *
+ * Effect: This is the minimum allowed timeout value in milliseconds.
+ * The minimum is to prevent rounding to 0 (we only check once
+ * per second).
+ */
+static int32_t
+circuit_build_times_min_timeout(void)
+{
+  int32_t num = networkstatus_get_param(NULL, "cbtmintimeout",
+                                        CBT_DEFAULT_TIMEOUT_MIN_VALUE,
+                                        CBT_MIN_TIMEOUT_MIN_VALUE,
+                                        CBT_MAX_TIMEOUT_MIN_VALUE);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_min_timeout() called, cbtmintimeout is %d",
+              num);
+  }
+
+  return num;
+}
+
+/**
+ * Retrieve and bounds-check the cbtinitialtimeout consensus paramter.
+ *
+ * Effect: This is the timeout value to use before computing a timeout,
+ * in milliseconds.
+ */
+int32_t
+circuit_build_times_initial_timeout(void)
+{
+  int32_t min = circuit_build_times_min_timeout();
+  int32_t param = networkstatus_get_param(NULL, "cbtinitialtimeout",
+                                          CBT_DEFAULT_TIMEOUT_INITIAL_VALUE,
+                                          CBT_MIN_TIMEOUT_INITIAL_VALUE,
+                                          CBT_MAX_TIMEOUT_INITIAL_VALUE);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_initial_timeout() called, "
+              "cbtinitialtimeout is %d",
+              param);
+  }
+
+  if (param < min) {
+    log_warn(LD_DIR, "Consensus parameter cbtinitialtimeout is too small, "
+             "raising to %d", min);
+    param = min;
+  }
+  return param;
+}
+
+/**
+ * Retrieve and bounds-check the cbtrecentcount consensus paramter.
+ *
+ * Effect: This is the number of circuit build times to keep track of
+ * for deciding if we hit cbtmaxtimeouts and need to reset our state
+ * and learn a new timeout.
+ */
+static int32_t
+circuit_build_times_recent_circuit_count(networkstatus_t *ns)
+{
+  int32_t num;
+  num = networkstatus_get_param(ns, "cbtrecentcount",
+                                CBT_DEFAULT_RECENT_CIRCUITS,
+                                CBT_MIN_RECENT_CIRCUITS,
+                                CBT_MAX_RECENT_CIRCUITS);
+
+  if (!(get_options()->LearnCircuitBuildTimeout)) {
+    log_debug(LD_BUG,
+              "circuit_build_times_recent_circuit_count() called, "
+              "cbtrecentcount is %d",
+              num);
+  }
+
+  return num;
+}
+
+/**
+ * This function is called when we get a consensus update.
+ *
+ * It checks to see if we have changed any consensus parameters
+ * that require reallocation or discard of previous stats.
+ */
+void
+circuit_build_times_new_consensus_params(circuit_build_times_t *cbt,
+                                         networkstatus_t *ns)
+{
+  int32_t num;
+
+  /*
+   * First check if we're doing adaptive timeouts at all; nothing to
+   * update if we aren't.
+   */
+
+  if (!circuit_build_times_disabled()) {
+    num = circuit_build_times_recent_circuit_count(ns);
+
+    if (num > 0) {
+      if (num != cbt->liveness.num_recent_circs) {
+        int8_t *recent_circs;
+        log_notice(LD_CIRC, "The Tor Directory Consensus has changed how many "
+                   "circuits we must track to detect network failures from %d "
+                   "to %d.", cbt->liveness.num_recent_circs, num);
+
+        tor_assert(cbt->liveness.timeouts_after_firsthop ||
+                   cbt->liveness.num_recent_circs == 0);
+
+        /*
+         * Technically this is a circular array that we are reallocating
+         * and memcopying. However, since it only consists of either 1s
+         * or 0s, and is only used in a statistical test to determine when
+         * we should discard our history after a sufficient number of 1's
+         * have been reached, it is fine if order is not preserved or
+         * elements are lost.
+         *
+         * cbtrecentcount should only be changing in cases of severe network
+         * distress anyway, so memory correctness here is paramount over
+         * doing acrobatics to preserve the array.
+         */
+        recent_circs = tor_malloc_zero(sizeof(int8_t)*num);
+        if (cbt->liveness.timeouts_after_firsthop &&
+            cbt->liveness.num_recent_circs > 0) {
+          memcpy(recent_circs, cbt->liveness.timeouts_after_firsthop,
+                 sizeof(int8_t)*MIN(num, cbt->liveness.num_recent_circs));
+        }
+
+        // Adjust the index if it needs it.
+        if (num < cbt->liveness.num_recent_circs) {
+          cbt->liveness.after_firsthop_idx = MIN(num-1,
+                  cbt->liveness.after_firsthop_idx);
+        }
+
+        tor_free(cbt->liveness.timeouts_after_firsthop);
+        cbt->liveness.timeouts_after_firsthop = recent_circs;
+        cbt->liveness.num_recent_circs = num;
+      }
+      /* else no change, nothing to do */
+    } else { /* num == 0 */
+      /*
+       * Weird.  This probably shouldn't happen, so log a warning, but try
+       * to do something sensible anyway.
+       */
+
+      log_warn(LD_CIRC,
+               "The cbtrecentcircs consensus parameter came back zero!  "
+               "This disables adaptive timeouts since we can't keep track of "
+               "any recent circuits.");
+
+      circuit_build_times_free_timeouts(cbt);
+    }
+  } else {
+    /*
+     * Adaptive timeouts are disabled; this might be be
