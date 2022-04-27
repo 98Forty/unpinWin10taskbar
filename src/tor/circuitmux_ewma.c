@@ -208,4 +208,334 @@ circuitmux_policy_t ewma_policy = {
   /*.notify_circ_active =*/ ewma_notify_circ_active,
   /*.notify_circ_inactive =*/ ewma_notify_circ_inactive,
   /*.notify_set_n_cells =*/ NULL, /* EWMA doesn't need this */
-  
+  /*.notify_xmit_cells =*/ ewma_notify_xmit_cells,
+  /*.pick_active_circuit =*/ ewma_pick_active_circuit
+};
+
+/*** EWMA method implementations using the below EWMA helper functions ***/
+
+/**
+ * Allocate an ewma_policy_data_t and upcast it to a circuitmux_policy_data_t;
+ * this is called when setting the policy on a circuitmux_t to ewma_policy.
+ */
+
+static circuitmux_policy_data_t *
+ewma_alloc_cmux_data(circuitmux_t *cmux)
+{
+  ewma_policy_data_t *pol = NULL;
+
+  tor_assert(cmux);
+
+  pol = tor_malloc_zero(sizeof(*pol));
+  pol->base_.magic = EWMA_POL_DATA_MAGIC;
+  pol->active_circuit_pqueue = smartlist_new();
+  pol->active_circuit_pqueue_last_recalibrated = cell_ewma_get_tick();
+
+  return TO_CMUX_POL_DATA(pol);
+}
+
+/**
+ * Free an ewma_policy_data_t allocated with ewma_alloc_cmux_data()
+ */
+
+static void
+ewma_free_cmux_data(circuitmux_t *cmux,
+                    circuitmux_policy_data_t *pol_data)
+{
+  ewma_policy_data_t *pol = NULL;
+
+  tor_assert(cmux);
+  if (!pol_data) return;
+
+  pol = TO_EWMA_POL_DATA(pol_data);
+
+  smartlist_free(pol->active_circuit_pqueue);
+  tor_free(pol);
+}
+
+/**
+ * Allocate an ewma_policy_circ_data_t and upcast it to a
+ * circuitmux_policy_data_t; this is called when attaching a circuit to a
+ * circuitmux_t with ewma_policy.
+ */
+
+static circuitmux_policy_circ_data_t *
+ewma_alloc_circ_data(circuitmux_t *cmux,
+                     circuitmux_policy_data_t *pol_data,
+                     circuit_t *circ,
+                     cell_direction_t direction,
+                     unsigned int cell_count)
+{
+  ewma_policy_circ_data_t *cdata = NULL;
+
+  tor_assert(cmux);
+  tor_assert(pol_data);
+  tor_assert(circ);
+  tor_assert(direction == CELL_DIRECTION_OUT ||
+             direction == CELL_DIRECTION_IN);
+  /* Shut the compiler up */
+  tor_assert(cell_count == cell_count);
+
+  cdata = tor_malloc_zero(sizeof(*cdata));
+  cdata->base_.magic = EWMA_POL_CIRC_DATA_MAGIC;
+  cdata->circ = circ;
+
+  /*
+   * Initialize the cell_ewma_t structure (formerly in
+   * init_circuit_base())
+   */
+  cdata->cell_ewma.last_adjusted_tick = cell_ewma_get_tick();
+  cdata->cell_ewma.cell_count = 0.0;
+  cdata->cell_ewma.heap_index = -1;
+  if (direction == CELL_DIRECTION_IN) {
+    cdata->cell_ewma.is_for_p_chan = 1;
+  } else {
+    cdata->cell_ewma.is_for_p_chan = 0;
+  }
+
+  return TO_CMUX_POL_CIRC_DATA(cdata);
+}
+
+/**
+ * Free an ewma_policy_circ_data_t allocated with ewma_alloc_circ_data()
+ */
+
+static void
+ewma_free_circ_data(circuitmux_t *cmux,
+                    circuitmux_policy_data_t *pol_data,
+                    circuit_t *circ,
+                    circuitmux_policy_circ_data_t *pol_circ_data)
+
+{
+  ewma_policy_circ_data_t *cdata = NULL;
+
+  tor_assert(cmux);
+  tor_assert(circ);
+  tor_assert(pol_data);
+
+  if (!pol_circ_data) return;
+
+  cdata = TO_EWMA_POL_CIRC_DATA(pol_circ_data);
+
+  tor_free(cdata);
+}
+
+/**
+ * Handle circuit activation; this inserts the circuit's cell_ewma into
+ * the active_circuits_pqueue.
+ */
+
+static void
+ewma_notify_circ_active(circuitmux_t *cmux,
+                        circuitmux_policy_data_t *pol_data,
+                        circuit_t *circ,
+                        circuitmux_policy_circ_data_t *pol_circ_data)
+{
+  ewma_policy_data_t *pol = NULL;
+  ewma_policy_circ_data_t *cdata = NULL;
+
+  tor_assert(cmux);
+  tor_assert(pol_data);
+  tor_assert(circ);
+  tor_assert(pol_circ_data);
+
+  pol = TO_EWMA_POL_DATA(pol_data);
+  cdata = TO_EWMA_POL_CIRC_DATA(pol_circ_data);
+
+  add_cell_ewma(pol, &(cdata->cell_ewma));
+}
+
+/**
+ * Handle circuit deactivation; this removes the circuit's cell_ewma from
+ * the active_circuits_pqueue.
+ */
+
+static void
+ewma_notify_circ_inactive(circuitmux_t *cmux,
+                          circuitmux_policy_data_t *pol_data,
+                          circuit_t *circ,
+                          circuitmux_policy_circ_data_t *pol_circ_data)
+{
+  ewma_policy_data_t *pol = NULL;
+  ewma_policy_circ_data_t *cdata = NULL;
+
+  tor_assert(cmux);
+  tor_assert(pol_data);
+  tor_assert(circ);
+  tor_assert(pol_circ_data);
+
+  pol = TO_EWMA_POL_DATA(pol_data);
+  cdata = TO_EWMA_POL_CIRC_DATA(pol_circ_data);
+
+  remove_cell_ewma(pol, &(cdata->cell_ewma));
+}
+
+/**
+ * Update cell_ewma for this circuit after we've sent some cells, and
+ * remove/reinsert it in the queue.  This used to be done (brokenly,
+ * see bug 6816) in channel_flush_from_first_active_circuit().
+ */
+
+static void
+ewma_notify_xmit_cells(circuitmux_t *cmux,
+                       circuitmux_policy_data_t *pol_data,
+                       circuit_t *circ,
+                       circuitmux_policy_circ_data_t *pol_circ_data,
+                       unsigned int n_cells)
+{
+  ewma_policy_data_t *pol = NULL;
+  ewma_policy_circ_data_t *cdata = NULL;
+  unsigned int tick;
+  double fractional_tick, ewma_increment;
+  /* The current (hi-res) time */
+  struct timeval now_hires;
+  cell_ewma_t *cell_ewma, *tmp;
+
+  tor_assert(cmux);
+  tor_assert(pol_data);
+  tor_assert(circ);
+  tor_assert(pol_circ_data);
+  tor_assert(n_cells > 0);
+
+  pol = TO_EWMA_POL_DATA(pol_data);
+  cdata = TO_EWMA_POL_CIRC_DATA(pol_circ_data);
+
+  /* Rescale the EWMAs if needed */
+  tor_gettimeofday_cached(&now_hires);
+  tick = cell_ewma_tick_from_timeval(&now_hires, &fractional_tick);
+
+  if (tick != pol->active_circuit_pqueue_last_recalibrated) {
+    scale_active_circuits(pol, tick);
+  }
+
+  /* How much do we adjust the cell count in cell_ewma by? */
+  ewma_increment =
+    ((double)(n_cells)) * pow(ewma_scale_factor, -fractional_tick);
+
+  /* Do the adjustment */
+  cell_ewma = &(cdata->cell_ewma);
+  cell_ewma->cell_count += ewma_increment;
+
+  /*
+   * Since we just sent on this circuit, it should be at the head of
+   * the queue.  Pop the head, assert that it matches, then re-add.
+   */
+  tmp = pop_first_cell_ewma(pol);
+  tor_assert(tmp == cell_ewma);
+  add_cell_ewma(pol, cell_ewma);
+}
+
+/**
+ * Pick the preferred circuit to send from; this will be the one with
+ * the lowest EWMA value in the priority queue.  This used to be done
+ * in channel_flush_from_first_active_circuit().
+ */
+
+static circuit_t *
+ewma_pick_active_circuit(circuitmux_t *cmux,
+                         circuitmux_policy_data_t *pol_data)
+{
+  ewma_policy_data_t *pol = NULL;
+  circuit_t *circ = NULL;
+  cell_ewma_t *cell_ewma = NULL;
+
+  tor_assert(cmux);
+  tor_assert(pol_data);
+
+  pol = TO_EWMA_POL_DATA(pol_data);
+
+  if (smartlist_len(pol->active_circuit_pqueue) > 0) {
+    /* Get the head of the queue */
+    cell_ewma = smartlist_get(pol->active_circuit_pqueue, 0);
+    circ = cell_ewma_to_circuit(cell_ewma);
+  }
+
+  return circ;
+}
+
+/** Helper for sorting cell_ewma_t values in their priority queue. */
+static int
+compare_cell_ewma_counts(const void *p1, const void *p2)
+{
+  const cell_ewma_t *e1 = p1, *e2 = p2;
+
+  if (e1->cell_count < e2->cell_count)
+    return -1;
+  else if (e1->cell_count > e2->cell_count)
+    return 1;
+  else
+    return 0;
+}
+
+/** Given a cell_ewma_t, return a pointer to the circuit containing it. */
+static circuit_t *
+cell_ewma_to_circuit(cell_ewma_t *ewma)
+{
+  ewma_policy_circ_data_t *cdata = NULL;
+
+  tor_assert(ewma);
+  cdata = SUBTYPE_P(ewma, ewma_policy_circ_data_t, cell_ewma);
+  tor_assert(cdata);
+
+  return cdata->circ;
+}
+
+/* ==== Functions for scaling cell_ewma_t ====
+
+   When choosing which cells to relay first, we favor circuits that have been
+   quiet recently.  This gives better latency on connections that aren't
+   pushing lots of data, and makes the network feel more interactive.
+
+   Conceptually, we take an exponentially weighted mean average of the number
+   of cells a circuit has sent, and allow active circuits (those with cells to
+   relay) to send cells in reverse order of their exponentially-weighted mean
+   average (EWMA) cell count.  [That is, a cell sent N seconds ago 'counts'
+   F^N times as much as a cell sent now, for 0<F<1.0, and we favor the
+   circuit that has sent the fewest cells]
+
+   If 'double' had infinite precision, we could do this simply by counting a
+   cell sent at startup as having weight 1.0, and a cell sent N seconds later
+   as having weight F^-N.  This way, we would never need to re-scale
+   any already-sent cells.
+
+   To prevent double from overflowing, we could count a cell sent now as
+   having weight 1.0 and a cell sent N seconds ago as having weight F^N.
+   This, however, would mean we'd need to re-scale *ALL* old circuits every
+   time we wanted to send a cell.
+
+   So as a compromise, we divide time into 'ticks' (currently, 10-second
+   increments) and say that a cell sent at the start of a current tick is
+   worth 1.0, a cell sent N seconds before the start of the current tick is
+   worth F^N, and a cell sent N seconds after the start of the current tick is
+   worth F^-N.  This way we don't overflow, and we don't need to constantly
+   rescale.
+ */
+
+/** Given a timeval <b>now</b>, compute the cell_ewma tick in which it occurs
+ * and the fraction of the tick that has elapsed between the start of the tick
+ * and <b>now</b>.  Return the former and store the latter in
+ * *<b>remainder_out</b>.
+ *
+ * These tick values are not meant to be shared between Tor instances, or used
+ * for other purposes. */
+
+static unsigned
+cell_ewma_tick_from_timeval(const struct timeval *now,
+                            double *remainder_out)
+{
+  unsigned res = (unsigned) (now->tv_sec / EWMA_TICK_LEN);
+  /* rem */
+  double rem = (now->tv_sec % EWMA_TICK_LEN) +
+    ((double)(now->tv_usec)) / 1.0e6;
+  *remainder_out = rem / EWMA_TICK_LEN;
+  return res;
+}
+
+/** Tell the caller whether ewma_enabled is set */
+int
+cell_ewma_enabled(void)
+{
+  return ewma_enabled;
+}
+
+/** Compute and 
