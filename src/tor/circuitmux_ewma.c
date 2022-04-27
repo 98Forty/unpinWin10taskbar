@@ -538,4 +538,147 @@ cell_ewma_enabled(void)
   return ewma_enabled;
 }
 
-/** Compute and 
+/** Compute and return the current cell_ewma tick. */
+unsigned int
+cell_ewma_get_tick(void)
+{
+  return ((unsigned)approx_time() / EWMA_TICK_LEN);
+}
+
+/** Adjust the global cell scale factor based on <b>options</b> */
+void
+cell_ewma_set_scale_factor(const or_options_t *options,
+                           const networkstatus_t *consensus)
+{
+  int32_t halflife_ms;
+  double halflife;
+  const char *source;
+  if (options && options->CircuitPriorityHalflife >= -EPSILON) {
+    halflife = options->CircuitPriorityHalflife;
+    source = "CircuitPriorityHalflife in configuration";
+  } else if (consensus && (halflife_ms = networkstatus_get_param(
+                 consensus, "CircuitPriorityHalflifeMsec",
+                 -1, -1, INT32_MAX)) >= 0) {
+    halflife = ((double)halflife_ms)/1000.0;
+    source = "CircuitPriorityHalflifeMsec in consensus";
+  } else {
+    halflife = EWMA_DEFAULT_HALFLIFE;
+    source = "Default value";
+  }
+
+  if (halflife <= EPSILON) {
+    /* The cell EWMA algorithm is disabled. */
+    ewma_scale_factor = 0.1;
+    ewma_enabled = 0;
+    log_info(LD_OR,
+             "Disabled cell_ewma algorithm because of value in %s",
+             source);
+  } else {
+    /* convert halflife into halflife-per-tick. */
+    halflife /= EWMA_TICK_LEN;
+    /* compute per-tick scale factor. */
+    ewma_scale_factor = exp( LOG_ONEHALF / halflife );
+    ewma_enabled = 1;
+    log_info(LD_OR,
+             "Enabled cell_ewma algorithm because of value in %s; "
+             "scale factor is %f per %d seconds",
+             source, ewma_scale_factor, EWMA_TICK_LEN);
+  }
+}
+
+/** Return the multiplier necessary to convert the value of a cell sent in
+ * 'from_tick' to one sent in 'to_tick'. */
+static INLINE double
+get_scale_factor(unsigned from_tick, unsigned to_tick)
+{
+  /* This math can wrap around, but that's okay: unsigned overflow is
+     well-defined */
+  int diff = (int)(to_tick - from_tick);
+  return pow(ewma_scale_factor, diff);
+}
+
+/** Adjust the cell count of <b>ewma</b> so that it is scaled with respect to
+ * <b>cur_tick</b> */
+static void
+scale_single_cell_ewma(cell_ewma_t *ewma, unsigned cur_tick)
+{
+  double factor = get_scale_factor(ewma->last_adjusted_tick, cur_tick);
+  ewma->cell_count *= factor;
+  ewma->last_adjusted_tick = cur_tick;
+}
+
+/** Adjust the cell count of every active circuit on <b>chan</b> so
+ * that they are scaled with respect to <b>cur_tick</b> */
+static void
+scale_active_circuits(ewma_policy_data_t *pol, unsigned cur_tick)
+{
+  double factor;
+
+  tor_assert(pol);
+  tor_assert(pol->active_circuit_pqueue);
+
+  factor =
+    get_scale_factor(
+      pol->active_circuit_pqueue_last_recalibrated,
+      cur_tick);
+  /** Ordinarily it isn't okay to change the value of an element in a heap,
+   * but it's okay here, since we are preserving the order. */
+  SMARTLIST_FOREACH_BEGIN(
+      pol->active_circuit_pqueue,
+      cell_ewma_t *, e) {
+    tor_assert(e->last_adjusted_tick ==
+               pol->active_circuit_pqueue_last_recalibrated);
+    e->cell_count *= factor;
+    e->last_adjusted_tick = cur_tick;
+  } SMARTLIST_FOREACH_END(e);
+  pol->active_circuit_pqueue_last_recalibrated = cur_tick;
+}
+
+/** Rescale <b>ewma</b> to the same scale as <b>pol</b>, and add it to
+ * <b>pol</b>'s priority queue of active circuits */
+static void
+add_cell_ewma(ewma_policy_data_t *pol, cell_ewma_t *ewma)
+{
+  tor_assert(pol);
+  tor_assert(pol->active_circuit_pqueue);
+  tor_assert(ewma);
+  tor_assert(ewma->heap_index == -1);
+
+  scale_single_cell_ewma(
+      ewma,
+      pol->active_circuit_pqueue_last_recalibrated);
+
+  smartlist_pqueue_add(pol->active_circuit_pqueue,
+                       compare_cell_ewma_counts,
+                       STRUCT_OFFSET(cell_ewma_t, heap_index),
+                       ewma);
+}
+
+/** Remove <b>ewma</b> from <b>pol</b>'s priority queue of active circuits */
+static void
+remove_cell_ewma(ewma_policy_data_t *pol, cell_ewma_t *ewma)
+{
+  tor_assert(pol);
+  tor_assert(pol->active_circuit_pqueue);
+  tor_assert(ewma);
+  tor_assert(ewma->heap_index != -1);
+
+  smartlist_pqueue_remove(pol->active_circuit_pqueue,
+                          compare_cell_ewma_counts,
+                          STRUCT_OFFSET(cell_ewma_t, heap_index),
+                          ewma);
+}
+
+/** Remove and return the first cell_ewma_t from pol's priority queue of
+ * active circuits.  Requires that the priority queue is nonempty. */
+static cell_ewma_t *
+pop_first_cell_ewma(ewma_policy_data_t *pol)
+{
+  tor_assert(pol);
+  tor_assert(pol->active_circuit_pqueue);
+
+  return smartlist_pqueue_pop(pol->active_circuit_pqueue,
+                              compare_cell_ewma_counts,
+                              STRUCT_OFFSET(cell_ewma_t, heap_index));
+}
+
