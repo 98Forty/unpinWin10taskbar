@@ -763,4 +763,310 @@ circuit_build_times_update_state(const circuit_build_times_t *cbt,
       or_state_mark_dirty(get_or_state(), 0);
   }
 
-  tor_free(histo
+  tor_free(histogram);
+}
+
+/**
+ * Shuffle the build times array.
+ *
+ * Adapted from http://en.wikipedia.org/wiki/Fisher-Yates_shuffle
+ */
+static void
+circuit_build_times_shuffle_and_store_array(circuit_build_times_t *cbt,
+                                            build_time_t *raw_times,
+                                            uint32_t num_times)
+{
+  uint32_t n = num_times;
+  if (num_times > CBT_NCIRCUITS_TO_OBSERVE) {
+    log_notice(LD_CIRC, "The number of circuit times that this Tor version "
+               "uses to calculate build times is less than the number stored "
+               "in your state file. Decreasing the circuit time history from "
+               "%lu to %d.", (unsigned long)num_times,
+               CBT_NCIRCUITS_TO_OBSERVE);
+  }
+
+  if (n > INT_MAX-1) {
+    log_warn(LD_CIRC, "For some insane reasons, you had %lu circuit build "
+             "observations in your state file. That's far too many; probably "
+             "there's a bug here.", (unsigned long)n);
+    n = INT_MAX-1;
+  }
+
+  /* This code can only be run on a compact array */
+  while (n-- > 1) {
+    int k = crypto_rand_int(n + 1); /* 0 <= k <= n. */
+    build_time_t tmp = raw_times[k];
+    raw_times[k] = raw_times[n];
+    raw_times[n] = tmp;
+  }
+
+  /* Since the times are now shuffled, take a random CBT_NCIRCUITS_TO_OBSERVE
+   * subset (ie the first CBT_NCIRCUITS_TO_OBSERVE values) */
+  for (n = 0; n < MIN(num_times, CBT_NCIRCUITS_TO_OBSERVE); n++) {
+    circuit_build_times_add_time(cbt, raw_times[n]);
+  }
+}
+
+/**
+ * Filter old synthetic timeouts that were created before the
+ * new right-censored Pareto calculation was deployed.
+ *
+ * Once all clients before 0.2.1.13-alpha are gone, this code
+ * will be unused.
+ */
+static int
+circuit_build_times_filter_timeouts(circuit_build_times_t *cbt)
+{
+  int num_filtered=0, i=0;
+  double timeout_rate = 0;
+  build_time_t max_timeout = 0;
+
+  timeout_rate = circuit_build_times_timeout_rate(cbt);
+  max_timeout = (build_time_t)cbt->close_ms;
+
+  for (i = 0; i < CBT_NCIRCUITS_TO_OBSERVE; i++) {
+    if (cbt->circuit_build_times[i] > max_timeout) {
+      build_time_t replaced = cbt->circuit_build_times[i];
+      num_filtered++;
+      cbt->circuit_build_times[i] = CBT_BUILD_ABANDONED;
+
+      log_debug(LD_CIRC, "Replaced timeout %d with %d", replaced,
+               cbt->circuit_build_times[i]);
+    }
+  }
+
+  log_info(LD_CIRC,
+           "We had %d timeouts out of %d build times, "
+           "and filtered %d above the max of %u",
+          (int)(cbt->total_build_times*timeout_rate),
+          cbt->total_build_times, num_filtered, max_timeout);
+
+  return num_filtered;
+}
+
+/**
+ * Load histogram from <b>state</b>, shuffling the resulting array
+ * after we do so. Use this result to estimate parameters and
+ * calculate the timeout.
+ *
+ * Return -1 on error.
+ */
+int
+circuit_build_times_parse_state(circuit_build_times_t *cbt,
+                                or_state_t *state)
+{
+  int tot_values = 0;
+  uint32_t loaded_cnt = 0, N = 0;
+  config_line_t *line;
+  unsigned int i;
+  build_time_t *loaded_times;
+  int err = 0;
+  circuit_build_times_init(cbt);
+
+  if (circuit_build_times_disabled()) {
+    return 0;
+  }
+
+  /* build_time_t 0 means uninitialized */
+  loaded_times = tor_malloc_zero(sizeof(build_time_t)*state->TotalBuildTimes);
+
+  for (line = state->BuildtimeHistogram; line; line = line->next) {
+    smartlist_t *args = smartlist_new();
+    smartlist_split_string(args, line->value, " ",
+                           SPLIT_SKIP_SPACE|SPLIT_IGNORE_BLANK, 0);
+    if (smartlist_len(args) < 2) {
+      log_warn(LD_GENERAL, "Unable to parse circuit build times: "
+                           "Too few arguments to CircuitBuildTime");
+      err = 1;
+      SMARTLIST_FOREACH(args, char*, cp, tor_free(cp));
+      smartlist_free(args);
+      break;
+    } else {
+      const char *ms_str = smartlist_get(args,0);
+      const char *count_str = smartlist_get(args,1);
+      uint32_t count, k;
+      build_time_t ms;
+      int ok;
+      ms = (build_time_t)tor_parse_ulong(ms_str, 0, 0,
+                                         CBT_BUILD_TIME_MAX, &ok, NULL);
+      if (!ok) {
+        log_warn(LD_GENERAL, "Unable to parse circuit build times: "
+                             "Unparsable bin number");
+        err = 1;
+        SMARTLIST_FOREACH(args, char*, cp, tor_free(cp));
+        smartlist_free(args);
+        break;
+      }
+      count = (uint32_t)tor_parse_ulong(count_str, 0, 0,
+                                        UINT32_MAX, &ok, NULL);
+      if (!ok) {
+        log_warn(LD_GENERAL, "Unable to parse circuit build times: "
+                             "Unparsable bin count");
+        err = 1;
+        SMARTLIST_FOREACH(args, char*, cp, tor_free(cp));
+        smartlist_free(args);
+        break;
+      }
+
+      if (loaded_cnt+count+state->CircuitBuildAbandonedCount
+            > state->TotalBuildTimes) {
+        log_warn(LD_CIRC,
+                 "Too many build times in state file. "
+                 "Stopping short before %d",
+                 loaded_cnt+count);
+        SMARTLIST_FOREACH(args, char*, cp, tor_free(cp));
+        smartlist_free(args);
+        break;
+      }
+
+      for (k = 0; k < count; k++) {
+        loaded_times[loaded_cnt++] = ms;
+      }
+      N++;
+      SMARTLIST_FOREACH(args, char*, cp, tor_free(cp));
+      smartlist_free(args);
+    }
+  }
+
+  log_info(LD_CIRC,
+           "Adding %d timeouts.", state->CircuitBuildAbandonedCount);
+  for (i=0; i < state->CircuitBuildAbandonedCount; i++) {
+    loaded_times[loaded_cnt++] = CBT_BUILD_ABANDONED;
+  }
+
+  if (loaded_cnt != state->TotalBuildTimes) {
+    log_warn(LD_CIRC,
+            "Corrupt state file? Build times count mismatch. "
+            "Read %d times, but file says %d", loaded_cnt,
+            state->TotalBuildTimes);
+    err = 1;
+    circuit_build_times_reset(cbt);
+    goto done;
+  }
+
+  circuit_build_times_shuffle_and_store_array(cbt, loaded_times, loaded_cnt);
+
+  /* Verify that we didn't overwrite any indexes */
+  for (i=0; i < CBT_NCIRCUITS_TO_OBSERVE; i++) {
+    if (!cbt->circuit_build_times[i])
+      break;
+    tot_values++;
+  }
+  log_info(LD_CIRC,
+           "Loaded %d/%d values from %d lines in circuit time histogram",
+           tot_values, cbt->total_build_times, N);
+
+  if (cbt->total_build_times != tot_values
+        || cbt->total_build_times > CBT_NCIRCUITS_TO_OBSERVE) {
+    log_warn(LD_CIRC,
+            "Corrupt state file? Shuffled build times mismatch. "
+            "Read %d times, but file says %d", tot_values,
+            state->TotalBuildTimes);
+    err = 1;
+    circuit_build_times_reset(cbt);
+    goto done;
+  }
+
+  circuit_build_times_set_timeout(cbt);
+
+  if (!state->CircuitBuildAbandonedCount && cbt->total_build_times) {
+    circuit_build_times_filter_timeouts(cbt);
+  }
+
+ done:
+  tor_free(loaded_times);
+  return err ? -1 : 0;
+}
+
+/**
+ * Estimates the Xm and Alpha parameters using
+ * http://en.wikipedia.org/wiki/Pareto_distribution#Parameter_estimation
+ *
+ * The notable difference is that we use mode instead of min to estimate Xm.
+ * This is because our distribution is frechet-like. We claim this is
+ * an acceptable approximation because we are only concerned with the
+ * accuracy of the CDF of the tail.
+ */
+STATIC int
+circuit_build_times_update_alpha(circuit_build_times_t *cbt)
+{
+  build_time_t *x=cbt->circuit_build_times;
+  double a = 0;
+  int n=0,i=0,abandoned_count=0;
+  build_time_t max_time=0;
+
+  /* http://en.wikipedia.org/wiki/Pareto_distribution#Parameter_estimation */
+  /* We sort of cheat here and make our samples slightly more pareto-like
+   * and less frechet-like. */
+  cbt->Xm = circuit_build_times_get_xm(cbt);
+
+  tor_assert(cbt->Xm > 0);
+
+  for (i=0; i< CBT_NCIRCUITS_TO_OBSERVE; i++) {
+    if (!x[i]) {
+      continue;
+    }
+
+    if (x[i] < cbt->Xm) {
+      a += tor_mathlog(cbt->Xm);
+    } else if (x[i] == CBT_BUILD_ABANDONED) {
+      abandoned_count++;
+    } else {
+      a += tor_mathlog(x[i]);
+      if (x[i] > max_time)
+        max_time = x[i];
+    }
+    n++;
+  }
+
+  /*
+   * We are erring and asserting here because this can only happen
+   * in codepaths other than startup. The startup state parsing code
+   * performs this same check, and resets state if it hits it. If we
+   * hit it at runtime, something serious has gone wrong.
+   */
+  if (n!=cbt->total_build_times) {
+    log_err(LD_CIRC, "Discrepancy in build times count: %d vs %d", n,
+            cbt->total_build_times);
+  }
+  tor_assert(n==cbt->total_build_times);
+
+  if (max_time <= 0) {
+    /* This can happen if Xm is actually the *maximum* value in the set.
+     * It can also happen if we've abandoned every single circuit somehow.
+     * In either case, tell the caller not to compute a new build timeout. */
+    log_warn(LD_BUG,
+             "Could not determine largest build time (%d). "
+             "Xm is %dms and we've abandoned %d out of %d circuits.", max_time,
+             cbt->Xm, abandoned_count, n);
+    return 0;
+  }
+
+  a += abandoned_count*tor_mathlog(max_time);
+
+  a -= n*tor_mathlog(cbt->Xm);
+  // Estimator comes from Eq #4 in:
+  // "Bayesian estimation based on trimmed samples from Pareto populations"
+  // by Arturo J. Fernández. We are right-censored only.
+  a = (n-abandoned_count)/a;
+
+  cbt->alpha = a;
+
+  return 1;
+}
+
+/**
+ * This is the Pareto Quantile Function. It calculates the point x
+ * in the distribution such that F(x) = quantile (ie quantile*100%
+ * of the mass of the density function is below x on the curve).
+ *
+ * We use it to calculate the timeout and also to generate synthetic
+ * values of time for circuits that timeout before completion.
+ *
+ * See http://en.wikipedia.org/wiki/Quantile_function,
+ * http://en.wikipedia.org/wiki/Inverse_transform_sampling and
+ * http://en.wikipedia.org/wiki/Pareto_distribution#Generating_a_
+ *     random_sample_from_Pareto_distribution
+ * That's right. I'll cite wikipedia all day long.
+ *
+ * Return value is in millis
