@@ -1069,4 +1069,305 @@ circuit_build_times_update_alpha(circuit_build_times_t *cbt)
  *     random_sample_from_Pareto_distribution
  * That's right. I'll cite wikipedia all day long.
  *
- * Return value is in millis
+ * Return value is in milliseconds.
+ */
+STATIC double
+circuit_build_times_calculate_timeout(circuit_build_times_t *cbt,
+                                      double quantile)
+{
+  double ret;
+  tor_assert(quantile >= 0);
+  tor_assert(1.0-quantile > 0);
+  tor_assert(cbt->Xm > 0);
+
+  ret = cbt->Xm/pow(1.0-quantile,1.0/cbt->alpha);
+  if (ret > INT32_MAX) {
+    ret = INT32_MAX;
+  }
+  tor_assert(ret > 0);
+  return ret;
+}
+
+#ifdef TOR_UNIT_TESTS
+/** Pareto CDF */
+double
+circuit_build_times_cdf(circuit_build_times_t *cbt, double x)
+{
+  double ret;
+  tor_assert(cbt->Xm > 0);
+  ret = 1.0-pow(cbt->Xm/x,cbt->alpha);
+  tor_assert(0 <= ret && ret <= 1.0);
+  return ret;
+}
+#endif
+
+#ifdef TOR_UNIT_TESTS
+/**
+ * Generate a synthetic time using our distribution parameters.
+ *
+ * The return value will be within the [q_lo, q_hi) quantile points
+ * on the CDF.
+ */
+build_time_t
+circuit_build_times_generate_sample(circuit_build_times_t *cbt,
+                                    double q_lo, double q_hi)
+{
+  double randval = crypto_rand_double();
+  build_time_t ret;
+  double u;
+
+  /* Generate between [q_lo, q_hi) */
+  /*XXXX This is what nextafter is supposed to be for; we should use it on the
+   * platforms that support it. */
+  q_hi -= 1.0/(INT32_MAX);
+
+  tor_assert(q_lo >= 0);
+  tor_assert(q_hi < 1);
+  tor_assert(q_lo < q_hi);
+
+  u = q_lo + (q_hi-q_lo)*randval;
+
+  tor_assert(0 <= u && u < 1.0);
+  /* circuit_build_times_calculate_timeout returns <= INT32_MAX */
+  ret = (build_time_t)
+    tor_lround(circuit_build_times_calculate_timeout(cbt, u));
+  tor_assert(ret > 0);
+  return ret;
+}
+#endif
+
+#ifdef TOR_UNIT_TESTS
+/**
+ * Estimate an initial alpha parameter by solving the quantile
+ * function with a quantile point and a specific timeout value.
+ */
+void
+circuit_build_times_initial_alpha(circuit_build_times_t *cbt,
+                                  double quantile, double timeout_ms)
+{
+  // Q(u) = Xm/((1-u)^(1/a))
+  // Q(0.8) = Xm/((1-0.8))^(1/a)) = CircBuildTimeout
+  // CircBuildTimeout = Xm/((1-0.8))^(1/a))
+  // CircBuildTimeout = Xm*((1-0.8))^(-1/a))
+  // ln(CircBuildTimeout) = ln(Xm)+ln(((1-0.8)))*(-1/a)
+  // -ln(1-0.8)/(ln(CircBuildTimeout)-ln(Xm))=a
+  tor_assert(quantile >= 0);
+  tor_assert(cbt->Xm > 0);
+  cbt->alpha = tor_mathlog(1.0-quantile)/
+    (tor_mathlog(cbt->Xm)-tor_mathlog(timeout_ms));
+  tor_assert(cbt->alpha > 0);
+}
+#endif
+
+/**
+ * Returns true if we need circuits to be built
+ */
+int
+circuit_build_times_needs_circuits(const circuit_build_times_t *cbt)
+{
+  /* Return true if < MIN_CIRCUITS_TO_OBSERVE */
+  return !circuit_build_times_enough_to_compute(cbt);
+}
+
+/**
+ * Returns true if we should build a timeout test circuit
+ * right now.
+ */
+int
+circuit_build_times_needs_circuits_now(const circuit_build_times_t *cbt)
+{
+  return circuit_build_times_needs_circuits(cbt) &&
+    approx_time()-cbt->last_circ_at > circuit_build_times_test_frequency();
+}
+
+/**
+ * Called to indicate that the network showed some signs of liveness,
+ * i.e. we received a cell.
+ *
+ * This is used by circuit_build_times_network_check_live() to decide
+ * if we should record the circuit build timeout or not.
+ *
+ * This function is called every time we receive a cell. Avoid
+ * syscalls, events, and other high-intensity work.
+ */
+void
+circuit_build_times_network_is_live(circuit_build_times_t *cbt)
+{
+  time_t now = approx_time();
+  if (cbt->liveness.nonlive_timeouts > 0) {
+    log_notice(LD_CIRC,
+               "Tor now sees network activity. Restoring circuit build "
+               "timeout recording. Network was down for %d seconds "
+               "during %d circuit attempts.",
+               (int)(now - cbt->liveness.network_last_live),
+               cbt->liveness.nonlive_timeouts);
+  }
+  cbt->liveness.network_last_live = now;
+  cbt->liveness.nonlive_timeouts = 0;
+}
+
+/**
+ * Called to indicate that we completed a circuit. Because this circuit
+ * succeeded, it doesn't count as a timeout-after-the-first-hop.
+ *
+ * This is used by circuit_build_times_network_check_changed() to determine
+ * if we had too many recent timeouts and need to reset our learned timeout
+ * to something higher.
+ */
+void
+circuit_build_times_network_circ_success(circuit_build_times_t *cbt)
+{
+  /* Check for NULLness because we might not be using adaptive timeouts */
+  if (cbt->liveness.timeouts_after_firsthop &&
+      cbt->liveness.num_recent_circs > 0) {
+    cbt->liveness.timeouts_after_firsthop[cbt->liveness.after_firsthop_idx]
+      = 0;
+    cbt->liveness.after_firsthop_idx++;
+    cbt->liveness.after_firsthop_idx %= cbt->liveness.num_recent_circs;
+  }
+}
+
+/**
+ * A circuit just timed out. If it failed after the first hop, record it
+ * in our history for later deciding if the network speed has changed.
+ *
+ * This is used by circuit_build_times_network_check_changed() to determine
+ * if we had too many recent timeouts and need to reset our learned timeout
+ * to something higher.
+ */
+static void
+circuit_build_times_network_timeout(circuit_build_times_t *cbt,
+                                    int did_onehop)
+{
+  /* Check for NULLness because we might not be using adaptive timeouts */
+  if (cbt->liveness.timeouts_after_firsthop &&
+      cbt->liveness.num_recent_circs > 0) {
+    if (did_onehop) {
+      cbt->liveness.timeouts_after_firsthop[cbt->liveness.after_firsthop_idx]
+        = 1;
+      cbt->liveness.after_firsthop_idx++;
+      cbt->liveness.after_firsthop_idx %= cbt->liveness.num_recent_circs;
+    }
+  }
+}
+
+/**
+ * A circuit was just forcibly closed. If there has been no recent network
+ * activity at all, but this circuit was launched back when we thought the
+ * network was live, increment the number of "nonlive" circuit timeouts.
+ *
+ * This is used by circuit_build_times_network_check_live() to decide
+ * if we should record the circuit build timeout or not.
+ */
+static void
+circuit_build_times_network_close(circuit_build_times_t *cbt,
+                                    int did_onehop, time_t start_time)
+{
+  time_t now = time(NULL);
+  /*
+   * Check if this is a timeout that was for a circuit that spent its
+   * entire existence during a time where we have had no network activity.
+   */
+  if (cbt->liveness.network_last_live < start_time) {
+    if (did_onehop) {
+      char last_live_buf[ISO_TIME_LEN+1];
+      char start_time_buf[ISO_TIME_LEN+1];
+      char now_buf[ISO_TIME_LEN+1];
+      format_local_iso_time(last_live_buf, cbt->liveness.network_last_live);
+      format_local_iso_time(start_time_buf, start_time);
+      format_local_iso_time(now_buf, now);
+      log_notice(LD_CIRC,
+               "A circuit somehow completed a hop while the network was "
+               "not live. The network was last live at %s, but the circuit "
+               "launched at %s. It's now %s. This could mean your clock "
+               "changed.", last_live_buf, start_time_buf, now_buf);
+    }
+    cbt->liveness.nonlive_timeouts++;
+    if (cbt->liveness.nonlive_timeouts == 1) {
+      log_notice(LD_CIRC,
+                 "Tor has not observed any network activity for the past %d "
+                 "seconds. Disabling circuit build timeout recording.",
+                 (int)(now - cbt->liveness.network_last_live));
+    } else {
+      log_info(LD_CIRC,
+             "Got non-live timeout. Current count is: %d",
+             cbt->liveness.nonlive_timeouts);
+    }
+  }
+}
+
+/**
+ * When the network is not live, we do not record circuit build times.
+ *
+ * The network is considered not live if there has been at least one
+ * circuit build that began and ended (had its close_ms measurement
+ * period expire) since we last received a cell.
+ *
+ * Also has the side effect of rewinding the circuit time history
+ * in the case of recent liveness changes.
+ */
+int
+circuit_build_times_network_check_live(const circuit_build_times_t *cbt)
+{
+  if (cbt->liveness.nonlive_timeouts > 0) {
+    return 0;
+  }
+
+  return 1;
+}
+
+/**
+ * Returns true if we have seen more than MAX_RECENT_TIMEOUT_COUNT of
+ * the past RECENT_CIRCUITS time out after the first hop. Used to detect
+ * if the network connection has changed significantly, and if so,
+ * resets our circuit build timeout to the default.
+ *
+ * Also resets the entire timeout history in this case and causes us
+ * to restart the process of building test circuits and estimating a
+ * new timeout.
+ */
+STATIC int
+circuit_build_times_network_check_changed(circuit_build_times_t *cbt)
+{
+  int total_build_times = cbt->total_build_times;
+  int timeout_count=0;
+  int i;
+
+  if (cbt->liveness.timeouts_after_firsthop &&
+      cbt->liveness.num_recent_circs > 0) {
+    /* how many of our recent circuits made it to the first hop but then
+     * timed out? */
+    for (i = 0; i < cbt->liveness.num_recent_circs; i++) {
+      timeout_count += cbt->liveness.timeouts_after_firsthop[i];
+    }
+  }
+
+  /* If 80% of our recent circuits are timing out after the first hop,
+   * we need to re-estimate a new initial alpha and timeout. */
+  if (timeout_count < circuit_build_times_max_timeouts()) {
+    return 0;
+  }
+
+  circuit_build_times_reset(cbt);
+  if (cbt->liveness.timeouts_after_firsthop &&
+      cbt->liveness.num_recent_circs > 0) {
+    memset(cbt->liveness.timeouts_after_firsthop, 0,
+            sizeof(*cbt->liveness.timeouts_after_firsthop)*
+            cbt->liveness.num_recent_circs);
+  }
+  cbt->liveness.after_firsthop_idx = 0;
+
+  /* Check to see if this has happened before. If so, double the timeout
+   * to give people on abysmally bad network connections a shot at access */
+  if (cbt->timeout_ms >= circuit_build_times_get_initial_timeout()) {
+    if (cbt->timeout_ms > INT32_MAX/2 || cbt->close_ms > INT32_MAX/2) {
+      log_warn(LD_CIRC, "Insanely large circuit build timeout value. "
+              "(timeout = %fmsec, close = %fmsec)",
+               cbt->timeout_ms, cbt->close_ms);
+    } else {
+      cbt->timeout_ms *= 2;
+      cbt->close_ms *= 2;
+    }
+  } else {
+    cbt->close_ms = cbt->timeout_ms
+             
