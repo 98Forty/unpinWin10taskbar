@@ -1370,4 +1370,275 @@ circuit_build_times_network_check_changed(circuit_build_times_t *cbt)
     }
   } else {
     cbt->close_ms = cbt->timeout_ms
-             
+                  = circuit_build_times_get_initial_timeout();
+  }
+
+  cbt_control_event_buildtimeout_set(cbt, BUILDTIMEOUT_SET_EVENT_RESET);
+
+  log_notice(LD_CIRC,
+            "Your network connection speed appears to have changed. Resetting "
+            "timeout to %lds after %d timeouts and %d buildtimes.",
+            tor_lround(cbt->timeout_ms/1000), timeout_count,
+            total_build_times);
+
+  return 1;
+}
+
+/**
+ * Count the number of timeouts in a set of cbt data.
+ */
+double
+circuit_build_times_timeout_rate(const circuit_build_times_t *cbt)
+{
+  int i=0,timeouts=0;
+  for (i = 0; i < CBT_NCIRCUITS_TO_OBSERVE; i++) {
+    if (cbt->circuit_build_times[i] >= cbt->timeout_ms) {
+       timeouts++;
+    }
+  }
+
+  if (!cbt->total_build_times)
+    return 0;
+
+  return ((double)timeouts)/cbt->total_build_times;
+}
+
+/**
+ * Count the number of closed circuits in a set of cbt data.
+ */
+double
+circuit_build_times_close_rate(const circuit_build_times_t *cbt)
+{
+  int i=0,closed=0;
+  for (i = 0; i < CBT_NCIRCUITS_TO_OBSERVE; i++) {
+    if (cbt->circuit_build_times[i] == CBT_BUILD_ABANDONED) {
+       closed++;
+    }
+  }
+
+  if (!cbt->total_build_times)
+    return 0;
+
+  return ((double)closed)/cbt->total_build_times;
+}
+
+/**
+ * Store a timeout as a synthetic value.
+ *
+ * Returns true if the store was successful and we should possibly
+ * update our timeout estimate.
+ */
+int
+circuit_build_times_count_close(circuit_build_times_t *cbt,
+                                int did_onehop,
+                                time_t start_time)
+{
+  if (circuit_build_times_disabled()) {
+    cbt->close_ms = cbt->timeout_ms
+                  = circuit_build_times_get_initial_timeout();
+    return 0;
+  }
+
+  /* Record this force-close to help determine if the network is dead */
+  circuit_build_times_network_close(cbt, did_onehop, start_time);
+
+  /* Only count timeouts if network is live.. */
+  if (!circuit_build_times_network_check_live(cbt)) {
+    return 0;
+  }
+
+  circuit_build_times_add_time(cbt, CBT_BUILD_ABANDONED);
+  return 1;
+}
+
+/**
+ * Update timeout counts to determine if we need to expire
+ * our build time history due to excessive timeouts.
+ *
+ * We do not record any actual time values at this stage;
+ * we are only interested in recording the fact that a timeout
+ * happened. We record the time values via
+ * circuit_build_times_count_close() and circuit_build_times_add_time().
+ */
+void
+circuit_build_times_count_timeout(circuit_build_times_t *cbt,
+                                  int did_onehop)
+{
+  if (circuit_build_times_disabled()) {
+    cbt->close_ms = cbt->timeout_ms
+                  = circuit_build_times_get_initial_timeout();
+    return;
+  }
+
+  /* Register the fact that a timeout just occurred. */
+  circuit_build_times_network_timeout(cbt, did_onehop);
+
+  /* If there are a ton of timeouts, we should reset
+   * the circuit build timeout. */
+  circuit_build_times_network_check_changed(cbt);
+}
+
+/**
+ * Estimate a new timeout based on history and set our timeout
+ * variable accordingly.
+ */
+static int
+circuit_build_times_set_timeout_worker(circuit_build_times_t *cbt)
+{
+  build_time_t max_time;
+  if (!circuit_build_times_enough_to_compute(cbt))
+    return 0;
+
+  if (!circuit_build_times_update_alpha(cbt))
+    return 0;
+
+  cbt->timeout_ms = circuit_build_times_calculate_timeout(cbt,
+                                circuit_build_times_quantile_cutoff());
+
+  cbt->close_ms = circuit_build_times_calculate_timeout(cbt,
+                                circuit_build_times_close_quantile());
+
+  max_time = circuit_build_times_max(cbt);
+
+  if (cbt->timeout_ms > max_time) {
+    log_info(LD_CIRC,
+               "Circuit build timeout of %dms is beyond the maximum build "
+               "time we have ever observed. Capping it to %dms.",
+               (int)cbt->timeout_ms, max_time);
+    cbt->timeout_ms = max_time;
+  }
+
+  if (max_time < INT32_MAX/2 && cbt->close_ms > 2*max_time) {
+    log_info(LD_CIRC,
+               "Circuit build measurement period of %dms is more than twice "
+               "the maximum build time we have ever observed. Capping it to "
+               "%dms.", (int)cbt->close_ms, 2*max_time);
+    cbt->close_ms = 2*max_time;
+  }
+
+  /* Sometimes really fast guard nodes give us such a steep curve
+   * that this ends up being not that much greater than timeout_ms.
+   * Make it be at least 1 min to handle this case. */
+  cbt->close_ms = MAX(cbt->close_ms, circuit_build_times_initial_timeout());
+
+  cbt->have_computed_timeout = 1;
+  return 1;
+}
+
+/**
+ * Exposed function to compute a new timeout. Dispatches events and
+ * also filters out extremely high timeout values.
+ */
+void
+circuit_build_times_set_timeout(circuit_build_times_t *cbt)
+{
+  long prev_timeout = tor_lround(cbt->timeout_ms/1000);
+  double timeout_rate;
+
+  /*
+   * Just return if we aren't using adaptive timeouts
+   */
+  if (circuit_build_times_disabled())
+    return;
+
+  if (!circuit_build_times_set_timeout_worker(cbt))
+    return;
+
+  if (cbt->timeout_ms < circuit_build_times_min_timeout()) {
+    log_info(LD_CIRC, "Set buildtimeout to low value %fms. Setting to %dms",
+             cbt->timeout_ms, circuit_build_times_min_timeout());
+    cbt->timeout_ms = circuit_build_times_min_timeout();
+    if (cbt->close_ms < cbt->timeout_ms) {
+      /* This shouldn't happen because of MAX() in timeout_worker above,
+       * but doing it just in case */
+      cbt->close_ms = circuit_build_times_initial_timeout();
+    }
+  }
+
+  cbt_control_event_buildtimeout_set(cbt, BUILDTIMEOUT_SET_EVENT_COMPUTED);
+
+  timeout_rate = circuit_build_times_timeout_rate(cbt);
+
+  if (prev_timeout > tor_lround(cbt->timeout_ms/1000)) {
+    log_info(LD_CIRC,
+               "Based on %d circuit times, it looks like we don't need to "
+               "wait so long for circuits to finish. We will now assume a "
+               "circuit is too slow to use after waiting %ld seconds.",
+               cbt->total_build_times,
+               tor_lround(cbt->timeout_ms/1000));
+    log_info(LD_CIRC,
+             "Circuit timeout data: %fms, %fms, Xm: %d, a: %f, r: %f",
+             cbt->timeout_ms, cbt->close_ms, cbt->Xm, cbt->alpha,
+             timeout_rate);
+  } else if (prev_timeout < tor_lround(cbt->timeout_ms/1000)) {
+    log_info(LD_CIRC,
+               "Based on %d circuit times, it looks like we need to wait "
+               "longer for circuits to finish. We will now assume a "
+               "circuit is too slow to use after waiting %ld seconds.",
+               cbt->total_build_times,
+               tor_lround(cbt->timeout_ms/1000));
+    log_info(LD_CIRC,
+             "Circuit timeout data: %fms, %fms, Xm: %d, a: %f, r: %f",
+             cbt->timeout_ms, cbt->close_ms, cbt->Xm, cbt->alpha,
+             timeout_rate);
+  } else {
+    log_info(LD_CIRC,
+             "Set circuit build timeout to %lds (%fms, %fms, Xm: %d, a: %f,"
+             " r: %f) based on %d circuit times",
+             tor_lround(cbt->timeout_ms/1000),
+             cbt->timeout_ms, cbt->close_ms, cbt->Xm, cbt->alpha, timeout_rate,
+             cbt->total_build_times);
+  }
+}
+
+#ifdef TOR_UNIT_TESTS
+/** Make a note that we're running unit tests (rather than running Tor
+ * itself), so we avoid clobbering our state file. */
+void
+circuitbuild_running_unit_tests(void)
+{
+  unit_tests = 1;
+}
+#endif
+
+void
+circuit_build_times_update_last_circ(circuit_build_times_t *cbt)
+{
+  cbt->last_circ_at = approx_time();
+}
+
+static void
+cbt_control_event_buildtimeout_set(const circuit_build_times_t *cbt,
+                                   buildtimeout_set_event_t type)
+{
+  char *args = NULL;
+  double qnt;
+
+  switch (type) {
+    case BUILDTIMEOUT_SET_EVENT_RESET:
+    case BUILDTIMEOUT_SET_EVENT_SUSPENDED:
+    case BUILDTIMEOUT_SET_EVENT_DISCARD:
+      qnt = 1.0;
+      break;
+    case BUILDTIMEOUT_SET_EVENT_COMPUTED:
+    case BUILDTIMEOUT_SET_EVENT_RESUME:
+    default:
+      qnt = circuit_build_times_quantile_cutoff();
+      break;
+  }
+
+  tor_asprintf(&args, "TOTAL_TIMES=%lu "
+               "TIMEOUT_MS=%lu XM=%lu ALPHA=%f CUTOFF_QUANTILE=%f "
+               "TIMEOUT_RATE=%f CLOSE_MS=%lu CLOSE_RATE=%f",
+               (unsigned long)cbt->total_build_times,
+               (unsigned long)cbt->timeout_ms,
+               (unsigned long)cbt->Xm, cbt->alpha, qnt,
+               circuit_build_times_timeout_rate(cbt),
+               (unsigned long)cbt->close_ms,
+               circuit_build_times_close_rate(cbt));
+
+  control_event_buildtimeout_set(type, args);
+
+  tor_free(args);
+}
+
