@@ -474,4 +474,313 @@ config_assign_line(const config_format_t *fmt, void *options,
 
   CONFIG_CHECK(fmt, options);
 
-  var = config_find_option(fmt, c->key)
+  var = config_find_option(fmt, c->key);
+  if (!var) {
+    if (fmt->extra) {
+      void *lvalue = STRUCT_VAR_P(options, fmt->extra->var_offset);
+      log_info(LD_CONFIG,
+               "Found unrecognized option '%s'; saving it.", c->key);
+      config_line_append((config_line_t**)lvalue, c->key, c->value);
+      return 0;
+    } else {
+      tor_asprintf(msg,
+                "Unknown option '%s'.  Failing.", c->key);
+      return -1;
+    }
+  }
+
+  /* Put keyword into canonical case. */
+  if (strcmp(var->name, c->key)) {
+    tor_free(c->key);
+    c->key = tor_strdup(var->name);
+  }
+
+  if (!strlen(c->value)) {
+    /* reset or clear it, then return */
+    if (!clear_first) {
+      if ((var->type == CONFIG_TYPE_LINELIST ||
+           var->type == CONFIG_TYPE_LINELIST_S) &&
+          c->command != CONFIG_LINE_CLEAR) {
+        /* We got an empty linelist from the torrc or command line.
+           As a special case, call this an error. Warn and ignore. */
+        log_warn(LD_CONFIG,
+                 "Linelist option '%s' has no value. Skipping.", c->key);
+      } else { /* not already cleared */
+        config_reset(fmt, options, var, use_defaults);
+      }
+    }
+    return 0;
+  } else if (c->command == CONFIG_LINE_CLEAR && !clear_first) {
+    config_reset(fmt, options, var, use_defaults);
+  }
+
+  if (options_seen && (var->type != CONFIG_TYPE_LINELIST &&
+                       var->type != CONFIG_TYPE_LINELIST_S)) {
+    /* We're tracking which options we've seen, and this option is not
+     * supposed to occur more than once. */
+    int var_index = (int)(var - fmt->vars);
+    if (bitarray_is_set(options_seen, var_index)) {
+      log_warn(LD_CONFIG, "Option '%s' used more than once; all but the last "
+               "value will be ignored.", var->name);
+    }
+    bitarray_set(options_seen, var_index);
+  }
+
+  if (config_assign_value(fmt, options, c, msg) < 0)
+    return -2;
+  return 0;
+}
+
+/** Restore the option named <b>key</b> in options to its default value.
+ * Called from config_assign(). */
+static void
+config_reset_line(const config_format_t *fmt, void *options,
+                  const char *key, int use_defaults)
+{
+  const config_var_t *var;
+
+  CONFIG_CHECK(fmt, options);
+
+  var = config_find_option(fmt, key);
+  if (!var)
+    return; /* give error on next pass. */
+
+  config_reset(fmt, options, var, use_defaults);
+}
+
+/** Return true iff value needs to be quoted and escaped to be used in
+ * a configuration file. */
+static int
+config_value_needs_escape(const char *value)
+{
+  if (*value == '\"')
+    return 1;
+  while (*value) {
+    switch (*value)
+    {
+    case '\r':
+    case '\n':
+    case '#':
+      /* Note: quotes and backspaces need special handling when we are using
+       * quotes, not otherwise, so they don't trigger escaping on their
+       * own. */
+      return 1;
+    default:
+      if (!TOR_ISPRINT(*value))
+        return 1;
+    }
+    ++value;
+  }
+  return 0;
+}
+
+/** Return a newly allocated deep copy of the lines in <b>inp</b>. */
+config_line_t *
+config_lines_dup(const config_line_t *inp)
+{
+  config_line_t *result = NULL;
+  config_line_t **next_out = &result;
+  while (inp) {
+    *next_out = tor_malloc_zero(sizeof(config_line_t));
+    (*next_out)->key = tor_strdup(inp->key);
+    (*next_out)->value = tor_strdup(inp->value);
+    inp = inp->next;
+    next_out = &((*next_out)->next);
+  }
+  (*next_out) = NULL;
+  return result;
+}
+
+/** Return newly allocated line or lines corresponding to <b>key</b> in the
+ * configuration <b>options</b>.  If <b>escape_val</b> is true and a
+ * value needs to be quoted before it's put in a config file, quote and
+ * escape that value. Return NULL if no such key exists. */
+config_line_t *
+config_get_assigned_option(const config_format_t *fmt, const void *options,
+                             const char *key, int escape_val)
+{
+  const config_var_t *var;
+  const void *value;
+  config_line_t *result;
+  smartlist_t *csv_str;
+  tor_assert(options && key);
+
+  CONFIG_CHECK(fmt, options);
+
+  var = config_find_option(fmt, key);
+  if (!var) {
+    log_warn(LD_CONFIG, "Unknown option '%s'.  Failing.", key);
+    return NULL;
+  }
+  value = STRUCT_VAR_P(options, var->var_offset);
+
+  result = tor_malloc_zero(sizeof(config_line_t));
+  result->key = tor_strdup(var->name);
+  switch (var->type)
+    {
+    case CONFIG_TYPE_STRING:
+    case CONFIG_TYPE_FILENAME:
+      if (*(char**)value) {
+        result->value = tor_strdup(*(char**)value);
+      } else {
+        tor_free(result->key);
+        tor_free(result);
+        return NULL;
+      }
+      break;
+    case CONFIG_TYPE_ISOTIME:
+      if (*(time_t*)value) {
+        result->value = tor_malloc(ISO_TIME_LEN+1);
+        format_iso_time(result->value, *(time_t*)value);
+      } else {
+        tor_free(result->key);
+        tor_free(result);
+      }
+      escape_val = 0; /* Can't need escape. */
+      break;
+    case CONFIG_TYPE_PORT:
+      if (*(int*)value == CFG_AUTO_PORT) {
+        result->value = tor_strdup("auto");
+        escape_val = 0;
+        break;
+      }
+      /* fall through */
+    case CONFIG_TYPE_INTERVAL:
+    case CONFIG_TYPE_MSEC_INTERVAL:
+    case CONFIG_TYPE_UINT:
+    case CONFIG_TYPE_INT:
+      /* This means every or_options_t uint or bool element
+       * needs to be an int. Not, say, a uint16_t or char. */
+      tor_asprintf(&result->value, "%d", *(int*)value);
+      escape_val = 0; /* Can't need escape. */
+      break;
+    case CONFIG_TYPE_MEMUNIT:
+      tor_asprintf(&result->value, U64_FORMAT,
+                   U64_PRINTF_ARG(*(uint64_t*)value));
+      escape_val = 0; /* Can't need escape. */
+      break;
+    case CONFIG_TYPE_DOUBLE:
+      tor_asprintf(&result->value, "%f", *(double*)value);
+      escape_val = 0; /* Can't need escape. */
+      break;
+
+    case CONFIG_TYPE_AUTOBOOL:
+      if (*(int*)value == -1) {
+        result->value = tor_strdup("auto");
+        escape_val = 0;
+        break;
+      }
+      /* fall through */
+    case CONFIG_TYPE_BOOL:
+      result->value = tor_strdup(*(int*)value ? "1" : "0");
+      escape_val = 0; /* Can't need escape. */
+      break;
+    case CONFIG_TYPE_ROUTERSET:
+      result->value = routerset_to_string(*(routerset_t**)value);
+      break;
+    case CONFIG_TYPE_CSV:
+      if (*(smartlist_t**)value)
+        result->value =
+          smartlist_join_strings(*(smartlist_t**)value, ",", 0, NULL);
+      else
+        result->value = tor_strdup("");
+      break;
+    case CONFIG_TYPE_CSV_INTERVAL:
+      if (*(smartlist_t**)value) {
+        csv_str = smartlist_new();
+        SMARTLIST_FOREACH_BEGIN(*(smartlist_t**)value, int *, i)
+          {
+            smartlist_add_asprintf(csv_str, "%d", *i);
+          }
+        SMARTLIST_FOREACH_END(i);
+        result->value = smartlist_join_strings(csv_str, ",", 0, NULL);
+        SMARTLIST_FOREACH(csv_str, char *, cp, tor_free(cp));
+        smartlist_free(csv_str);
+      } else
+        result->value = tor_strdup("");
+      break;
+    case CONFIG_TYPE_OBSOLETE:
+      log_fn(LOG_INFO, LD_CONFIG,
+             "You asked me for the value of an obsolete config option '%s'.",
+             key);
+      tor_free(result->key);
+      tor_free(result);
+      return NULL;
+    case CONFIG_TYPE_LINELIST_S:
+      log_warn(LD_CONFIG,
+               "Can't return context-sensitive '%s' on its own", key);
+      tor_free(result->key);
+      tor_free(result);
+      return NULL;
+    case CONFIG_TYPE_LINELIST:
+    case CONFIG_TYPE_LINELIST_V:
+      tor_free(result->key);
+      tor_free(result);
+      result = config_lines_dup(*(const config_line_t**)value);
+      break;
+    default:
+      tor_free(result->key);
+      tor_free(result);
+      log_warn(LD_BUG,"Unknown type %d for known key '%s'",
+               var->type, key);
+      return NULL;
+    }
+
+  if (escape_val) {
+    config_line_t *line;
+    for (line = result; line; line = line->next) {
+      if (line->value && config_value_needs_escape(line->value)) {
+        char *newval = esc_for_log(line->value);
+        tor_free(line->value);
+        line->value = newval;
+      }
+    }
+  }
+
+  return result;
+}
+/** Iterate through the linked list of requested options <b>list</b>.
+ * For each item, convert as appropriate and assign to <b>options</b>.
+ * If an item is unrecognized, set *msg and return -1 immediately,
+ * else return 0 for success.
+ *
+ * If <b>clear_first</b>, interpret config options as replacing (not
+ * extending) their previous values. If <b>clear_first</b> is set,
+ * then <b>use_defaults</b> to decide if you set to defaults after
+ * clearing, or make the value 0 or NULL.
+ *
+ * Here are the use cases:
+ * 1. A non-empty AllowInvalid line in your torrc. Appends to current
+ *    if linelist, replaces current if csv.
+ * 2. An empty AllowInvalid line in your torrc. Should clear it.
+ * 3. "RESETCONF AllowInvalid" sets it to default.
+ * 4. "SETCONF AllowInvalid" makes it NULL.
+ * 5. "SETCONF AllowInvalid=foo" clears it and sets it to "foo".
+ *
+ * Use_defaults   Clear_first
+ *    0                0       "append"
+ *    1                0       undefined, don't use
+ *    0                1       "set to null first"
+ *    1                1       "set to defaults first"
+ * Return 0 on success, -1 on bad key, -2 on bad value.
+ *
+ * As an additional special case, if a LINELIST config option has
+ * no value and clear_first is 0, then warn and ignore it.
+ */
+
+/*
+There are three call cases for config_assign() currently.
+
+Case one: Torrc entry
+options_init_from_torrc() calls config_assign(0, 0)
+  calls config_assign_line(0, 0).
+    if value is empty, calls config_reset(0) and returns.
+    calls config_assign_value(), appends.
+
+Case two: setconf
+options_trial_assign() calls config_assign(0, 1)
+  calls config_reset_line(0)
+    calls config_reset(0)
+      calls option_clear().
+  calls config_assign_line(0, 1).
+    if v
