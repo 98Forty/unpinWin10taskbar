@@ -783,4 +783,350 @@ options_trial_assign() calls config_assign(0, 1)
     calls config_reset(0)
       calls option_clear().
   calls config_assign_line(0, 1).
-    if v
+    if value is empty, returns.
+    calls config_assign_value(), appends.
+
+Case three: resetconf
+options_trial_assign() calls config_assign(1, 1)
+  calls config_reset_line(1)
+    calls config_reset(1)
+      calls option_clear().
+      calls config_assign_value(default)
+  calls config_assign_line(1, 1).
+    returns.
+*/
+int
+config_assign(const config_format_t *fmt, void *options, config_line_t *list,
+              int use_defaults, int clear_first, char **msg)
+{
+  config_line_t *p;
+  bitarray_t *options_seen;
+  const int n_options = config_count_options(fmt);
+
+  CONFIG_CHECK(fmt, options);
+
+  /* pass 1: normalize keys */
+  for (p = list; p; p = p->next) {
+    const char *full = config_expand_abbrev(fmt, p->key, 0, 1);
+    if (strcmp(full,p->key)) {
+      tor_free(p->key);
+      p->key = tor_strdup(full);
+    }
+  }
+
+  /* pass 2: if we're reading from a resetting source, clear all
+   * mentioned config options, and maybe set to their defaults. */
+  if (clear_first) {
+    for (p = list; p; p = p->next)
+      config_reset_line(fmt, options, p->key, use_defaults);
+  }
+
+  options_seen = bitarray_init_zero(n_options);
+  /* pass 3: assign. */
+  while (list) {
+    int r;
+    if ((r=config_assign_line(fmt, options, list, use_defaults,
+                              clear_first, options_seen, msg))) {
+      bitarray_free(options_seen);
+      return r;
+    }
+    list = list->next;
+  }
+  bitarray_free(options_seen);
+
+  /** Now we're done assigning a group of options to the configuration.
+   * Subsequent group assignments should _replace_ linelists, not extend
+   * them. */
+  config_mark_lists_fragile(fmt, options);
+
+  return 0;
+}
+
+/** Reset config option <b>var</b> to 0, 0.0, NULL, or the equivalent.
+ * Called from config_reset() and config_free(). */
+static void
+config_clear(const config_format_t *fmt, void *options,
+             const config_var_t *var)
+{
+  void *lvalue = STRUCT_VAR_P(options, var->var_offset);
+  (void)fmt; /* unused */
+  switch (var->type) {
+    case CONFIG_TYPE_STRING:
+    case CONFIG_TYPE_FILENAME:
+      tor_free(*(char**)lvalue);
+      break;
+    case CONFIG_TYPE_DOUBLE:
+      *(double*)lvalue = 0.0;
+      break;
+    case CONFIG_TYPE_ISOTIME:
+      *(time_t*)lvalue = 0;
+      break;
+    case CONFIG_TYPE_INTERVAL:
+    case CONFIG_TYPE_MSEC_INTERVAL:
+    case CONFIG_TYPE_UINT:
+    case CONFIG_TYPE_INT:
+    case CONFIG_TYPE_PORT:
+    case CONFIG_TYPE_BOOL:
+      *(int*)lvalue = 0;
+      break;
+    case CONFIG_TYPE_AUTOBOOL:
+      *(int*)lvalue = -1;
+      break;
+    case CONFIG_TYPE_MEMUNIT:
+      *(uint64_t*)lvalue = 0;
+      break;
+    case CONFIG_TYPE_ROUTERSET:
+      if (*(routerset_t**)lvalue) {
+        routerset_free(*(routerset_t**)lvalue);
+        *(routerset_t**)lvalue = NULL;
+      }
+      break;
+    case CONFIG_TYPE_CSV:
+      if (*(smartlist_t**)lvalue) {
+        SMARTLIST_FOREACH(*(smartlist_t **)lvalue, char *, cp, tor_free(cp));
+        smartlist_free(*(smartlist_t **)lvalue);
+        *(smartlist_t **)lvalue = NULL;
+      }
+      break;
+    case CONFIG_TYPE_CSV_INTERVAL:
+      if (*(smartlist_t**)lvalue) {
+        SMARTLIST_FOREACH(*(smartlist_t **)lvalue, int *, cp, tor_free(cp));
+        smartlist_free(*(smartlist_t **)lvalue);
+        *(smartlist_t **)lvalue = NULL;
+      }
+      break;
+    case CONFIG_TYPE_LINELIST:
+    case CONFIG_TYPE_LINELIST_S:
+      config_free_lines(*(config_line_t **)lvalue);
+      *(config_line_t **)lvalue = NULL;
+      break;
+    case CONFIG_TYPE_LINELIST_V:
+      /* handled by linelist_s. */
+      break;
+    case CONFIG_TYPE_OBSOLETE:
+      break;
+  }
+}
+
+/** Clear the option indexed by <b>var</b> in <b>options</b>. Then if
+ * <b>use_defaults</b>, set it to its default value.
+ * Called by config_init() and option_reset_line() and option_assign_line(). */
+static void
+config_reset(const config_format_t *fmt, void *options,
+             const config_var_t *var, int use_defaults)
+{
+  config_line_t *c;
+  char *msg = NULL;
+  CONFIG_CHECK(fmt, options);
+  config_clear(fmt, options, var); /* clear it first */
+  if (!use_defaults)
+    return; /* all done */
+  if (var->initvalue) {
+    c = tor_malloc_zero(sizeof(config_line_t));
+    c->key = tor_strdup(var->name);
+    c->value = tor_strdup(var->initvalue);
+    if (config_assign_value(fmt, options, c, &msg) < 0) {
+      log_warn(LD_BUG, "Failed to assign default: %s", msg);
+      tor_free(msg); /* if this happens it's a bug */
+    }
+    config_free_lines(c);
+  }
+}
+
+/** Release storage held by <b>options</b>. */
+void
+config_free(const config_format_t *fmt, void *options)
+{
+  int i;
+
+  if (!options)
+    return;
+
+  tor_assert(fmt);
+
+  for (i=0; fmt->vars[i].name; ++i)
+    config_clear(fmt, options, &(fmt->vars[i]));
+  if (fmt->extra) {
+    config_line_t **linep = STRUCT_VAR_P(options, fmt->extra->var_offset);
+    config_free_lines(*linep);
+    *linep = NULL;
+  }
+  tor_free(options);
+}
+
+/** Return true iff a and b contain identical keys and values in identical
+ * order. */
+int
+config_lines_eq(config_line_t *a, config_line_t *b)
+{
+  while (a && b) {
+    if (strcasecmp(a->key, b->key) || strcmp(a->value, b->value))
+      return 0;
+    a = a->next;
+    b = b->next;
+  }
+  if (a || b)
+    return 0;
+  return 1;
+}
+
+/** Return the number of lines in <b>a</b> whose key is <b>key</b>. */
+int
+config_count_key(const config_line_t *a, const char *key)
+{
+  int n = 0;
+  while (a) {
+    if (!strcasecmp(a->key, key)) {
+      ++n;
+    }
+    a = a->next;
+  }
+  return n;
+}
+
+/** Return true iff the option <b>name</b> has the same value in <b>o1</b>
+ * and <b>o2</b>.  Must not be called for LINELIST_S or OBSOLETE options.
+ */
+int
+config_is_same(const config_format_t *fmt,
+               const void *o1, const void *o2,
+               const char *name)
+{
+  config_line_t *c1, *c2;
+  int r = 1;
+  CONFIG_CHECK(fmt, o1);
+  CONFIG_CHECK(fmt, o2);
+
+  c1 = config_get_assigned_option(fmt, o1, name, 0);
+  c2 = config_get_assigned_option(fmt, o2, name, 0);
+  r = config_lines_eq(c1, c2);
+  config_free_lines(c1);
+  config_free_lines(c2);
+  return r;
+}
+
+/** Copy storage held by <b>old</b> into a new or_options_t and return it. */
+void *
+config_dup(const config_format_t *fmt, const void *old)
+{
+  void *newopts;
+  int i;
+  config_line_t *line;
+
+  newopts = config_new(fmt);
+  for (i=0; fmt->vars[i].name; ++i) {
+    if (fmt->vars[i].type == CONFIG_TYPE_LINELIST_S)
+      continue;
+    if (fmt->vars[i].type == CONFIG_TYPE_OBSOLETE)
+      continue;
+    line = config_get_assigned_option(fmt, old, fmt->vars[i].name, 0);
+    if (line) {
+      char *msg = NULL;
+      if (config_assign(fmt, newopts, line, 0, 0, &msg) < 0) {
+        log_err(LD_BUG, "config_get_assigned_option() generated "
+                "something we couldn't config_assign(): %s", msg);
+        tor_free(msg);
+        tor_assert(0);
+      }
+    }
+    config_free_lines(line);
+  }
+  return newopts;
+}
+/** Set all vars in the configuration object <b>options</b> to their default
+ * values. */
+void
+config_init(const config_format_t *fmt, void *options)
+{
+  int i;
+  const config_var_t *var;
+  CONFIG_CHECK(fmt, options);
+
+  for (i=0; fmt->vars[i].name; ++i) {
+    var = &fmt->vars[i];
+    if (!var->initvalue)
+      continue; /* defaults to NULL or 0 */
+    config_reset(fmt, options, var, 1);
+  }
+}
+
+/** Allocate and return a new string holding the written-out values of the vars
+ * in 'options'.  If 'minimal', do not write out any default-valued vars.
+ * Else, if comment_defaults, write default values as comments.
+ */
+char *
+config_dump(const config_format_t *fmt, const void *default_options,
+            const void *options, int minimal,
+            int comment_defaults)
+{
+  smartlist_t *elements;
+  const void *defaults = default_options;
+  void *defaults_tmp = NULL;
+  config_line_t *line, *assigned;
+  char *result;
+  int i;
+  char *msg = NULL;
+
+  if (defaults == NULL) {
+    defaults = defaults_tmp = config_new(fmt);
+    config_init(fmt, defaults_tmp);
+  }
+
+  /* XXX use a 1 here so we don't add a new log line while dumping */
+  if (default_options == NULL) {
+    if (fmt->validate_fn(NULL, defaults_tmp, defaults_tmp, 1, &msg) < 0) {
+      log_err(LD_BUG, "Failed to validate default config: %s", msg);
+      tor_free(msg);
+      tor_assert(0);
+    }
+  }
+
+  elements = smartlist_new();
+  for (i=0; fmt->vars[i].name; ++i) {
+    int comment_option = 0;
+    if (fmt->vars[i].type == CONFIG_TYPE_OBSOLETE ||
+        fmt->vars[i].type == CONFIG_TYPE_LINELIST_S)
+      continue;
+    /* Don't save 'hidden' control variables. */
+    if (!strcmpstart(fmt->vars[i].name, "__"))
+      continue;
+    if (minimal && config_is_same(fmt, options, defaults, fmt->vars[i].name))
+      continue;
+    else if (comment_defaults &&
+             config_is_same(fmt, options, defaults, fmt->vars[i].name))
+      comment_option = 1;
+
+    line = assigned =
+      config_get_assigned_option(fmt, options, fmt->vars[i].name, 1);
+
+    for (; line; line = line->next) {
+      smartlist_add_asprintf(elements, "%s%s %s\n",
+                   comment_option ? "# " : "",
+                   line->key, line->value);
+    }
+    config_free_lines(assigned);
+  }
+
+  if (fmt->extra) {
+    line = *(config_line_t**)STRUCT_VAR_P(options, fmt->extra->var_offset);
+    for (; line; line = line->next) {
+      smartlist_add_asprintf(elements, "%s %s\n", line->key, line->value);
+    }
+  }
+
+  result = smartlist_join_strings(elements, "", 0, NULL);
+  SMARTLIST_FOREACH(elements, char *, cp, tor_free(cp));
+  smartlist_free(elements);
+  if (defaults_tmp)
+    config_free(fmt, defaults_tmp);
+  return result;
+}
+
+/** Mapping from a unit name to a multiplier for converting that unit into a
+ * base unit.  Used by config_parse_unit. */
+struct unit_table_t {
+  const char *unit; /**< The name of the unit */
+  uint64_t multiplier; /**< How many of the base unit appear in this unit */
+};
+
+/** Table to m
