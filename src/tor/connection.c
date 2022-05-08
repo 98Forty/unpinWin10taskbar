@@ -4667,3 +4667,184 @@ assert_connection_ok(connection_t *conn, time_t now)
       if (conn->state == AP_CONN_STATE_OPEN) {
         tor_assert(entry_conn->socks_request->has_finished);
         if (!conn->marked_for_close) {
+          tor_assert(ENTRY_TO_EDGE_CONN(entry_conn)->cpath_layer);
+          assert_cpath_layer_ok(ENTRY_TO_EDGE_CONN(entry_conn)->cpath_layer);
+        }
+      }
+    }
+    if (conn->type == CONN_TYPE_EXIT) {
+      tor_assert(conn->purpose == EXIT_PURPOSE_CONNECT ||
+                 conn->purpose == EXIT_PURPOSE_RESOLVE);
+    }
+  } else if (conn->type == CONN_TYPE_DIR) {
+  } else {
+    /* Purpose is only used for dir and exit types currently */
+    tor_assert(!conn->purpose);
+  }
+
+  switch (conn->type)
+    {
+    CASE_ANY_LISTENER_TYPE:
+      tor_assert(conn->state == LISTENER_STATE_READY);
+      break;
+    case CONN_TYPE_OR:
+      tor_assert(conn->state >= OR_CONN_STATE_MIN_);
+      tor_assert(conn->state <= OR_CONN_STATE_MAX_);
+      break;
+    case CONN_TYPE_EXT_OR:
+      tor_assert(conn->state >= EXT_OR_CONN_STATE_MIN_);
+      tor_assert(conn->state <= EXT_OR_CONN_STATE_MAX_);
+      break;
+    case CONN_TYPE_EXIT:
+      tor_assert(conn->state >= EXIT_CONN_STATE_MIN_);
+      tor_assert(conn->state <= EXIT_CONN_STATE_MAX_);
+      tor_assert(conn->purpose >= EXIT_PURPOSE_MIN_);
+      tor_assert(conn->purpose <= EXIT_PURPOSE_MAX_);
+      break;
+    case CONN_TYPE_AP:
+      tor_assert(conn->state >= AP_CONN_STATE_MIN_);
+      tor_assert(conn->state <= AP_CONN_STATE_MAX_);
+      tor_assert(TO_ENTRY_CONN(conn)->socks_request);
+      break;
+    case CONN_TYPE_DIR:
+      tor_assert(conn->state >= DIR_CONN_STATE_MIN_);
+      tor_assert(conn->state <= DIR_CONN_STATE_MAX_);
+      tor_assert(conn->purpose >= DIR_PURPOSE_MIN_);
+      tor_assert(conn->purpose <= DIR_PURPOSE_MAX_);
+      break;
+    case CONN_TYPE_CPUWORKER:
+      tor_assert(conn->state >= CPUWORKER_STATE_MIN_);
+      tor_assert(conn->state <= CPUWORKER_STATE_MAX_);
+      break;
+    case CONN_TYPE_CONTROL:
+      tor_assert(conn->state >= CONTROL_CONN_STATE_MIN_);
+      tor_assert(conn->state <= CONTROL_CONN_STATE_MAX_);
+      break;
+    default:
+      tor_assert(0);
+  }
+}
+
+/** Fills <b>addr</b> and <b>port</b> with the details of the global
+ *  proxy server we are using.
+ *  <b>conn</b> contains the connection we are using the proxy for.
+ *
+ *  Return 0 on success, -1 on failure.
+ */
+int
+get_proxy_addrport(tor_addr_t *addr, uint16_t *port, int *proxy_type,
+                   const connection_t *conn)
+{
+  const or_options_t *options = get_options();
+
+  if (options->HTTPSProxy) {
+    tor_addr_copy(addr, &options->HTTPSProxyAddr);
+    *port = options->HTTPSProxyPort;
+    *proxy_type = PROXY_CONNECT;
+    return 0;
+  } else if (options->Socks4Proxy) {
+    tor_addr_copy(addr, &options->Socks4ProxyAddr);
+    *port = options->Socks4ProxyPort;
+    *proxy_type = PROXY_SOCKS4;
+    return 0;
+  } else if (options->Socks5Proxy) {
+    tor_addr_copy(addr, &options->Socks5ProxyAddr);
+    *port = options->Socks5ProxyPort;
+    *proxy_type = PROXY_SOCKS5;
+    return 0;
+  } else if (options->ClientTransportPlugin ||
+             options->Bridges) {
+    const transport_t *transport = NULL;
+    int r;
+    r = get_transport_by_bridge_addrport(&conn->addr, conn->port, &transport);
+    if (r<0)
+      return -1;
+    if (transport) { /* transport found */
+      tor_addr_copy(addr, &transport->addr);
+      *port = transport->port;
+      *proxy_type = transport->socks_version;
+      return 0;
+    }
+  }
+
+  *proxy_type = PROXY_NONE;
+  return 0;
+}
+
+/** Log a failed connection to a proxy server.
+ *  <b>conn</b> is the connection we use the proxy server for. */
+void
+log_failed_proxy_connection(connection_t *conn)
+{
+  tor_addr_t proxy_addr;
+  uint16_t proxy_port;
+  int proxy_type;
+
+  if (get_proxy_addrport(&proxy_addr, &proxy_port, &proxy_type, conn) != 0)
+    return; /* if we have no proxy set up, leave this function. */
+
+  log_warn(LD_NET,
+           "The connection to the %s proxy server at %s just failed. "
+           "Make sure that the proxy server is up and running.",
+           proxy_type_to_string(get_proxy_type()),
+           fmt_addrport(&proxy_addr, proxy_port));
+}
+
+/** Return string representation of <b>proxy_type</b>. */
+static const char *
+proxy_type_to_string(int proxy_type)
+{
+  switch (proxy_type) {
+  case PROXY_CONNECT:   return "HTTP";
+  case PROXY_SOCKS4:    return "SOCKS4";
+  case PROXY_SOCKS5:    return "SOCKS5";
+  case PROXY_PLUGGABLE: return "pluggable transports SOCKS";
+  case PROXY_NONE:      return "NULL";
+  default:              tor_assert(0);
+  }
+  return NULL; /*Unreached*/
+}
+
+/** Call connection_free_() on every connection in our array, and release all
+ * storage held by connection.c. This is used by cpuworkers and dnsworkers
+ * when they fork, so they don't keep resources held open (especially
+ * sockets).
+ *
+ * Don't do the checks in connection_free(), because they will
+ * fail.
+ */
+void
+connection_free_all(void)
+{
+  smartlist_t *conns = get_connection_array();
+
+  /* We don't want to log any messages to controllers. */
+  SMARTLIST_FOREACH(conns, connection_t *, conn,
+    if (conn->type == CONN_TYPE_CONTROL)
+      TO_CONTROL_CONN(conn)->event_mask = 0);
+
+  control_update_global_event_mask();
+
+  /* Unlink everything from the identity map. */
+  connection_or_clear_identity_map();
+  connection_or_clear_ext_or_id_map();
+
+  /* Clear out our list of broken connections */
+  clear_broken_connection_map(0);
+
+  SMARTLIST_FOREACH(conns, connection_t *, conn, connection_free_(conn));
+
+  if (outgoing_addrs) {
+    SMARTLIST_FOREACH(outgoing_addrs, tor_addr_t *, addr, tor_free(addr));
+    smartlist_free(outgoing_addrs);
+    outgoing_addrs = NULL;
+  }
+
+  tor_free(last_interface_ipv4);
+  tor_free(last_interface_ipv6);
+
+#ifdef USE_BUFFEREVENTS
+  if (global_rate_limit)
+    bufferevent_rate_limit_group_free(global_rate_limit);
+#endif
+}
