@@ -834,4 +834,336 @@ smartlist_heapify(smartlist_t *sl,
 
 /** Insert <b>item</b> into the heap stored in <b>sl</b>, where order is
  * determined by <b>compare</b> and the offset of the item in the heap is
- * stored in an in
+ * stored in an int-typed field at position <b>idx_field_offset</b> within
+ * item.
+ */
+void
+smartlist_pqueue_add(smartlist_t *sl,
+                     int (*compare)(const void *a, const void *b),
+                     int idx_field_offset,
+                     void *item)
+{
+  int idx;
+  smartlist_add(sl,item);
+  UPDATE_IDX(sl->num_used-1);
+
+  for (idx = sl->num_used - 1; idx; ) {
+    int parent = PARENT(idx);
+    if (compare(sl->list[idx], sl->list[parent]) < 0) {
+      void *tmp = sl->list[parent];
+      sl->list[parent] = sl->list[idx];
+      sl->list[idx] = tmp;
+      UPDATE_IDX(parent);
+      UPDATE_IDX(idx);
+      idx = parent;
+    } else {
+      return;
+    }
+  }
+}
+
+/** Remove and return the top-priority item from the heap stored in <b>sl</b>,
+ * where order is determined by <b>compare</b> and the item's position is
+ * stored at position <b>idx_field_offset</b> within the item.  <b>sl</b> must
+ * not be empty. */
+void *
+smartlist_pqueue_pop(smartlist_t *sl,
+                     int (*compare)(const void *a, const void *b),
+                     int idx_field_offset)
+{
+  void *top;
+  tor_assert(sl->num_used);
+
+  top = sl->list[0];
+  *IDXP(top)=-1;
+  if (--sl->num_used) {
+    sl->list[0] = sl->list[sl->num_used];
+    UPDATE_IDX(0);
+    smartlist_heapify(sl, compare, idx_field_offset, 0);
+  }
+  return top;
+}
+
+/** Remove the item <b>item</b> from the heap stored in <b>sl</b>,
+ * where order is determined by <b>compare</b> and the item's position is
+ * stored at position <b>idx_field_offset</b> within the item.  <b>sl</b> must
+ * not be empty. */
+void
+smartlist_pqueue_remove(smartlist_t *sl,
+                        int (*compare)(const void *a, const void *b),
+                        int idx_field_offset,
+                        void *item)
+{
+  int idx = IDX_OF_ITEM(item);
+  tor_assert(idx >= 0);
+  tor_assert(sl->list[idx] == item);
+  --sl->num_used;
+  *IDXP(item) = -1;
+  if (idx == sl->num_used) {
+    return;
+  } else {
+    sl->list[idx] = sl->list[sl->num_used];
+    UPDATE_IDX(idx);
+    smartlist_heapify(sl, compare, idx_field_offset, idx);
+  }
+}
+
+/** Assert that the heap property is correctly maintained by the heap stored
+ * in <b>sl</b>, where order is determined by <b>compare</b>. */
+void
+smartlist_pqueue_assert_ok(smartlist_t *sl,
+                           int (*compare)(const void *a, const void *b),
+                           int idx_field_offset)
+{
+  int i;
+  for (i = sl->num_used - 1; i >= 0; --i) {
+    if (i>0)
+      tor_assert(compare(sl->list[PARENT(i)], sl->list[i]) <= 0);
+    tor_assert(IDX_OF_ITEM(sl->list[i]) == i);
+  }
+}
+
+/** Helper: compare two DIGEST_LEN digests. */
+static int
+compare_digests_(const void **_a, const void **_b)
+{
+  return tor_memcmp((const char*)*_a, (const char*)*_b, DIGEST_LEN);
+}
+
+/** Sort the list of DIGEST_LEN-byte digests into ascending order. */
+void
+smartlist_sort_digests(smartlist_t *sl)
+{
+  smartlist_sort(sl, compare_digests_);
+}
+
+/** Remove duplicate digests from a sorted list, and free them with tor_free().
+ */
+void
+smartlist_uniq_digests(smartlist_t *sl)
+{
+  smartlist_uniq(sl, compare_digests_, tor_free_);
+}
+
+/** Helper: compare two DIGEST256_LEN digests. */
+static int
+compare_digests256_(const void **_a, const void **_b)
+{
+  return tor_memcmp((const char*)*_a, (const char*)*_b, DIGEST256_LEN);
+}
+
+/** Sort the list of DIGEST256_LEN-byte digests into ascending order. */
+void
+smartlist_sort_digests256(smartlist_t *sl)
+{
+  smartlist_sort(sl, compare_digests256_);
+}
+
+/** Return the most frequent member of the sorted list of DIGEST256_LEN
+ * digests in <b>sl</b> */
+char *
+smartlist_get_most_frequent_digest256(smartlist_t *sl)
+{
+  return smartlist_get_most_frequent(sl, compare_digests256_);
+}
+
+/** Remove duplicate 256-bit digests from a sorted list, and free them with
+ * tor_free().
+ */
+void
+smartlist_uniq_digests256(smartlist_t *sl)
+{
+  smartlist_uniq(sl, compare_digests256_, tor_free_);
+}
+
+/** Helper: Declare an entry type and a map type to implement a mapping using
+ * ht.h.  The map type will be called <b>maptype</b>.  The key part of each
+ * entry is declared using the C declaration <b>keydecl</b>.  All functions
+ * and types associated with the map get prefixed with <b>prefix</b> */
+#define DEFINE_MAP_STRUCTS(maptype, keydecl, prefix)      \
+  typedef struct prefix ## entry_t {                      \
+    HT_ENTRY(prefix ## entry_t) node;                     \
+    void *val;                                            \
+    keydecl;                                              \
+  } prefix ## entry_t;                                    \
+  struct maptype {                                        \
+    HT_HEAD(prefix ## impl, prefix ## entry_t) head;      \
+  }
+
+DEFINE_MAP_STRUCTS(strmap_t, char *key, strmap_);
+DEFINE_MAP_STRUCTS(digestmap_t, char key[DIGEST_LEN], digestmap_);
+
+/** Helper: compare strmap_entry_t objects by key value. */
+static INLINE int
+strmap_entries_eq(const strmap_entry_t *a, const strmap_entry_t *b)
+{
+  return !strcmp(a->key, b->key);
+}
+
+/** Helper: return a hash value for a strmap_entry_t. */
+static INLINE unsigned int
+strmap_entry_hash(const strmap_entry_t *a)
+{
+  return ht_string_hash(a->key);
+}
+
+/** Helper: compare digestmap_entry_t objects by key value. */
+static INLINE int
+digestmap_entries_eq(const digestmap_entry_t *a, const digestmap_entry_t *b)
+{
+  return tor_memeq(a->key, b->key, DIGEST_LEN);
+}
+
+/** Helper: return a hash value for a digest_map_t. */
+static INLINE unsigned int
+digestmap_entry_hash(const digestmap_entry_t *a)
+{
+#if SIZEOF_INT != 8
+  const uint32_t *p = (const uint32_t*)a->key;
+  return p[0] ^ p[1] ^ p[2] ^ p[3] ^ p[4];
+#else
+  const uint64_t *p = (const uint64_t*)a->key;
+  return p[0] ^ p[1];
+#endif
+}
+
+HT_PROTOTYPE(strmap_impl, strmap_entry_t, node, strmap_entry_hash,
+             strmap_entries_eq)
+HT_GENERATE(strmap_impl, strmap_entry_t, node, strmap_entry_hash,
+            strmap_entries_eq, 0.6, malloc, realloc, free)
+
+HT_PROTOTYPE(digestmap_impl, digestmap_entry_t, node, digestmap_entry_hash,
+             digestmap_entries_eq)
+HT_GENERATE(digestmap_impl, digestmap_entry_t, node, digestmap_entry_hash,
+            digestmap_entries_eq, 0.6, malloc, realloc, free)
+
+/** Constructor to create a new empty map from strings to void*'s.
+ */
+strmap_t *
+strmap_new(void)
+{
+  strmap_t *result;
+  result = tor_malloc(sizeof(strmap_t));
+  HT_INIT(strmap_impl, &result->head);
+  return result;
+}
+
+/** Constructor to create a new empty map from digests to void*'s.
+ */
+digestmap_t *
+digestmap_new(void)
+{
+  digestmap_t *result;
+  result = tor_malloc(sizeof(digestmap_t));
+  HT_INIT(digestmap_impl, &result->head);
+  return result;
+}
+
+/** Set the current value for <b>key</b> to <b>val</b>.  Returns the previous
+ * value for <b>key</b> if one was set, or NULL if one was not.
+ *
+ * This function makes a copy of <b>key</b> if necessary, but not of
+ * <b>val</b>.
+ */
+void *
+strmap_set(strmap_t *map, const char *key, void *val)
+{
+  strmap_entry_t *resolve;
+  strmap_entry_t search;
+  void *oldval;
+  tor_assert(map);
+  tor_assert(key);
+  tor_assert(val);
+  search.key = (char*)key;
+  resolve = HT_FIND(strmap_impl, &map->head, &search);
+  if (resolve) {
+    oldval = resolve->val;
+    resolve->val = val;
+    return oldval;
+  } else {
+    resolve = tor_malloc_zero(sizeof(strmap_entry_t));
+    resolve->key = tor_strdup(key);
+    resolve->val = val;
+    tor_assert(!HT_FIND(strmap_impl, &map->head, resolve));
+    HT_INSERT(strmap_impl, &map->head, resolve);
+    return NULL;
+  }
+}
+
+#define OPTIMIZED_DIGESTMAP_SET
+
+/** Like strmap_set() above but for digestmaps. */
+void *
+digestmap_set(digestmap_t *map, const char *key, void *val)
+{
+#ifndef OPTIMIZED_DIGESTMAP_SET
+  digestmap_entry_t *resolve;
+#endif
+  digestmap_entry_t search;
+  void *oldval;
+  tor_assert(map);
+  tor_assert(key);
+  tor_assert(val);
+  memcpy(&search.key, key, DIGEST_LEN);
+#ifndef OPTIMIZED_DIGESTMAP_SET
+  resolve = HT_FIND(digestmap_impl, &map->head, &search);
+  if (resolve) {
+    oldval = resolve->val;
+    resolve->val = val;
+    return oldval;
+  } else {
+    resolve = tor_malloc_zero(sizeof(digestmap_entry_t));
+    memcpy(resolve->key, key, DIGEST_LEN);
+    resolve->val = val;
+    HT_INSERT(digestmap_impl, &map->head, resolve);
+    return NULL;
+  }
+#else
+  /* We spend up to 5% of our time in this function, so the code below is
+   * meant to optimize the check/alloc/set cycle by avoiding the two trips to
+   * the hash table that we do in the unoptimized code above.  (Each of
+   * HT_INSERT and HT_FIND calls HT_SET_HASH and HT_FIND_P.)
+   */
+  HT_FIND_OR_INSERT_(digestmap_impl, node, digestmap_entry_hash, &(map->head),
+         digestmap_entry_t, &search, ptr,
+         {
+            /* we found an entry. */
+            oldval = (*ptr)->val;
+            (*ptr)->val = val;
+            return oldval;
+         },
+         {
+           /* We didn't find the entry. */
+           digestmap_entry_t *newent =
+             tor_malloc_zero(sizeof(digestmap_entry_t));
+           memcpy(newent->key, key, DIGEST_LEN);
+           newent->val = val;
+           HT_FOI_INSERT_(node, &(map->head), &search, newent, ptr);
+           return NULL;
+         });
+#endif
+}
+
+/** Return the current value associated with <b>key</b>, or NULL if no
+ * value is set.
+ */
+void *
+strmap_get(const strmap_t *map, const char *key)
+{
+  strmap_entry_t *resolve;
+  strmap_entry_t search;
+  tor_assert(map);
+  tor_assert(key);
+  search.key = (char*)key;
+  resolve = HT_FIND(strmap_impl, &map->head, &search);
+  if (resolve) {
+    return resolve->val;
+  } else {
+    return NULL;
+  }
+}
+
+/** Like strmap_get() above but for digestmaps. */
+void *
+digestmap_get(const digestmap_t *map, const char *key)
+{
