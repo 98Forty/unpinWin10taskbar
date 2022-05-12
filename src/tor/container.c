@@ -1167,3 +1167,365 @@ strmap_get(const strmap_t *map, const char *key)
 void *
 digestmap_get(const digestmap_t *map, const char *key)
 {
+  digestmap_entry_t *resolve;
+  digestmap_entry_t search;
+  tor_assert(map);
+  tor_assert(key);
+  memcpy(&search.key, key, DIGEST_LEN);
+  resolve = HT_FIND(digestmap_impl, &map->head, &search);
+  if (resolve) {
+    return resolve->val;
+  } else {
+    return NULL;
+  }
+}
+
+/** Remove the value currently associated with <b>key</b> from the map.
+ * Return the value if one was set, or NULL if there was no entry for
+ * <b>key</b>.
+ *
+ * Note: you must free any storage associated with the returned value.
+ */
+void *
+strmap_remove(strmap_t *map, const char *key)
+{
+  strmap_entry_t *resolve;
+  strmap_entry_t search;
+  void *oldval;
+  tor_assert(map);
+  tor_assert(key);
+  search.key = (char*)key;
+  resolve = HT_REMOVE(strmap_impl, &map->head, &search);
+  if (resolve) {
+    oldval = resolve->val;
+    tor_free(resolve->key);
+    tor_free(resolve);
+    return oldval;
+  } else {
+    return NULL;
+  }
+}
+
+/** Like strmap_remove() above but for digestmaps. */
+void *
+digestmap_remove(digestmap_t *map, const char *key)
+{
+  digestmap_entry_t *resolve;
+  digestmap_entry_t search;
+  void *oldval;
+  tor_assert(map);
+  tor_assert(key);
+  memcpy(&search.key, key, DIGEST_LEN);
+  resolve = HT_REMOVE(digestmap_impl, &map->head, &search);
+  if (resolve) {
+    oldval = resolve->val;
+    tor_free(resolve);
+    return oldval;
+  } else {
+    return NULL;
+  }
+}
+
+/** Same as strmap_set, but first converts <b>key</b> to lowercase. */
+void *
+strmap_set_lc(strmap_t *map, const char *key, void *val)
+{
+  /* We could be a little faster by using strcasecmp instead, and a separate
+   * type, but I don't think it matters. */
+  void *v;
+  char *lc_key = tor_strdup(key);
+  tor_strlower(lc_key);
+  v = strmap_set(map,lc_key,val);
+  tor_free(lc_key);
+  return v;
+}
+
+/** Same as strmap_get, but first converts <b>key</b> to lowercase. */
+void *
+strmap_get_lc(const strmap_t *map, const char *key)
+{
+  void *v;
+  char *lc_key = tor_strdup(key);
+  tor_strlower(lc_key);
+  v = strmap_get(map,lc_key);
+  tor_free(lc_key);
+  return v;
+}
+
+/** Same as strmap_remove, but first converts <b>key</b> to lowercase */
+void *
+strmap_remove_lc(strmap_t *map, const char *key)
+{
+  void *v;
+  char *lc_key = tor_strdup(key);
+  tor_strlower(lc_key);
+  v = strmap_remove(map,lc_key);
+  tor_free(lc_key);
+  return v;
+}
+
+/** return an <b>iterator</b> pointer to the front of a map.
+ *
+ * Iterator example:
+ *
+ * \code
+ * // uppercase values in "map", removing empty values.
+ *
+ * strmap_iter_t *iter;
+ * const char *key;
+ * void *val;
+ * char *cp;
+ *
+ * for (iter = strmap_iter_init(map); !strmap_iter_done(iter); ) {
+ *    strmap_iter_get(iter, &key, &val);
+ *    cp = (char*)val;
+ *    if (!*cp) {
+ *       iter = strmap_iter_next_rmv(map,iter);
+ *       free(val);
+ *    } else {
+ *       for (;*cp;cp++) *cp = TOR_TOUPPER(*cp);
+ *       iter = strmap_iter_next(map,iter);
+ *    }
+ * }
+ * \endcode
+ *
+ */
+strmap_iter_t *
+strmap_iter_init(strmap_t *map)
+{
+  tor_assert(map);
+  return HT_START(strmap_impl, &map->head);
+}
+
+/** Start iterating through <b>map</b>.  See strmap_iter_init() for example. */
+digestmap_iter_t *
+digestmap_iter_init(digestmap_t *map)
+{
+  tor_assert(map);
+  return HT_START(digestmap_impl, &map->head);
+}
+
+/** Advance the iterator <b>iter</b> for <b>map</b> a single step to the next
+ * entry, and return its new value. */
+strmap_iter_t *
+strmap_iter_next(strmap_t *map, strmap_iter_t *iter)
+{
+  tor_assert(map);
+  tor_assert(iter);
+  return HT_NEXT(strmap_impl, &map->head, iter);
+}
+
+/** Advance the iterator <b>iter</b> for map a single step to the next entry,
+ * and return its new value. */
+digestmap_iter_t *
+digestmap_iter_next(digestmap_t *map, digestmap_iter_t *iter)
+{
+  tor_assert(map);
+  tor_assert(iter);
+  return HT_NEXT(digestmap_impl, &map->head, iter);
+}
+
+/** Advance the iterator <b>iter</b> a single step to the next entry, removing
+ * the current entry, and return its new value.
+ */
+strmap_iter_t *
+strmap_iter_next_rmv(strmap_t *map, strmap_iter_t *iter)
+{
+  strmap_entry_t *rmv;
+  tor_assert(map);
+  tor_assert(iter);
+  tor_assert(*iter);
+  rmv = *iter;
+  iter = HT_NEXT_RMV(strmap_impl, &map->head, iter);
+  tor_free(rmv->key);
+  tor_free(rmv);
+  return iter;
+}
+
+/** Advance the iterator <b>iter</b> a single step to the next entry, removing
+ * the current entry, and return its new value.
+ */
+digestmap_iter_t *
+digestmap_iter_next_rmv(digestmap_t *map, digestmap_iter_t *iter)
+{
+  digestmap_entry_t *rmv;
+  tor_assert(map);
+  tor_assert(iter);
+  tor_assert(*iter);
+  rmv = *iter;
+  iter = HT_NEXT_RMV(digestmap_impl, &map->head, iter);
+  tor_free(rmv);
+  return iter;
+}
+
+/** Set *<b>keyp</b> and *<b>valp</b> to the current entry pointed to by
+ * iter. */
+void
+strmap_iter_get(strmap_iter_t *iter, const char **keyp, void **valp)
+{
+  tor_assert(iter);
+  tor_assert(*iter);
+  tor_assert(keyp);
+  tor_assert(valp);
+  *keyp = (*iter)->key;
+  *valp = (*iter)->val;
+}
+
+/** Set *<b>keyp</b> and *<b>valp</b> to the current entry pointed to by
+ * iter. */
+void
+digestmap_iter_get(digestmap_iter_t *iter, const char **keyp, void **valp)
+{
+  tor_assert(iter);
+  tor_assert(*iter);
+  tor_assert(keyp);
+  tor_assert(valp);
+  *keyp = (*iter)->key;
+  *valp = (*iter)->val;
+}
+
+/** Return true iff <b>iter</b> has advanced past the last entry of
+ * <b>map</b>. */
+int
+strmap_iter_done(strmap_iter_t *iter)
+{
+  return iter == NULL;
+}
+
+/** Return true iff <b>iter</b> has advanced past the last entry of
+ * <b>map</b>. */
+int
+digestmap_iter_done(digestmap_iter_t *iter)
+{
+  return iter == NULL;
+}
+
+/** Remove all entries from <b>map</b>, and deallocate storage for those
+ * entries.  If free_val is provided, it is invoked on every value in
+ * <b>map</b>.
+ */
+void
+strmap_free(strmap_t *map, void (*free_val)(void*))
+{
+  strmap_entry_t **ent, **next, *this;
+  if (!map)
+    return;
+
+  for (ent = HT_START(strmap_impl, &map->head); ent != NULL; ent = next) {
+    this = *ent;
+    next = HT_NEXT_RMV(strmap_impl, &map->head, ent);
+    tor_free(this->key);
+    if (free_val)
+      free_val(this->val);
+    tor_free(this);
+  }
+  tor_assert(HT_EMPTY(&map->head));
+  HT_CLEAR(strmap_impl, &map->head);
+  tor_free(map);
+}
+
+/** Remove all entries from <b>map</b>, and deallocate storage for those
+ * entries.  If free_val is provided, it is invoked on every value in
+ * <b>map</b>.
+ */
+void
+digestmap_free(digestmap_t *map, void (*free_val)(void*))
+{
+  digestmap_entry_t **ent, **next, *this;
+  if (!map)
+    return;
+  for (ent = HT_START(digestmap_impl, &map->head); ent != NULL; ent = next) {
+    this = *ent;
+    next = HT_NEXT_RMV(digestmap_impl, &map->head, ent);
+    if (free_val)
+      free_val(this->val);
+    tor_free(this);
+  }
+  tor_assert(HT_EMPTY(&map->head));
+  HT_CLEAR(digestmap_impl, &map->head);
+  tor_free(map);
+}
+
+/** Fail with an assertion error if anything has gone wrong with the internal
+ * representation of <b>map</b>. */
+void
+strmap_assert_ok(const strmap_t *map)
+{
+  tor_assert(!strmap_impl_HT_REP_IS_BAD_(&map->head));
+}
+/** Fail with an assertion error if anything has gone wrong with the internal
+ * representation of <b>map</b>. */
+void
+digestmap_assert_ok(const digestmap_t *map)
+{
+  tor_assert(!digestmap_impl_HT_REP_IS_BAD_(&map->head));
+}
+
+/** Return true iff <b>map</b> has no entries. */
+int
+strmap_isempty(const strmap_t *map)
+{
+  return HT_EMPTY(&map->head);
+}
+
+/** Return true iff <b>map</b> has no entries. */
+int
+digestmap_isempty(const digestmap_t *map)
+{
+  return HT_EMPTY(&map->head);
+}
+
+/** Return the number of items in <b>map</b>. */
+int
+strmap_size(const strmap_t *map)
+{
+  return HT_SIZE(&map->head);
+}
+
+/** Return the number of items in <b>map</b>. */
+int
+digestmap_size(const digestmap_t *map)
+{
+  return HT_SIZE(&map->head);
+}
+
+/** Declare a function called <b>funcname</b> that acts as a find_nth_FOO
+ * function for an array of type <b>elt_t</b>*.
+ *
+ * NOTE: The implementation kind of sucks: It's O(n log n), whereas finding
+ * the kth element of an n-element list can be done in O(n).  Then again, this
+ * implementation is not in critical path, and it is obviously correct. */
+#define IMPLEMENT_ORDER_FUNC(funcname, elt_t)                   \
+  static int                                                    \
+  _cmp_ ## elt_t(const void *_a, const void *_b)                \
+  {                                                             \
+    const elt_t *a = _a, *b = _b;                               \
+    if (*a<*b)                                                  \
+      return -1;                                                \
+    else if (*a>*b)                                             \
+      return 1;                                                 \
+    else                                                        \
+      return 0;                                                 \
+  }                                                             \
+  elt_t                                                         \
+  funcname(elt_t *array, int n_elements, int nth)               \
+  {                                                             \
+    tor_assert(nth >= 0);                                       \
+    tor_assert(nth < n_elements);                               \
+    qsort(array, n_elements, sizeof(elt_t), _cmp_ ##elt_t);     \
+    return array[nth];                                          \
+  }
+
+IMPLEMENT_ORDER_FUNC(find_nth_int, int)
+IMPLEMENT_ORDER_FUNC(find_nth_time, time_t)
+IMPLEMENT_ORDER_FUNC(find_nth_double, double)
+IMPLEMENT_ORDER_FUNC(find_nth_uint32, uint32_t)
+IMPLEMENT_ORDER_FUNC(find_nth_int32, int32_t)
+IMPLEMENT_ORDER_FUNC(find_nth_long, long)
+
+/** Return a newly allocated digestset_t, optimized to hold a total of
+ * <b>max_elements</b> digests with a reasonably low false positive weight. */
+digestset_t *
+digestset_new(int max_elements)
+{
+  /* The probability of false positives is about P=(1 - exp(-kn/m))^k, where k
