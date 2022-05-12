@@ -513,4 +513,325 @@ smartlist_sort(smartlist_t *sl, int (*compare)(const void **a, const void **b))
  */
 void *
 smartlist_get_most_frequent(const smartlist_t *sl,
-                            int (*compare)(const void **a, const voi
+                            int (*compare)(const void **a, const void **b))
+{
+  const void *most_frequent = NULL;
+  int most_frequent_count = 0;
+
+  const void *cur = NULL;
+  int i, count=0;
+
+  if (!sl->num_used)
+    return NULL;
+  for (i = 0; i < sl->num_used; ++i) {
+    const void *item = sl->list[i];
+    if (cur && 0 == compare(&cur, &item)) {
+      ++count;
+    } else {
+      if (cur && count >= most_frequent_count) {
+        most_frequent = cur;
+        most_frequent_count = count;
+      }
+      cur = item;
+      count = 1;
+    }
+  }
+  if (cur && count >= most_frequent_count) {
+    most_frequent = cur;
+    most_frequent_count = count;
+  }
+  return (void*)most_frequent;
+}
+
+/** Given a sorted smartlist <b>sl</b> and the comparison function used to
+ * sort it, remove all duplicate members.  If free_fn is provided, calls
+ * free_fn on each duplicate.  Otherwise, just removes them.  Preserves order.
+ */
+void
+smartlist_uniq(smartlist_t *sl,
+               int (*compare)(const void **a, const void **b),
+               void (*free_fn)(void *a))
+{
+  int i;
+  for (i=1; i < sl->num_used; ++i) {
+    if (compare((const void **)&(sl->list[i-1]),
+                (const void **)&(sl->list[i])) == 0) {
+      if (free_fn)
+        free_fn(sl->list[i]);
+      smartlist_del_keeporder(sl, i--);
+    }
+  }
+}
+
+/** Assuming the members of <b>sl</b> are in order, return a pointer to the
+ * member that matches <b>key</b>.  Ordering and matching are defined by a
+ * <b>compare</b> function that returns 0 on a match; less than 0 if key is
+ * less than member, and greater than 0 if key is greater then member.
+ */
+void *
+smartlist_bsearch(smartlist_t *sl, const void *key,
+                  int (*compare)(const void *key, const void **member))
+{
+  int found, idx;
+  idx = smartlist_bsearch_idx(sl, key, compare, &found);
+  return found ? smartlist_get(sl, idx) : NULL;
+}
+
+/** Assuming the members of <b>sl</b> are in order, return the index of the
+ * member that matches <b>key</b>.  If no member matches, return the index of
+ * the first member greater than <b>key</b>, or smartlist_len(sl) if no member
+ * is greater than <b>key</b>.  Set <b>found_out</b> to true on a match, to
+ * false otherwise.  Ordering and matching are defined by a <b>compare</b>
+ * function that returns 0 on a match; less than 0 if key is less than member,
+ * and greater than 0 if key is greater then member.
+ */
+int
+smartlist_bsearch_idx(const smartlist_t *sl, const void *key,
+                      int (*compare)(const void *key, const void **member),
+                      int *found_out)
+{
+  int hi, lo, cmp, mid, len, diff;
+
+  tor_assert(sl);
+  tor_assert(compare);
+  tor_assert(found_out);
+
+  len = smartlist_len(sl);
+
+  /* Check for the trivial case of a zero-length list */
+  if (len == 0) {
+    *found_out = 0;
+    /* We already know smartlist_len(sl) is 0 in this case */
+    return 0;
+  }
+
+  /* Okay, we have a real search to do */
+  tor_assert(len > 0);
+  lo = 0;
+  hi = len - 1;
+
+  /*
+   * These invariants are always true:
+   *
+   * For all i such that 0 <= i < lo, sl[i] < key
+   * For all i such that hi < i <= len, sl[i] > key
+   */
+
+  while (lo <= hi) {
+    diff = hi - lo;
+    /*
+     * We want mid = (lo + hi) / 2, but that could lead to overflow, so
+     * instead diff = hi - lo (non-negative because of loop condition), and
+     * then hi = lo + diff, mid = (lo + lo + diff) / 2 = lo + (diff / 2).
+     */
+    mid = lo + (diff / 2);
+    cmp = compare(key, (const void**) &(sl->list[mid]));
+    if (cmp == 0) {
+      /* sl[mid] == key; we found it */
+      *found_out = 1;
+      return mid;
+    } else if (cmp > 0) {
+      /*
+       * key > sl[mid] and an index i such that sl[i] == key must
+       * have i > mid if it exists.
+       */
+
+      /*
+       * Since lo <= mid <= hi, hi can only decrease on each iteration (by
+       * being set to mid - 1) and hi is initially len - 1, mid < len should
+       * always hold, and this is not symmetric with the left end of list
+       * mid > 0 test below.  A key greater than the right end of the list
+       * should eventually lead to lo == hi == mid == len - 1, and then
+       * we set lo to len below and fall out to the same exit we hit for
+       * a key in the middle of the list but not matching.  Thus, we just
+       * assert for consistency here rather than handle a mid == len case.
+       */
+      tor_assert(mid < len);
+      /* Move lo to the element immediately after sl[mid] */
+      lo = mid + 1;
+    } else {
+      /* This should always be true in this case */
+      tor_assert(cmp < 0);
+
+      /*
+       * key < sl[mid] and an index i such that sl[i] == key must
+       * have i < mid if it exists.
+       */
+
+      if (mid > 0) {
+        /* Normal case, move hi to the element immediately before sl[mid] */
+        hi = mid - 1;
+      } else {
+        /* These should always be true in this case */
+        tor_assert(mid == lo);
+        tor_assert(mid == 0);
+        /*
+         * We were at the beginning of the list and concluded that every
+         * element e compares e > key.
+         */
+        *found_out = 0;
+        return 0;
+      }
+    }
+  }
+
+  /*
+   * lo > hi; we have no element matching key but we have elements falling
+   * on both sides of it.  The lo index points to the first element > key.
+   */
+  tor_assert(lo == hi + 1); /* All other cases should have been handled */
+  tor_assert(lo >= 0);
+  tor_assert(lo <= len);
+  tor_assert(hi >= 0);
+  tor_assert(hi <= len);
+
+  if (lo < len) {
+    cmp = compare(key, (const void **) &(sl->list[lo]));
+    tor_assert(cmp < 0);
+  } else {
+    cmp = compare(key, (const void **) &(sl->list[len-1]));
+    tor_assert(cmp > 0);
+  }
+
+  *found_out = 0;
+  return lo;
+}
+
+/** Helper: compare two const char **s. */
+static int
+compare_string_ptrs_(const void **_a, const void **_b)
+{
+  return strcmp((const char*)*_a, (const char*)*_b);
+}
+
+/** Sort a smartlist <b>sl</b> containing strings into lexically ascending
+ * order. */
+void
+smartlist_sort_strings(smartlist_t *sl)
+{
+  smartlist_sort(sl, compare_string_ptrs_);
+}
+
+/** Return the most frequent string in the sorted list <b>sl</b> */
+char *
+smartlist_get_most_frequent_string(smartlist_t *sl)
+{
+  return smartlist_get_most_frequent(sl, compare_string_ptrs_);
+}
+
+/** Remove duplicate strings from a sorted list, and free them with tor_free().
+ */
+void
+smartlist_uniq_strings(smartlist_t *sl)
+{
+  smartlist_uniq(sl, compare_string_ptrs_, tor_free_);
+}
+
+/* Heap-based priority queue implementation for O(lg N) insert and remove.
+ * Recall that the heap property is that, for every index I, h[I] <
+ * H[LEFT_CHILD[I]] and h[I] < H[RIGHT_CHILD[I]].
+ *
+ * For us to remove items other than the topmost item, each item must store
+ * its own index within the heap.  When calling the pqueue functions, tell
+ * them about the offset of the field that stores the index within the item.
+ *
+ * Example:
+ *
+ *   typedef struct timer_t {
+ *     struct timeval tv;
+ *     int heap_index;
+ *   } timer_t;
+ *
+ *   static int compare(const void *p1, const void *p2) {
+ *     const timer_t *t1 = p1, *t2 = p2;
+ *     if (t1->tv.tv_sec < t2->tv.tv_sec) {
+ *        return -1;
+ *     } else if (t1->tv.tv_sec > t2->tv.tv_sec) {
+ *        return 1;
+ *     } else {
+ *        return t1->tv.tv_usec - t2->tv_usec;
+ *     }
+ *   }
+ *
+ *   void timer_heap_insert(smartlist_t *heap, timer_t *timer) {
+ *      smartlist_pqueue_add(heap, compare, STRUCT_OFFSET(timer_t, heap_index),
+ *         timer);
+ *   }
+ *
+ *   void timer_heap_pop(smartlist_t *heap) {
+ *      return smartlist_pqueue_pop(heap, compare,
+ *         STRUCT_OFFSET(timer_t, heap_index));
+ *   }
+ */
+
+/** @{ */
+/** Functions to manipulate heap indices to find a node's parent and children.
+ *
+ * For a 1-indexed array, we would use LEFT_CHILD[x] = 2*x and RIGHT_CHILD[x]
+ *   = 2*x + 1.  But this is C, so we have to adjust a little. */
+//#define LEFT_CHILD(i)  ( ((i)+1)*2 - 1)
+//#define RIGHT_CHILD(i) ( ((i)+1)*2 )
+//#define PARENT(i)      ( ((i)+1)/2 - 1)
+#define LEFT_CHILD(i)  ( 2*(i) + 1 )
+#define RIGHT_CHILD(i) ( 2*(i) + 2 )
+#define PARENT(i)      ( ((i)-1) / 2 )
+/** }@ */
+
+/** @{ */
+/** Helper macros for heaps: Given a local variable <b>idx_field_offset</b>
+ * set to the offset of an integer index within the heap element structure,
+ * IDX_OF_ITEM(p) gives you the index of p, and IDXP(p) gives you a pointer to
+ * where p's index is stored.  Given additionally a local smartlist <b>sl</b>,
+ * UPDATE_IDX(i) sets the index of the element at <b>i</b> to the correct
+ * value (that is, to <b>i</b>).
+ */
+#define IDXP(p) ((int*)STRUCT_VAR_P(p, idx_field_offset))
+
+#define UPDATE_IDX(i)  do {                            \
+    void *updated = sl->list[i];                       \
+    *IDXP(updated) = i;                                \
+  } while (0)
+
+#define IDX_OF_ITEM(p) (*IDXP(p))
+/** @} */
+
+/** Helper. <b>sl</b> may have at most one violation of the heap property:
+ * the item at <b>idx</b> may be greater than one or both of its children.
+ * Restore the heap property. */
+static INLINE void
+smartlist_heapify(smartlist_t *sl,
+                  int (*compare)(const void *a, const void *b),
+                  int idx_field_offset,
+                  int idx)
+{
+  while (1) {
+    int left_idx = LEFT_CHILD(idx);
+    int best_idx;
+
+    if (left_idx >= sl->num_used)
+      return;
+    if (compare(sl->list[idx],sl->list[left_idx]) < 0)
+      best_idx = idx;
+    else
+      best_idx = left_idx;
+    if (left_idx+1 < sl->num_used &&
+        compare(sl->list[left_idx+1],sl->list[best_idx]) < 0)
+      best_idx = left_idx + 1;
+
+    if (best_idx == idx) {
+      return;
+    } else {
+      void *tmp = sl->list[idx];
+      sl->list[idx] = sl->list[best_idx];
+      sl->list[best_idx] = tmp;
+      UPDATE_IDX(idx);
+      UPDATE_IDX(best_idx);
+
+      idx = best_idx;
+    }
+  }
+}
+
+/** Insert <b>item</b> into the heap stored in <b>sl</b>, where order is
+ * determined by <b>compare</b> and the offset of the item in the heap is
+ * stored in an in
