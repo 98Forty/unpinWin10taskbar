@@ -365,4 +365,318 @@ static void fsquare_inner(limb *output, const limb *in) {
   output[10] = 2 * (((limb) ((s32) in[5])) * ((s32) in[5]) +
                     ((limb) ((s32) in[4])) * ((s32) in[6]) +
                     ((limb) ((s32) in[2])) * ((s32) in[8]) +
-               2 * (((limb) ((s32) in[3])) 
+               2 * (((limb) ((s32) in[3])) * ((s32) in[7]) +
+                    ((limb) ((s32) in[1])) * ((s32) in[9])));
+  output[11] = 2 * (((limb) ((s32) in[5])) * ((s32) in[6]) +
+                    ((limb) ((s32) in[4])) * ((s32) in[7]) +
+                    ((limb) ((s32) in[3])) * ((s32) in[8]) +
+                    ((limb) ((s32) in[2])) * ((s32) in[9]));
+  output[12] =      ((limb) ((s32) in[6])) * ((s32) in[6]) +
+               2 * (((limb) ((s32) in[4])) * ((s32) in[8]) +
+               2 * (((limb) ((s32) in[5])) * ((s32) in[7]) +
+                    ((limb) ((s32) in[3])) * ((s32) in[9])));
+  output[13] = 2 * (((limb) ((s32) in[6])) * ((s32) in[7]) +
+                    ((limb) ((s32) in[5])) * ((s32) in[8]) +
+                    ((limb) ((s32) in[4])) * ((s32) in[9]));
+  output[14] = 2 * (((limb) ((s32) in[7])) * ((s32) in[7]) +
+                    ((limb) ((s32) in[6])) * ((s32) in[8]) +
+               2 *  ((limb) ((s32) in[5])) * ((s32) in[9]));
+  output[15] = 2 * (((limb) ((s32) in[7])) * ((s32) in[8]) +
+                    ((limb) ((s32) in[6])) * ((s32) in[9]));
+  output[16] =      ((limb) ((s32) in[8])) * ((s32) in[8]) +
+               4 *  ((limb) ((s32) in[7])) * ((s32) in[9]);
+  output[17] = 2 *  ((limb) ((s32) in[8])) * ((s32) in[9]);
+  output[18] = 2 *  ((limb) ((s32) in[9])) * ((s32) in[9]);
+}
+
+static void
+fsquare(limb *output, const limb *in) {
+  limb t[19];
+  fsquare_inner(t, in);
+  freduce_degree(t);
+  freduce_coefficients(t);
+  memcpy(output, t, sizeof(limb) * 10);
+}
+
+/* Take a little-endian, 32-byte number and expand it into polynomial form */
+static void
+fexpand(limb *output, const u8 *input) {
+#define F(n,start,shift,mask) \
+  output[n] = ((((limb) input[start + 0]) | \
+                ((limb) input[start + 1]) << 8 | \
+                ((limb) input[start + 2]) << 16 | \
+                ((limb) input[start + 3]) << 24) >> shift) & mask;
+  F(0, 0, 0, 0x3ffffff);
+  F(1, 3, 2, 0x1ffffff);
+  F(2, 6, 3, 0x3ffffff);
+  F(3, 9, 5, 0x1ffffff);
+  F(4, 12, 6, 0x3ffffff);
+  F(5, 16, 0, 0x1ffffff);
+  F(6, 19, 1, 0x3ffffff);
+  F(7, 22, 3, 0x1ffffff);
+  F(8, 25, 4, 0x3ffffff);
+  F(9, 28, 6, 0x1ffffff);
+#undef F
+}
+
+#if (-32 >> 1) != -16
+#error "This code only works when >> does sign-extension on negative numbers"
+#endif
+
+/* Take a fully reduced polynomial form number and contract it into a
+ * little-endian, 32-byte array
+ */
+static void
+fcontract(u8 *output, limb *input) {
+  int i;
+  int j;
+
+  for (j = 0; j < 2; ++j) {
+    for (i = 0; i < 9; ++i) {
+      if ((i & 1) == 1) {
+        /* This calculation is a time-invariant way to make input[i] positive
+           by borrowing from the next-larger limb.
+        */
+        const s32 mask = (s32)(input[i]) >> 31;
+        const s32 carry = -(((s32)(input[i]) & mask) >> 25);
+        input[i] = (s32)(input[i]) + (carry << 25);
+        input[i+1] = (s32)(input[i+1]) - carry;
+      } else {
+        const s32 mask = (s32)(input[i]) >> 31;
+        const s32 carry = -(((s32)(input[i]) & mask) >> 26);
+        input[i] = (s32)(input[i]) + (carry << 26);
+        input[i+1] = (s32)(input[i+1]) - carry;
+      }
+    }
+    {
+      const s32 mask = (s32)(input[9]) >> 31;
+      const s32 carry = -(((s32)(input[9]) & mask) >> 25);
+      input[9] = (s32)(input[9]) + (carry << 25);
+      input[0] = (s32)(input[0]) - (carry * 19);
+    }
+  }
+
+  /* The first borrow-propagation pass above ended with every limb
+     except (possibly) input[0] non-negative.
+
+     Since each input limb except input[0] is decreased by at most 1
+     by a borrow-propagation pass, the second borrow-propagation pass
+     could only have wrapped around to decrease input[0] again if the
+     first pass left input[0] negative *and* input[1] through input[9]
+     were all zero.  In that case, input[1] is now 2^25 - 1, and this
+     last borrow-propagation step will leave input[1] non-negative.
+  */
+  {
+    const s32 mask = (s32)(input[0]) >> 31;
+    const s32 carry = -(((s32)(input[0]) & mask) >> 26);
+    input[0] = (s32)(input[0]) + (carry << 26);
+    input[1] = (s32)(input[1]) - carry;
+  }
+
+  /* Both passes through the above loop, plus the last 0-to-1 step, are
+     necessary: if input[9] is -1 and input[0] through input[8] are 0,
+     negative values will remain in the array until the end.
+   */
+
+  input[1] <<= 2;
+  input[2] <<= 3;
+  input[3] <<= 5;
+  input[4] <<= 6;
+  input[6] <<= 1;
+  input[7] <<= 3;
+  input[8] <<= 4;
+  input[9] <<= 6;
+#define F(i, s) \
+  output[s+0] |=  input[i] & 0xff; \
+  output[s+1]  = (input[i] >> 8) & 0xff; \
+  output[s+2]  = (input[i] >> 16) & 0xff; \
+  output[s+3]  = (input[i] >> 24) & 0xff;
+  output[0] = 0;
+  output[16] = 0;
+  F(0,0);
+  F(1,3);
+  F(2,6);
+  F(3,9);
+  F(4,12);
+  F(5,16);
+  F(6,19);
+  F(7,22);
+  F(8,25);
+  F(9,28);
+#undef F
+}
+
+/* Input: Q, Q', Q-Q'
+ * Output: 2Q, Q+Q'
+ *
+ *   x2 z3: long form
+ *   x3 z3: long form
+ *   x z: short form, destroyed
+ *   xprime zprime: short form, destroyed
+ *   qmqp: short form, preserved
+ */
+static void fmonty(limb *x2, limb *z2,  /* output 2Q */
+                   limb *x3, limb *z3,  /* output Q + Q' */
+                   limb *x, limb *z,    /* input Q */
+                   limb *xprime, limb *zprime,  /* input Q' */
+                   const limb *qmqp /* input Q - Q' */) {
+  limb origx[10], origxprime[10], zzz[19], xx[19], zz[19], xxprime[19],
+        zzprime[19], zzzprime[19], xxxprime[19];
+
+  memcpy(origx, x, 10 * sizeof(limb));
+  fsum(x, z);
+  fdifference(z, origx);  // does x - z
+
+  memcpy(origxprime, xprime, sizeof(limb) * 10);
+  fsum(xprime, zprime);
+  fdifference(zprime, origxprime);
+  fproduct(xxprime, xprime, z);
+  fproduct(zzprime, x, zprime);
+  freduce_degree(xxprime);
+  freduce_coefficients(xxprime);
+  freduce_degree(zzprime);
+  freduce_coefficients(zzprime);
+  memcpy(origxprime, xxprime, sizeof(limb) * 10);
+  fsum(xxprime, zzprime);
+  fdifference(zzprime, origxprime);
+  fsquare(xxxprime, xxprime);
+  fsquare(zzzprime, zzprime);
+  fproduct(zzprime, zzzprime, qmqp);
+  freduce_degree(zzprime);
+  freduce_coefficients(zzprime);
+  memcpy(x3, xxxprime, sizeof(limb) * 10);
+  memcpy(z3, zzprime, sizeof(limb) * 10);
+
+  fsquare(xx, x);
+  fsquare(zz, z);
+  fproduct(x2, xx, zz);
+  freduce_degree(x2);
+  freduce_coefficients(x2);
+  fdifference(zz, xx);  // does zz = xx - zz
+  memset(zzz + 10, 0, sizeof(limb) * 9);
+  fscalar_product(zzz, zz, 121665);
+  /* No need to call freduce_degree here:
+     fscalar_product doesn't increase the degree of its input. */
+  freduce_coefficients(zzz);
+  fsum(zzz, xx);
+  fproduct(z2, zz, zzz);
+  freduce_degree(z2);
+  freduce_coefficients(z2);
+}
+
+/* Conditionally swap two reduced-form limb arrays if 'iswap' is 1, but leave
+ * them unchanged if 'iswap' is 0.  Runs in data-invariant time to avoid
+ * side-channel attacks.
+ *
+ * NOTE that this function requires that 'iswap' be 1 or 0; other values give
+ * wrong results.  Also, the two limb arrays must be in reduced-coefficient,
+ * reduced-degree form: the values in a[10..19] or b[10..19] aren't swapped,
+ * and all all values in a[0..9],b[0..9] must have magnitude less than
+ * INT32_MAX.
+ */
+static void
+swap_conditional(limb a[19], limb b[19], limb iswap) {
+  unsigned i;
+  const s32 swap = (s32) -iswap;
+
+  for (i = 0; i < 10; ++i) {
+    const s32 x = swap & ( ((s32)a[i]) ^ ((s32)b[i]) );
+    a[i] = ((s32)a[i]) ^ x;
+    b[i] = ((s32)b[i]) ^ x;
+  }
+}
+
+/* Calculates nQ where Q is the x-coordinate of a point on the curve
+ *
+ *   resultx/resultz: the x coordinate of the resulting curve point (short form)
+ *   n: a little endian, 32-byte number
+ *   q: a point of the curve (short form)
+ */
+static void
+cmult(limb *resultx, limb *resultz, const u8 *n, const limb *q) {
+  limb a[19] = {0}, b[19] = {1}, c[19] = {1}, d[19] = {0};
+  limb *nqpqx = a, *nqpqz = b, *nqx = c, *nqz = d, *t;
+  limb e[19] = {0}, f[19] = {1}, g[19] = {0}, h[19] = {1};
+  limb *nqpqx2 = e, *nqpqz2 = f, *nqx2 = g, *nqz2 = h;
+
+  unsigned i, j;
+
+  memcpy(nqpqx, q, sizeof(limb) * 10);
+
+  for (i = 0; i < 32; ++i) {
+    u8 byte = n[31 - i];
+    for (j = 0; j < 8; ++j) {
+      const limb bit = byte >> 7;
+
+      swap_conditional(nqx, nqpqx, bit);
+      swap_conditional(nqz, nqpqz, bit);
+      fmonty(nqx2, nqz2,
+             nqpqx2, nqpqz2,
+             nqx, nqz,
+             nqpqx, nqpqz,
+             q);
+      swap_conditional(nqx2, nqpqx2, bit);
+      swap_conditional(nqz2, nqpqz2, bit);
+
+      t = nqx;
+      nqx = nqx2;
+      nqx2 = t;
+      t = nqz;
+      nqz = nqz2;
+      nqz2 = t;
+      t = nqpqx;
+      nqpqx = nqpqx2;
+      nqpqx2 = t;
+      t = nqpqz;
+      nqpqz = nqpqz2;
+      nqpqz2 = t;
+
+      byte <<= 1;
+    }
+  }
+
+  memcpy(resultx, nqx, sizeof(limb) * 10);
+  memcpy(resultz, nqz, sizeof(limb) * 10);
+}
+
+// -----------------------------------------------------------------------------
+// Shamelessly copied from djb's code
+// -----------------------------------------------------------------------------
+static void
+crecip(limb *out, const limb *z) {
+  limb z2[10];
+  limb z9[10];
+  limb z11[10];
+  limb z2_5_0[10];
+  limb z2_10_0[10];
+  limb z2_20_0[10];
+  limb z2_50_0[10];
+  limb z2_100_0[10];
+  limb t0[10];
+  limb t1[10];
+  int i;
+
+  /* 2 */ fsquare(z2,z);
+  /* 4 */ fsquare(t1,z2);
+  /* 8 */ fsquare(t0,t1);
+  /* 9 */ fmul(z9,t0,z);
+  /* 11 */ fmul(z11,z9,z2);
+  /* 22 */ fsquare(t0,z11);
+  /* 2^5 - 2^0 = 31 */ fmul(z2_5_0,t0,z9);
+
+  /* 2^6 - 2^1 */ fsquare(t0,z2_5_0);
+  /* 2^7 - 2^2 */ fsquare(t1,t0);
+  /* 2^8 - 2^3 */ fsquare(t0,t1);
+  /* 2^9 - 2^4 */ fsquare(t1,t0);
+  /* 2^10 - 2^5 */ fsquare(t0,t1);
+  /* 2^10 - 2^0 */ fmul(z2_10_0,t0,z2_5_0);
+
+  /* 2^11 - 2^1 */ fsquare(t0,z2_10_0);
+  /* 2^12 - 2^2 */ fsquare(t1,t0);
+  /* 2^20 - 2^10 */ for (i = 2;i < 10;i += 2) { fsquare(t0,t1); fsquare(t1,t0); }
+  /* 2^20 - 2^0 */ fmul(z2_20_0,t1,z2_10_0);
+
+  /* 2^21 - 2^1 */ fsquare(t0,z2_20_0);
+  /* 2^22 - 2^2 */ fsquare(t1,t0);
+  /* 2^40 - 2^20 */ for (i = 2;i < 20;i += 2) { fsquare(t0,t1); fsquare(t1,t0); }
+  /* 2^40 - 2^0 */ fmul(t0,t1,z2_20_0
