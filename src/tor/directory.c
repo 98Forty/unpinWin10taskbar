@@ -198,4 +198,265 @@ dir_conn_purpose_to_string(int purpose)
       return "hidden-service v2 descriptor fetch";
     case DIR_PURPOSE_UPLOAD_RENDDESC_V2:
       return "hidden-service v2 descriptor upload";
-    case DIR_PURPOSE_FETCH_MICRODES
+    case DIR_PURPOSE_FETCH_MICRODESC:
+      return "microdescriptor fetch";
+    }
+
+  log_warn(LD_BUG, "Called with unknown purpose %d", purpose);
+  return "(unknown)";
+}
+
+/** Return true iff <b>identity_digest</b> is the digest of a router we
+ * believe to support extrainfo downloads.  (If <b>is_authority</b> we do
+ * additional checking that's only valid for authorities.) */
+int
+router_supports_extrainfo(const char *identity_digest, int is_authority)
+{
+  const node_t *node = node_get_by_id(identity_digest);
+
+  if (node && node->ri) {
+    if (node->ri->caches_extra_info)
+      return 1;
+  }
+  if (is_authority) {
+    return 1;
+  }
+  return 0;
+}
+
+/** Return true iff any trusted directory authority has accepted our
+ * server descriptor.
+ *
+ * We consider any authority sufficient because waiting for all of
+ * them means it never happens while any authority is down; we don't
+ * go for something more complex in the middle (like \>1/3 or \>1/2 or
+ * \>=1/2) because that doesn't seem necessary yet.
+ */
+int
+directories_have_accepted_server_descriptor(void)
+{
+  const smartlist_t *servers = router_get_trusted_dir_servers();
+  const or_options_t *options = get_options();
+  SMARTLIST_FOREACH(servers, dir_server_t *, d, {
+    if ((d->type & options->PublishServerDescriptor_) &&
+        d->has_accepted_serverdesc) {
+      return 1;
+    }
+  });
+  return 0;
+}
+
+/** Start a connection to every suitable directory authority, using
+ * connection purpose <b>dir_purpose</b> and uploading <b>payload</b>
+ * (of length <b>payload_len</b>). The dir_purpose should be one of
+ * 'DIR_PURPOSE_UPLOAD_DIR' or 'DIR_PURPOSE_UPLOAD_RENDDESC'.
+ *
+ * <b>router_purpose</b> describes the type of descriptor we're
+ * publishing, if we're publishing a descriptor -- e.g. general or bridge.
+ *
+ * <b>type</b> specifies what sort of dir authorities (V1, V3,
+ * HIDSERV, BRIDGE, etc) we should upload to.
+ *
+ * If <b>extrainfo_len</b> is nonzero, the first <b>payload_len</b> bytes of
+ * <b>payload</b> hold a router descriptor, and the next <b>extrainfo_len</b>
+ * bytes of <b>payload</b> hold an extra-info document.  Upload the descriptor
+ * to all authorities, and the extra-info document to all authorities that
+ * support it.
+ */
+void
+directory_post_to_dirservers(uint8_t dir_purpose, uint8_t router_purpose,
+                             dirinfo_type_t type,
+                             const char *payload,
+                             size_t payload_len, size_t extrainfo_len)
+{
+  const or_options_t *options = get_options();
+  int post_via_tor;
+  const smartlist_t *dirservers = router_get_trusted_dir_servers();
+  int found = 0;
+  const int exclude_self = (dir_purpose == DIR_PURPOSE_UPLOAD_VOTE ||
+                            dir_purpose == DIR_PURPOSE_UPLOAD_SIGNATURES);
+  tor_assert(dirservers);
+  /* This tries dirservers which we believe to be down, but ultimately, that's
+   * harmless, and we may as well err on the side of getting things uploaded.
+   */
+  SMARTLIST_FOREACH_BEGIN(dirservers, dir_server_t *, ds) {
+      routerstatus_t *rs = &(ds->fake_status);
+      size_t upload_len = payload_len;
+      tor_addr_t ds_addr;
+
+      if ((type & ds->type) == 0)
+        continue;
+
+      if (exclude_self && router_digest_is_me(ds->digest))
+        continue;
+
+      if (options->StrictNodes &&
+          routerset_contains_routerstatus(options->ExcludeNodes, rs, -1)) {
+        log_warn(LD_DIR, "Wanted to contact authority '%s' for %s, but "
+                 "it's in our ExcludedNodes list and StrictNodes is set. "
+                 "Skipping.",
+                 ds->nickname,
+                 dir_conn_purpose_to_string(dir_purpose));
+        continue;
+      }
+
+      found = 1; /* at least one authority of this type was listed */
+      if (dir_purpose == DIR_PURPOSE_UPLOAD_DIR)
+        ds->has_accepted_serverdesc = 0;
+
+      if (extrainfo_len && router_supports_extrainfo(ds->digest, 1)) {
+        upload_len += extrainfo_len;
+        log_info(LD_DIR, "Uploading an extrainfo too (length %d)",
+                 (int) extrainfo_len);
+      }
+      tor_addr_from_ipv4h(&ds_addr, ds->addr);
+      post_via_tor = purpose_needs_anonymity(dir_purpose, router_purpose) ||
+        !fascist_firewall_allows_address_dir(&ds_addr, ds->dir_port);
+      directory_initiate_command_routerstatus(rs, dir_purpose,
+                                              router_purpose,
+                                              post_via_tor,
+                                              NULL, payload, upload_len, 0);
+  } SMARTLIST_FOREACH_END(ds);
+  if (!found) {
+    char *s = authdir_type_to_string(type);
+    log_warn(LD_DIR, "Publishing server descriptor to directory authorities "
+             "of type '%s', but no authorities of that type listed!", s);
+    tor_free(s);
+  }
+}
+
+/** Return true iff, according to the values in <b>options</b>, we should be
+ * using directory guards for direct downloads of directory information. */
+static int
+should_use_directory_guards(const or_options_t *options)
+{
+  /* Public (non-bridge) servers never use directory guards. */
+  if (public_server_mode(options))
+    return 0;
+  /* If guards are disabled, or directory guards are disabled, we can't
+   * use directory guards.
+   */
+  if (!options->UseEntryGuards || !options->UseEntryGuardsAsDirGuards)
+    return 0;
+  /* If we're configured to fetch directory info aggressively or of a
+   * nonstandard type, don't use directory guards. */
+  if (options->DownloadExtraInfo || options->FetchDirInfoEarly ||
+      options->FetchDirInfoExtraEarly || options->FetchUselessDescriptors)
+    return 0;
+  if (! options->PreferTunneledDirConns)
+    return 0;
+  return 1;
+}
+
+/** Pick an unconsetrained directory server from among our guards, the latest
+ * networkstatus, or the fallback dirservers, for use in downloading
+ * information of type <b>type</b>, and return its routerstatus. */
+static const routerstatus_t *
+directory_pick_generic_dirserver(dirinfo_type_t type, int pds_flags,
+                                 uint8_t dir_purpose)
+{
+  const routerstatus_t *rs = NULL;
+  const or_options_t *options = get_options();
+
+  if (options->UseBridges)
+    log_warn(LD_BUG, "Called when we have UseBridges set.");
+
+  if (should_use_directory_guards(options)) {
+    const node_t *node = choose_random_dirguard(type);
+    if (node)
+      rs = node->rs;
+  } else {
+    /* anybody with a non-zero dirport will do */
+    rs = router_pick_directory_server(type, pds_flags);
+  }
+  if (!rs) {
+    log_info(LD_DIR, "No router found for %s; falling back to "
+             "dirserver list.", dir_conn_purpose_to_string(dir_purpose));
+    rs = router_pick_fallback_dirserver(type, pds_flags);
+  }
+
+  return rs;
+}
+
+/** Start a connection to a random running directory server, using
+ * connection purpose <b>dir_purpose</b>, intending to fetch descriptors
+ * of purpose <b>router_purpose</b>, and requesting <b>resource</b>.
+ * Use <b>pds_flags</b> as arguments to router_pick_directory_server()
+ * or router_pick_trusteddirserver().
+ */
+void
+directory_get_from_dirserver(uint8_t dir_purpose, uint8_t router_purpose,
+                             const char *resource, int pds_flags)
+{
+  const routerstatus_t *rs = NULL;
+  const or_options_t *options = get_options();
+  int prefer_authority = directory_fetches_from_authorities(options);
+  int require_authority = 0;
+  int get_via_tor = purpose_needs_anonymity(dir_purpose, router_purpose);
+  dirinfo_type_t type;
+  time_t if_modified_since = 0;
+
+  /* FFFF we could break this switch into its own function, and call
+   * it elsewhere in directory.c. -RD */
+  switch (dir_purpose) {
+    case DIR_PURPOSE_FETCH_EXTRAINFO:
+      type = EXTRAINFO_DIRINFO |
+             (router_purpose == ROUTER_PURPOSE_BRIDGE ? BRIDGE_DIRINFO :
+                                                        V3_DIRINFO);
+      break;
+    case DIR_PURPOSE_FETCH_SERVERDESC:
+      type = (router_purpose == ROUTER_PURPOSE_BRIDGE ? BRIDGE_DIRINFO :
+                                                        V3_DIRINFO);
+      break;
+    case DIR_PURPOSE_FETCH_RENDDESC:
+      type = HIDSERV_DIRINFO;
+      break;
+    case DIR_PURPOSE_FETCH_STATUS_VOTE:
+    case DIR_PURPOSE_FETCH_DETACHED_SIGNATURES:
+    case DIR_PURPOSE_FETCH_CERTIFICATE:
+      type = V3_DIRINFO;
+      break;
+    case DIR_PURPOSE_FETCH_CONSENSUS:
+      type = V3_DIRINFO;
+      if (resource && !strcmp(resource,"microdesc"))
+        type |= MICRODESC_DIRINFO;
+      break;
+    case DIR_PURPOSE_FETCH_MICRODESC:
+      type = MICRODESC_DIRINFO;
+      break;
+    default:
+      log_warn(LD_BUG, "Unexpected purpose %d", (int)dir_purpose);
+      return;
+  }
+
+  if (dir_purpose == DIR_PURPOSE_FETCH_CONSENSUS) {
+    int flav = FLAV_NS;
+    networkstatus_t *v;
+    if (resource)
+      flav = networkstatus_parse_flavor_name(resource);
+
+    if (flav != -1) {
+      /* IF we have a parsed consensus of this type, we can do an
+       * if-modified-time based on it. */
+      v = networkstatus_get_latest_consensus_by_flavor(flav);
+      if (v)
+        if_modified_since = v->valid_after + 180;
+    } else {
+      /* Otherwise it might be a consensus we don't parse, but which we
+       * do cache.  Look at the cached copy, perhaps. */
+      cached_dir_t *cd = dirserv_get_consensus(resource);
+      if (cd)
+        if_modified_since = cd->published + 180;
+    }
+  }
+
+  if (!options->FetchServerDescriptors && type != HIDSERV_DIRINFO)
+    return;
+
+  if (!get_via_tor) {
+    if (options->UseBridges && type != BRIDGE_DIRINFO) {
+      /* We want to ask a running bridge for which we have a descriptor.
+       *
+       * When we ask choose_random_entry() for a bridge, we specify what
+       * sort of dir fetch we'll be doing, so it won't return a bridge
+       *
