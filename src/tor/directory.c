@@ -459,4 +459,222 @@ directory_get_from_dirserver(uint8_t dir_purpose, uint8_t router_purpose,
        *
        * When we ask choose_random_entry() for a bridge, we specify what
        * sort of dir fetch we'll be doing, so it won't return a bridge
-       *
+       * that can't answer our question.
+       */
+      /* XXX024 Not all bridges handle conditional consensus downloading,
+       * so, for now, never assume the server supports that. -PP */
+      const node_t *node = choose_random_dirguard(type);
+      if (node && node->ri) {
+        /* every bridge has a routerinfo. */
+        tor_addr_t addr;
+        routerinfo_t *ri = node->ri;
+        node_get_addr(node, &addr);
+        directory_initiate_command(ri->address, &addr,
+                                   ri->or_port, 0/*no dirport*/,
+                                   ri->cache_info.identity_digest,
+                                   dir_purpose,
+                                   router_purpose,
+                                   DIRIND_ONEHOP,
+                                   resource, NULL, 0, if_modified_since);
+      } else
+        log_notice(LD_DIR, "Ignoring directory request, since no bridge "
+                           "nodes are available yet.");
+      return;
+    } else {
+      if (prefer_authority || type == BRIDGE_DIRINFO) {
+        /* only ask authdirservers, and don't ask myself */
+        rs = router_pick_trusteddirserver(type, pds_flags);
+        if (rs == NULL && (pds_flags & (PDS_NO_EXISTING_SERVERDESC_FETCH|
+                                        PDS_NO_EXISTING_MICRODESC_FETCH))) {
+          /* We don't want to fetch from any authorities that we're currently
+           * fetching server descriptors from, and we got no match.  Did we
+           * get no match because all the authorities have connections
+           * fetching server descriptors (in which case we should just
+           * return,) or because all the authorities are down or on fire or
+           * unreachable or something (in which case we should go on with
+           * our fallback code)? */
+          pds_flags &= ~(PDS_NO_EXISTING_SERVERDESC_FETCH|
+                         PDS_NO_EXISTING_MICRODESC_FETCH);
+          rs = router_pick_trusteddirserver(type, pds_flags);
+          if (rs) {
+            log_debug(LD_DIR, "Deferring serverdesc fetch: all authorities "
+                      "are in use.");
+            return;
+          }
+        }
+        if (rs == NULL && require_authority) {
+          log_info(LD_DIR, "No authorities were available for %s: will try "
+                   "later.", dir_conn_purpose_to_string(dir_purpose));
+          return;
+        }
+      }
+      if (!rs && type != BRIDGE_DIRINFO) {
+        /* */
+        rs = directory_pick_generic_dirserver(type, pds_flags,
+                                              dir_purpose);
+        if (!rs) {
+          /*XXXX024 I'm pretty sure this can never do any good, since
+           * rs isn't set. */
+          get_via_tor = 1; /* last resort: try routing it via Tor */
+        }
+      }
+    }
+  } else { /* get_via_tor */
+    /* Never use fascistfirewall; we're going via Tor. */
+    if (dir_purpose == DIR_PURPOSE_FETCH_RENDDESC) {
+      /* only ask hidserv authorities, any of them will do */
+      pds_flags |= PDS_IGNORE_FASCISTFIREWALL|PDS_ALLOW_SELF;
+      rs = router_pick_trusteddirserver(HIDSERV_DIRINFO, pds_flags);
+    } else {
+      /* anybody with a non-zero dirport will do. Disregard firewalls. */
+      pds_flags |= PDS_IGNORE_FASCISTFIREWALL;
+      rs = router_pick_directory_server(type, pds_flags);
+      /* If we have any hope of building an indirect conn, we know some router
+       * descriptors.  If (rs==NULL), we can't build circuits anyway, so
+       * there's no point in falling back to the authorities in this case. */
+    }
+  }
+
+  if (rs) {
+    const dir_indirection_t indirection =
+      get_via_tor ? DIRIND_ANONYMOUS : DIRIND_ONEHOP;
+    directory_initiate_command_routerstatus(rs, dir_purpose,
+                                            router_purpose,
+                                            indirection,
+                                            resource, NULL, 0,
+                                            if_modified_since);
+  } else {
+    log_notice(LD_DIR,
+               "While fetching directory info, "
+               "no running dirservers known. Will try again later. "
+               "(purpose %d)", dir_purpose);
+    if (!purpose_needs_anonymity(dir_purpose, router_purpose)) {
+      /* remember we tried them all and failed. */
+      directory_all_unreachable(time(NULL));
+    }
+  }
+}
+
+/** As directory_get_from_dirserver, but initiates a request to <i>every</i>
+ * directory authority other than ourself.  Only for use by authorities when
+ * searching for missing information while voting. */
+void
+directory_get_from_all_authorities(uint8_t dir_purpose,
+                                   uint8_t router_purpose,
+                                   const char *resource)
+{
+  tor_assert(dir_purpose == DIR_PURPOSE_FETCH_STATUS_VOTE ||
+             dir_purpose == DIR_PURPOSE_FETCH_DETACHED_SIGNATURES);
+
+  SMARTLIST_FOREACH_BEGIN(router_get_trusted_dir_servers(),
+                          dir_server_t *, ds) {
+      routerstatus_t *rs;
+      if (router_digest_is_me(ds->digest))
+        continue;
+      if (!(ds->type & V3_DIRINFO))
+        continue;
+      rs = &ds->fake_status;
+      directory_initiate_command_routerstatus(rs, dir_purpose, router_purpose,
+                                              DIRIND_ONEHOP, resource, NULL,
+                                              0, 0);
+  } SMARTLIST_FOREACH_END(ds);
+}
+
+/** Return true iff <b>ind</b> requires a multihop circuit. */
+static int
+dirind_is_anon(dir_indirection_t ind)
+{
+  return ind == DIRIND_ANON_DIRPORT || ind == DIRIND_ANONYMOUS;
+}
+
+/** Same as directory_initiate_command_routerstatus(), but accepts
+ * rendezvous data to fetch a hidden service descriptor. */
+void
+directory_initiate_command_routerstatus_rend(const routerstatus_t *status,
+                                             uint8_t dir_purpose,
+                                             uint8_t router_purpose,
+                                             dir_indirection_t indirection,
+                                             const char *resource,
+                                             const char *payload,
+                                             size_t payload_len,
+                                             time_t if_modified_since,
+                                             const rend_data_t *rend_query)
+{
+  const or_options_t *options = get_options();
+  const node_t *node;
+  char address_buf[INET_NTOA_BUF_LEN+1];
+  struct in_addr in;
+  const char *address;
+  tor_addr_t addr;
+  const int anonymized_connection = dirind_is_anon(indirection);
+  node = node_get_by_id(status->identity_digest);
+
+  if (!node && anonymized_connection) {
+    log_info(LD_DIR, "Not sending anonymized request to directory '%s'; we "
+             "don't have its router descriptor.",
+             routerstatus_describe(status));
+    return;
+  } else if (node) {
+    node_get_address_string(node, address_buf, sizeof(address_buf));
+    address = address_buf;
+  } else {
+    in.s_addr = htonl(status->addr);
+    tor_inet_ntoa(&in, address_buf, sizeof(address_buf));
+    address = address_buf;
+  }
+  tor_addr_from_ipv4h(&addr, status->addr);
+
+  if (options->ExcludeNodes && options->StrictNodes &&
+      routerset_contains_routerstatus(options->ExcludeNodes, status, -1)) {
+    log_warn(LD_DIR, "Wanted to contact directory mirror %s for %s, but "
+             "it's in our ExcludedNodes list and StrictNodes is set. "
+             "Skipping. This choice might make your Tor not work.",
+             routerstatus_describe(status),
+             dir_conn_purpose_to_string(dir_purpose));
+    return;
+  }
+
+  directory_initiate_command_rend(address, &addr,
+                             status->or_port, status->dir_port,
+                             status->identity_digest,
+                             dir_purpose, router_purpose,
+                             indirection, resource,
+                             payload, payload_len, if_modified_since,
+                             rend_query);
+}
+
+/** Launch a new connection to the directory server <b>status</b> to
+ * upload or download a server or rendezvous
+ * descriptor. <b>dir_purpose</b> determines what
+ * kind of directory connection we're launching, and must be one of
+ * DIR_PURPOSE_{FETCH|UPLOAD}_{DIR|RENDDESC|RENDDESC_V2}. <b>router_purpose</b>
+ * specifies the descriptor purposes we have in mind (currently only
+ * used for FETCH_DIR).
+ *
+ * When uploading, <b>payload</b> and <b>payload_len</b> determine the content
+ * of the HTTP post.  Otherwise, <b>payload</b> should be NULL.
+ *
+ * When fetching a rendezvous descriptor, <b>resource</b> is the service ID we
+ * want to fetch.
+ */
+void
+directory_initiate_command_routerstatus(const routerstatus_t *status,
+                                        uint8_t dir_purpose,
+                                        uint8_t router_purpose,
+                                        dir_indirection_t indirection,
+                                        const char *resource,
+                                        const char *payload,
+                                        size_t payload_len,
+                                        time_t if_modified_since)
+{
+  directory_initiate_command_routerstatus_rend(status, dir_purpose,
+                                          router_purpose,
+                                          indirection, resource,
+                                          payload, payload_len,
+                                          if_modified_since, NULL);
+}
+
+/** Return true iff <b>conn</b> is the client side of a directory connection
+ * we launched to ourself in order to determine the reachability of our
+ * dir_port. */
+s
