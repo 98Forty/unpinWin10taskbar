@@ -679,4 +679,54 @@ crecip(limb *out, const limb *z) {
   /* 2^21 - 2^1 */ fsquare(t0,z2_20_0);
   /* 2^22 - 2^2 */ fsquare(t1,t0);
   /* 2^40 - 2^20 */ for (i = 2;i < 20;i += 2) { fsquare(t0,t1); fsquare(t1,t0); }
-  /* 2^40 - 2^0 */ fmul(t0,t1,z2_20_0
+  /* 2^40 - 2^0 */ fmul(t0,t1,z2_20_0);
+
+  /* 2^41 - 2^1 */ fsquare(t1,t0);
+  /* 2^42 - 2^2 */ fsquare(t0,t1);
+  /* 2^50 - 2^10 */ for (i = 2;i < 10;i += 2) { fsquare(t1,t0); fsquare(t0,t1); }
+  /* 2^50 - 2^0 */ fmul(z2_50_0,t0,z2_10_0);
+
+  /* 2^51 - 2^1 */ fsquare(t0,z2_50_0);
+  /* 2^52 - 2^2 */ fsquare(t1,t0);
+  /* 2^100 - 2^50 */ for (i = 2;i < 50;i += 2) { fsquare(t0,t1); fsquare(t1,t0); }
+  /* 2^100 - 2^0 */ fmul(z2_100_0,t1,z2_50_0);
+
+  /* 2^101 - 2^1 */ fsquare(t1,z2_100_0);
+  /* 2^102 - 2^2 */ fsquare(t0,t1);
+  /* 2^200 - 2^100 */ for (i = 2;i < 100;i += 2) { fsquare(t1,t0); fsquare(t0,t1); }
+  /* 2^200 - 2^0 */ fmul(t1,t0,z2_100_0);
+
+  /* 2^201 - 2^1 */ fsquare(t0,t1);
+  /* 2^202 - 2^2 */ fsquare(t1,t0);
+  /* 2^250 - 2^50 */ for (i = 2;i < 50;i += 2) { fsquare(t0,t1); fsquare(t1,t0); }
+  /* 2^250 - 2^0 */ fmul(t0,t1,z2_50_0);
+
+  /* 2^251 - 2^1 */ fsquare(t1,t0);
+  /* 2^252 - 2^2 */ fsquare(t0,t1);
+  /* 2^253 - 2^3 */ fsquare(t1,t0);
+  /* 2^254 - 2^4 */ fsquare(t0,t1);
+  /* 2^255 - 2^5 */ fsquare(t1,t0);
+  /* 2^255 - 21 */ fmul(out,t1,z11);
+}
+
+int curve25519_donna(u8 *, const u8 *, const u8 *);
+
+int
+curve25519_donna(u8 *mypublic, const u8 *secret, const u8 *basepoint) {
+  limb bp[10], x[10], z[11], zmone[10];
+  uint8_t e[32];
+  int i;
+
+  for (i = 0; i < 32; ++i) e[i] = secret[i];
+  e[0] &= 248;
+  e[31] &= 127;
+  e[31] |= 64;
+
+  fexpand(bp, basepoint);
+  cmult(x, z, e, bp);
+  crecip(zmone, z);
+  fmul(z, x, zmone);
+  freduce_coefficients(z);
+  fcontract(mypublic, z);
+  return 0;
+}
