@@ -677,4 +677,243 @@ directory_initiate_command_routerstatus(const routerstatus_t *status,
 /** Return true iff <b>conn</b> is the client side of a directory connection
  * we launched to ourself in order to determine the reachability of our
  * dir_port. */
-s
+static int
+directory_conn_is_self_reachability_test(dir_connection_t *conn)
+{
+  if (conn->requested_resource &&
+      !strcmpstart(conn->requested_resource,"authority")) {
+    const routerinfo_t *me = router_get_my_routerinfo();
+    if (me &&
+        router_digest_is_me(conn->identity_digest) &&
+        tor_addr_eq_ipv4h(&conn->base_.addr, me->addr) && /*XXXX prop 118*/
+        me->dir_port == conn->base_.port)
+      return 1;
+  }
+  return 0;
+}
+
+/** Called when we are unable to complete the client's request to a directory
+ * server due to a network error: Mark the router as down and try again if
+ * possible.
+ */
+static void
+connection_dir_request_failed(dir_connection_t *conn)
+{
+  if (directory_conn_is_self_reachability_test(conn)) {
+    return; /* this was a test fetch. don't retry. */
+  }
+  if (!entry_list_is_constrained(get_options()))
+    router_set_status(conn->identity_digest, 0); /* don't try him again */
+  if (conn->base_.purpose == DIR_PURPOSE_FETCH_SERVERDESC ||
+             conn->base_.purpose == DIR_PURPOSE_FETCH_EXTRAINFO) {
+    log_info(LD_DIR, "Giving up on serverdesc/extrainfo fetch from "
+             "directory server at '%s'; retrying",
+             conn->base_.address);
+    if (conn->router_purpose == ROUTER_PURPOSE_BRIDGE)
+      connection_dir_bridge_routerdesc_failed(conn);
+    connection_dir_download_routerdesc_failed(conn);
+  } else if (conn->base_.purpose == DIR_PURPOSE_FETCH_CONSENSUS) {
+    if (conn->requested_resource)
+      networkstatus_consensus_download_failed(0, conn->requested_resource);
+  } else if (conn->base_.purpose == DIR_PURPOSE_FETCH_CERTIFICATE) {
+    log_info(LD_DIR, "Giving up on certificate fetch from directory server "
+             "at '%s'; retrying",
+             conn->base_.address);
+    connection_dir_download_cert_failed(conn, 0);
+  } else if (conn->base_.purpose == DIR_PURPOSE_FETCH_DETACHED_SIGNATURES) {
+    log_info(LD_DIR, "Giving up downloading detached signatures from '%s'",
+             conn->base_.address);
+  } else if (conn->base_.purpose == DIR_PURPOSE_FETCH_STATUS_VOTE) {
+    log_info(LD_DIR, "Giving up downloading votes from '%s'",
+             conn->base_.address);
+  } else if (conn->base_.purpose == DIR_PURPOSE_FETCH_MICRODESC) {
+    log_info(LD_DIR, "Giving up on downloading microdescriptors from "
+             "directory server at '%s'; will retry", conn->base_.address);
+    connection_dir_download_routerdesc_failed(conn);
+  }
+}
+
+/** Helper: Attempt to fetch directly the descriptors of each bridge
+ * listed in <b>failed</b>.
+ */
+static void
+connection_dir_retry_bridges(smartlist_t *descs)
+{
+  char digest[DIGEST_LEN];
+  SMARTLIST_FOREACH(descs, const char *, cp,
+  {
+    if (base16_decode(digest, DIGEST_LEN, cp, strlen(cp))<0) {
+      log_warn(LD_BUG, "Malformed fingerprint in list: %s",
+              escaped(cp));
+      continue;
+    }
+    retry_bridge_descriptor_fetch_directly(digest);
+  });
+}
+
+/** Called when an attempt to download one or more router descriptors
+ * or extra-info documents on connection <b>conn</b> failed.
+ */
+static void
+connection_dir_download_routerdesc_failed(dir_connection_t *conn)
+{
+  /* No need to increment the failure count for routerdescs, since
+   * it's not their fault. */
+
+  /* No need to relaunch descriptor downloads here: we already do it
+   * every 10 or 60 seconds (FOO_DESCRIPTOR_RETRY_INTERVAL) in onion_main.c. */
+  tor_assert(conn->base_.purpose == DIR_PURPOSE_FETCH_SERVERDESC ||
+             conn->base_.purpose == DIR_PURPOSE_FETCH_EXTRAINFO ||
+             conn->base_.purpose == DIR_PURPOSE_FETCH_MICRODESC);
+
+  (void) conn;
+}
+
+/** Called when an attempt to download a bridge's routerdesc from
+ * one of the authorities failed due to a network error. If
+ * possible attempt to download descriptors from the bridge directly.
+ */
+static void
+connection_dir_bridge_routerdesc_failed(dir_connection_t *conn)
+{
+  smartlist_t *which = NULL;
+
+  /* Requests for bridge descriptors are in the form 'fp/', so ignore
+     anything else. */
+  if (!conn->requested_resource || strcmpstart(conn->requested_resource,"fp/"))
+    return;
+
+  which = smartlist_new();
+  dir_split_resource_into_fingerprints(conn->requested_resource
+                                        + strlen("fp/"),
+                                       which, NULL, 0);
+
+  tor_assert(conn->base_.purpose != DIR_PURPOSE_FETCH_EXTRAINFO);
+  if (smartlist_len(which)) {
+    connection_dir_retry_bridges(which);
+    SMARTLIST_FOREACH(which, char *, cp, tor_free(cp));
+  }
+  smartlist_free(which);
+}
+
+/** Called when an attempt to fetch a certificate fails. */
+static void
+connection_dir_download_cert_failed(dir_connection_t *conn, int status)
+{
+  const char *fp_pfx = "fp/";
+  const char *fpsk_pfx = "fp-sk/";
+  smartlist_t *failed;
+  tor_assert(conn->base_.purpose == DIR_PURPOSE_FETCH_CERTIFICATE);
+
+  if (!conn->requested_resource)
+    return;
+  failed = smartlist_new();
+  /*
+   * We have two cases download by fingerprint (resource starts
+   * with "fp/") or download by fingerprint/signing key pair
+   * (resource starts with "fp-sk/").
+   */
+  if (!strcmpstart(conn->requested_resource, fp_pfx)) {
+    /* Download by fingerprint case */
+    dir_split_resource_into_fingerprints(conn->requested_resource +
+                                         strlen(fp_pfx),
+                                         failed, NULL, DSR_HEX);
+    SMARTLIST_FOREACH_BEGIN(failed, char *, cp) {
+      /* Null signing key digest indicates download by fp only */
+      authority_cert_dl_failed(cp, NULL, status);
+      tor_free(cp);
+    } SMARTLIST_FOREACH_END(cp);
+  } else if (!strcmpstart(conn->requested_resource, fpsk_pfx)) {
+    /* Download by (fp,sk) pairs */
+    dir_split_resource_into_fingerprint_pairs(conn->requested_resource +
+                                              strlen(fpsk_pfx), failed);
+    SMARTLIST_FOREACH_BEGIN(failed, fp_pair_t *, cp) {
+      authority_cert_dl_failed(cp->first, cp->second, status);
+      tor_free(cp);
+    } SMARTLIST_FOREACH_END(cp);
+  } else {
+    log_warn(LD_DIR,
+             "Don't know what to do with failure for cert fetch %s",
+             conn->requested_resource);
+  }
+
+  smartlist_free(failed);
+
+  update_certificate_downloads(time(NULL));
+}
+
+/** Evaluate the situation and decide if we should use an encrypted
+ * "begindir-style" connection for this directory request.
+ * 1) If or_port is 0, or it's a direct conn and or_port is firewalled
+ *    or we're a dir mirror, no.
+ * 2) If we prefer to avoid begindir conns, and we're not fetching or
+ *    publishing a bridge relay descriptor, no.
+ * 3) Else yes.
+ */
+static int
+directory_command_should_use_begindir(const or_options_t *options,
+                                      const tor_addr_t *addr,
+                                      int or_port, uint8_t router_purpose,
+                                      dir_indirection_t indirection)
+{
+  if (!or_port)
+    return 0; /* We don't know an ORPort -- no chance. */
+  if (indirection == DIRIND_DIRECT_CONN || indirection == DIRIND_ANON_DIRPORT)
+    return 0;
+  if (indirection == DIRIND_ONEHOP)
+    if (!fascist_firewall_allows_address_or(addr, or_port) ||
+        directory_fetches_from_authorities(options))
+      return 0; /* We're firewalled or are acting like a relay -- also no. */
+  if (!options->TunnelDirConns &&
+      router_purpose != ROUTER_PURPOSE_BRIDGE)
+    return 0; /* We prefer to avoid using begindir conns. Fine. */
+  return 1;
+}
+
+/** Helper for directory_initiate_command_routerstatus: send the
+ * command to a server whose address is <b>address</b>, whose IP is
+ * <b>addr</b>, whose directory port is <b>dir_port</b>, whose tor version
+ * <b>supports_begindir</b>, and whose identity key digest is
+ * <b>digest</b>. */
+void
+directory_initiate_command(const char *address, const tor_addr_t *_addr,
+                           uint16_t or_port, uint16_t dir_port,
+                           const char *digest,
+                           uint8_t dir_purpose, uint8_t router_purpose,
+                           dir_indirection_t indirection, const char *resource,
+                           const char *payload, size_t payload_len,
+                           time_t if_modified_since)
+{
+  directory_initiate_command_rend(address, _addr, or_port, dir_port,
+                             digest, dir_purpose,
+                             router_purpose, indirection,
+                             resource, payload, payload_len,
+                             if_modified_since, NULL);
+}
+
+/** Return non-zero iff a directory connection with purpose
+ * <b>dir_purpose</b> reveals sensitive information about a Tor
+ * instance's client activities.  (Such connections must be performed
+ * through normal three-hop Tor circuits.) */
+static int
+is_sensitive_dir_purpose(uint8_t dir_purpose)
+{
+  return ((dir_purpose == DIR_PURPOSE_FETCH_RENDDESC) ||
+          (dir_purpose == DIR_PURPOSE_HAS_FETCHED_RENDDESC) ||
+          (dir_purpose == DIR_PURPOSE_UPLOAD_RENDDESC) ||
+          (dir_purpose == DIR_PURPOSE_UPLOAD_RENDDESC_V2) ||
+          (dir_purpose == DIR_PURPOSE_FETCH_RENDDESC_V2));
+}
+
+/** Same as directory_initiate_command(), but accepts rendezvous data to
+ * fetch a hidden service descriptor. */
+static void
+directory_initiate_command_rend(const char *address, const tor_addr_t *_addr,
+                                uint16_t or_port, uint16_t dir_port,
+                                const char *digest,
+                                uint8_t dir_purpose, uint8_t router_purpose,
+                                dir_indirection_t indirection,
+                                const char *resource,
+                                const char *payload, size_t payload_len,
+                                time_t if_modified_since,
+                                const rend
