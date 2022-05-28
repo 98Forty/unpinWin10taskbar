@@ -916,4 +916,284 @@ directory_initiate_command_rend(const char *address, const tor_addr_t *_addr,
                                 const char *resource,
                                 const char *payload, size_t payload_len,
                                 time_t if_modified_since,
-                                const rend
+                                const rend_data_t *rend_query)
+{
+  dir_connection_t *conn;
+  const or_options_t *options = get_options();
+  int socket_error = 0;
+  int use_begindir = directory_command_should_use_begindir(options, _addr,
+                                     or_port, router_purpose, indirection);
+  const int anonymized_connection = dirind_is_anon(indirection);
+  tor_addr_t addr;
+
+  tor_assert(address);
+  tor_assert(_addr);
+  tor_assert(or_port || dir_port);
+  tor_assert(digest);
+
+  tor_addr_copy(&addr, _addr);
+
+  log_debug(LD_DIR, "anonymized %d, use_begindir %d.",
+            anonymized_connection, use_begindir);
+
+  log_debug(LD_DIR, "Initiating %s", dir_conn_purpose_to_string(dir_purpose));
+
+#ifndef NON_ANONYMOUS_MODE_ENABLED
+  tor_assert(!(is_sensitive_dir_purpose(dir_purpose) &&
+               !anonymized_connection));
+#else
+  (void)is_sensitive_dir_purpose;
+#endif
+
+  /* ensure that we don't make direct connections when a SOCKS server is
+   * configured. */
+  if (!anonymized_connection && !use_begindir && !options->HTTPProxy &&
+      (options->Socks4Proxy || options->Socks5Proxy)) {
+    log_warn(LD_DIR, "Cannot connect to a directory server through a "
+                     "SOCKS proxy!");
+    return;
+  }
+
+  conn = dir_connection_new(tor_addr_family(&addr));
+
+  /* set up conn so it's got all the data we need to remember */
+  tor_addr_copy(&conn->base_.addr, &addr);
+  conn->base_.port = use_begindir ? or_port : dir_port;
+  conn->base_.address = tor_strdup(address);
+  memcpy(conn->identity_digest, digest, DIGEST_LEN);
+
+  conn->base_.purpose = dir_purpose;
+  conn->router_purpose = router_purpose;
+
+  /* give it an initial state */
+  conn->base_.state = DIR_CONN_STATE_CONNECTING;
+
+  /* decide whether we can learn our IP address from this conn */
+  /* XXXX This is a bad name for this field now. */
+  conn->dirconn_direct = !anonymized_connection;
+
+  /* copy rendezvous data, if any */
+  if (rend_query)
+    conn->rend_data = rend_data_dup(rend_query);
+
+  if (!anonymized_connection && !use_begindir) {
+    /* then we want to connect to dirport directly */
+
+    if (options->HTTPProxy) {
+      tor_addr_copy(&addr, &options->HTTPProxyAddr);
+      dir_port = options->HTTPProxyPort;
+    }
+
+    switch (connection_connect(TO_CONN(conn), conn->base_.address, &addr,
+                               dir_port, &socket_error)) {
+      case -1:
+        connection_dir_request_failed(conn); /* retry if we want */
+        /* XXX we only pass 'conn' above, not 'resource', 'payload',
+         * etc. So in many situations it can't retry! -RD */
+        connection_free(TO_CONN(conn));
+        return;
+      case 1:
+        /* start flushing conn */
+        conn->base_.state = DIR_CONN_STATE_CLIENT_SENDING;
+        /* fall through */
+      case 0:
+        /* queue the command on the outbuf */
+        directory_send_command(conn, dir_purpose, 1, resource,
+                               payload, payload_len,
+                               if_modified_since);
+        connection_watch_events(TO_CONN(conn), READ_EVENT | WRITE_EVENT);
+        /* writable indicates finish, readable indicates broken link,
+           error indicates broken link in windowsland. */
+    }
+  } else { /* we want to connect via a tor connection */
+    entry_connection_t *linked_conn;
+    /* Anonymized tunneled connections can never share a circuit.
+     * One-hop directory connections can share circuits with each other
+     * but nothing else. */
+    int iso_flags = anonymized_connection ? ISO_STREAM : ISO_SESSIONGRP;
+
+    /* If it's an anonymized connection, remember the fact that we
+     * wanted it for later: maybe we'll want it again soon. */
+    if (anonymized_connection && use_begindir)
+      rep_hist_note_used_internal(time(NULL), 0, 1);
+    else if (anonymized_connection && !use_begindir)
+      rep_hist_note_used_port(time(NULL), conn->base_.port);
+
+    /* make an AP connection
+     * populate it and add it at the right state
+     * hook up both sides
+     */
+    linked_conn =
+      connection_ap_make_link(TO_CONN(conn),
+                              conn->base_.address, conn->base_.port,
+                              digest,
+                              SESSION_GROUP_DIRCONN, iso_flags,
+                              use_begindir, conn->dirconn_direct);
+    if (!linked_conn) {
+      log_warn(LD_NET,"Making tunnel to dirserver failed.");
+      connection_mark_for_close(TO_CONN(conn));
+      return;
+    }
+
+    if (connection_add(TO_CONN(conn)) < 0) {
+      log_warn(LD_NET,"Unable to add connection for link to dirserver.");
+      connection_mark_for_close(TO_CONN(conn));
+      return;
+    }
+    conn->base_.state = DIR_CONN_STATE_CLIENT_SENDING;
+    /* queue the command on the outbuf */
+    directory_send_command(conn, dir_purpose, 0, resource,
+                           payload, payload_len,
+                           if_modified_since);
+
+    connection_watch_events(TO_CONN(conn), READ_EVENT|WRITE_EVENT);
+    IF_HAS_BUFFEREVENT(ENTRY_TO_CONN(linked_conn), {
+      connection_watch_events(ENTRY_TO_CONN(linked_conn),
+                              READ_EVENT|WRITE_EVENT);
+    }) ELSE_IF_NO_BUFFEREVENT
+      connection_start_reading(ENTRY_TO_CONN(linked_conn));
+  }
+}
+
+/** Return true iff anything we say on <b>conn</b> is being encrypted before
+ * we send it to the client/server. */
+int
+connection_dir_is_encrypted(dir_connection_t *conn)
+{
+  /* Right now it's sufficient to see if conn is or has been linked, since
+   * the only thing it could be linked to is an edge connection on a
+   * circuit, and the only way it could have been unlinked is at the edge
+   * connection getting closed.
+   */
+  return TO_CONN(conn)->linked;
+}
+
+/** Helper for sorting
+ *
+ * sort strings alphabetically
+ */
+static int
+compare_strs_(const void **a, const void **b)
+{
+  const char *s1 = *a, *s2 = *b;
+  return strcmp(s1, s2);
+}
+
+#define CONDITIONAL_CONSENSUS_FPR_LEN 3
+#if (CONDITIONAL_CONSENSUS_FPR_LEN > DIGEST_LEN)
+#error "conditional consensus fingerprint length is larger than digest length"
+#endif
+
+/** Return the URL we should use for a consensus download.
+ *
+ * This url depends on whether or not the server we go to
+ * is sufficiently new to support conditional consensus downloading,
+ * i.e. GET .../consensus/<b>fpr</b>+<b>fpr</b>+<b>fpr</b>
+ *
+ * If 'resource' is provided, it is the name of a consensus flavor to request.
+ */
+static char *
+directory_get_consensus_url(const char *resource)
+{
+  char *url = NULL;
+  const char *hyphen, *flavor;
+  if (resource==NULL || strcmp(resource, "ns")==0) {
+    flavor = ""; /* Request ns consensuses as "", so older servers will work*/
+    hyphen = "";
+  } else {
+    flavor = resource;
+    hyphen = "-";
+  }
+
+  {
+    char *authority_id_list;
+    smartlist_t *authority_digests = smartlist_new();
+
+    SMARTLIST_FOREACH_BEGIN(router_get_trusted_dir_servers(),
+                            dir_server_t *, ds) {
+        char *hex;
+        if (!(ds->type & V3_DIRINFO))
+          continue;
+
+        hex = tor_malloc(2*CONDITIONAL_CONSENSUS_FPR_LEN+1);
+        base16_encode(hex, 2*CONDITIONAL_CONSENSUS_FPR_LEN+1,
+                      ds->v3_identity_digest, CONDITIONAL_CONSENSUS_FPR_LEN);
+        smartlist_add(authority_digests, hex);
+    } SMARTLIST_FOREACH_END(ds);
+    smartlist_sort(authority_digests, compare_strs_);
+    authority_id_list = smartlist_join_strings(authority_digests,
+                                               "+", 0, NULL);
+
+    tor_asprintf(&url, "/tor/status-vote/current/consensus%s%s/%s.z",
+                 hyphen, flavor, authority_id_list);
+
+    SMARTLIST_FOREACH(authority_digests, char *, cp, tor_free(cp));
+    smartlist_free(authority_digests);
+    tor_free(authority_id_list);
+  }
+  return url;
+}
+
+/** Queue an appropriate HTTP command on conn-\>outbuf.  The other args
+ * are as in directory_initiate_command().
+ */
+static void
+directory_send_command(dir_connection_t *conn,
+                       int purpose, int direct, const char *resource,
+                       const char *payload, size_t payload_len,
+                       time_t if_modified_since)
+{
+  char proxystring[256];
+  char hoststring[128];
+  smartlist_t *headers = smartlist_new();
+  char *url;
+  char request[8192];
+  const char *httpcommand = NULL;
+
+  tor_assert(conn);
+  tor_assert(conn->base_.type == CONN_TYPE_DIR);
+
+  tor_free(conn->requested_resource);
+  if (resource)
+    conn->requested_resource = tor_strdup(resource);
+
+  /* come up with a string for which Host: we want */
+  if (conn->base_.port == 80) {
+    strlcpy(hoststring, conn->base_.address, sizeof(hoststring));
+  } else {
+    tor_snprintf(hoststring, sizeof(hoststring),"%s:%d",
+                 conn->base_.address, conn->base_.port);
+  }
+
+  /* Format if-modified-since */
+  if (if_modified_since) {
+    char b[RFC1123_TIME_LEN+1];
+    format_rfc1123_time(b, if_modified_since);
+    smartlist_add_asprintf(headers, "If-Modified-Since: %s\r\n", b);
+  }
+
+  /* come up with some proxy lines, if we're using one. */
+  if (direct && get_options()->HTTPProxy) {
+    char *base64_authenticator=NULL;
+    const char *authenticator = get_options()->HTTPProxyAuthenticator;
+
+    tor_snprintf(proxystring, sizeof(proxystring),"http://%s", hoststring);
+    if (authenticator) {
+      base64_authenticator = alloc_http_authenticator(authenticator);
+      if (!base64_authenticator)
+        log_warn(LD_BUG, "Encoding http authenticator failed");
+    }
+    if (base64_authenticator) {
+      smartlist_add_asprintf(headers,
+                   "Proxy-Authorization: Basic %s\r\n",
+                   base64_authenticator);
+      tor_free(base64_authenticator);
+    }
+  } else {
+    proxystring[0] = 0;
+  }
+
+  switch (purpose) {
+    case DIR_PURPOSE_FETCH_CONSENSUS:
+      /* resource is optional.  If present, it's a flavor name */
+     
