@@ -1196,4 +1196,309 @@ directory_send_command(dir_connection_t *conn,
   switch (purpose) {
     case DIR_PURPOSE_FETCH_CONSENSUS:
       /* resource is optional.  If present, it's a flavor name */
-     
+      tor_assert(!payload);
+      httpcommand = "GET";
+      url = directory_get_consensus_url(resource);
+      log_info(LD_DIR, "Downloading consensus from %s using %s",
+               hoststring, url);
+      break;
+    case DIR_PURPOSE_FETCH_CERTIFICATE:
+      tor_assert(resource);
+      tor_assert(!payload);
+      httpcommand = "GET";
+      tor_asprintf(&url, "/tor/keys/%s", resource);
+      break;
+    case DIR_PURPOSE_FETCH_STATUS_VOTE:
+      tor_assert(resource);
+      tor_assert(!payload);
+      httpcommand = "GET";
+      tor_asprintf(&url, "/tor/status-vote/next/%s.z", resource);
+      break;
+    case DIR_PURPOSE_FETCH_DETACHED_SIGNATURES:
+      tor_assert(!resource);
+      tor_assert(!payload);
+      httpcommand = "GET";
+      url = tor_strdup("/tor/status-vote/next/consensus-signatures.z");
+      break;
+    case DIR_PURPOSE_FETCH_SERVERDESC:
+      tor_assert(resource);
+      httpcommand = "GET";
+      tor_asprintf(&url, "/tor/server/%s", resource);
+      break;
+    case DIR_PURPOSE_FETCH_EXTRAINFO:
+      tor_assert(resource);
+      httpcommand = "GET";
+      tor_asprintf(&url, "/tor/extra/%s", resource);
+      break;
+    case DIR_PURPOSE_FETCH_MICRODESC:
+      tor_assert(resource);
+      httpcommand = "GET";
+      tor_asprintf(&url, "/tor/micro/%s", resource);
+      break;
+    case DIR_PURPOSE_UPLOAD_DIR: {
+      const char *why = router_get_descriptor_gen_reason();
+      tor_assert(!resource);
+      tor_assert(payload);
+      httpcommand = "POST";
+      url = tor_strdup("/tor/");
+      if (why) {
+        smartlist_add_asprintf(headers, "X-Desc-Gen-Reason: %s\r\n", why);
+      }
+      break;
+    }
+    case DIR_PURPOSE_UPLOAD_VOTE:
+      tor_assert(!resource);
+      tor_assert(payload);
+      httpcommand = "POST";
+      url = tor_strdup("/tor/post/vote");
+      break;
+    case DIR_PURPOSE_UPLOAD_SIGNATURES:
+      tor_assert(!resource);
+      tor_assert(payload);
+      httpcommand = "POST";
+      url = tor_strdup("/tor/post/consensus-signature");
+      break;
+    case DIR_PURPOSE_FETCH_RENDDESC_V2:
+      tor_assert(resource);
+      tor_assert(strlen(resource) <= REND_DESC_ID_V2_LEN_BASE32);
+      tor_assert(!payload);
+      httpcommand = "GET";
+      tor_asprintf(&url, "/tor/rendezvous2/%s", resource);
+      break;
+    case DIR_PURPOSE_UPLOAD_RENDDESC:
+      tor_assert(!resource);
+      tor_assert(payload);
+      httpcommand = "POST";
+      url = tor_strdup("/tor/rendezvous/publish");
+      break;
+    case DIR_PURPOSE_UPLOAD_RENDDESC_V2:
+      tor_assert(!resource);
+      tor_assert(payload);
+      httpcommand = "POST";
+      url = tor_strdup("/tor/rendezvous2/publish");
+      break;
+    default:
+      tor_assert(0);
+      return;
+  }
+
+  if (strlen(proxystring) + strlen(url) >= 4096) {
+    log_warn(LD_BUG,
+             "Squid does not like URLs longer than 4095 bytes, and this "
+             "one is %d bytes long: %s%s",
+             (int)(strlen(proxystring) + strlen(url)), proxystring, url);
+  }
+
+  tor_snprintf(request, sizeof(request), "%s %s", httpcommand, proxystring);
+  connection_write_to_buf(request, strlen(request), TO_CONN(conn));
+  connection_write_to_buf(url, strlen(url), TO_CONN(conn));
+  tor_free(url);
+
+  if (!strcmp(httpcommand, "POST") || payload) {
+    smartlist_add_asprintf(headers, "Content-Length: %lu\r\n",
+                 payload ? (unsigned long)payload_len : 0);
+  }
+
+  {
+    char *header = smartlist_join_strings(headers, "", 0, NULL);
+    tor_snprintf(request, sizeof(request), " HTTP/1.0\r\nHost: %s\r\n%s\r\n",
+                 hoststring, header);
+    tor_free(header);
+  }
+
+  connection_write_to_buf(request, strlen(request), TO_CONN(conn));
+
+  if (payload) {
+    /* then send the payload afterwards too */
+    connection_write_to_buf(payload, payload_len, TO_CONN(conn));
+  }
+
+  SMARTLIST_FOREACH(headers, char *, h, tor_free(h));
+  smartlist_free(headers);
+}
+
+/** Parse an HTTP request string <b>headers</b> of the form
+ * \verbatim
+ * "\%s [http[s]://]\%s HTTP/1..."
+ * \endverbatim
+ * If it's well-formed, strdup the second \%s into *<b>url</b>, and
+ * nul-terminate it. If the url doesn't start with "/tor/", rewrite it
+ * so it does. Return 0.
+ * Otherwise, return -1.
+ */
+STATIC int
+parse_http_url(const char *headers, char **url)
+{
+  char *s, *start, *tmp;
+
+  s = (char *)eat_whitespace_no_nl(headers);
+  if (!*s) return -1;
+  s = (char *)find_whitespace(s); /* get past GET/POST */
+  if (!*s) return -1;
+  s = (char *)eat_whitespace_no_nl(s);
+  if (!*s) return -1;
+  start = s; /* this is it, assuming it's valid */
+  s = (char *)find_whitespace(start);
+  if (!*s) return -1;
+
+  /* tolerate the http[s] proxy style of putting the hostname in the url */
+  if (s-start >= 4 && !strcmpstart(start,"http")) {
+    tmp = start + 4;
+    if (*tmp == 's')
+      tmp++;
+    if (s-tmp >= 3 && !strcmpstart(tmp,"://")) {
+      tmp = strchr(tmp+3, '/');
+      if (tmp && tmp < s) {
+        log_debug(LD_DIR,"Skipping over 'http[s]://hostname/' string");
+        start = tmp;
+      }
+    }
+  }
+
+  /* Check if the header is well formed (next sequence
+   * should be HTTP/1.X\r\n). Assumes we're supporting 1.0? */
+  {
+    unsigned minor_ver;
+    char ch;
+    char *e = (char *)eat_whitespace_no_nl(s);
+    if (2 != tor_sscanf(e, "HTTP/1.%u%c", &minor_ver, &ch)) {
+      return -1;
+    }
+    if (ch != '\r')
+      return -1;
+  }
+
+  if (s-start < 5 || strcmpstart(start,"/tor/")) { /* need to rewrite it */
+    *url = tor_malloc(s - start + 5);
+    strlcpy(*url,"/tor", s-start+5);
+    strlcat((*url)+4, start, s-start+1);
+  } else {
+    *url = tor_strndup(start, s-start);
+  }
+  return 0;
+}
+
+/** Return a copy of the first HTTP header in <b>headers</b> whose key is
+ * <b>which</b>.  The key should be given with a terminating colon and space;
+ * this function copies everything after, up to but not including the
+ * following \\r\\n. */
+static char *
+http_get_header(const char *headers, const char *which)
+{
+  const char *cp = headers;
+  while (cp) {
+    if (!strcasecmpstart(cp, which)) {
+      char *eos;
+      cp += strlen(which);
+      if ((eos = strchr(cp,'\r')))
+        return tor_strndup(cp, eos-cp);
+      else
+        return tor_strdup(cp);
+    }
+    cp = strchr(cp, '\n');
+    if (cp)
+      ++cp;
+  }
+  return NULL;
+}
+
+/** If <b>headers</b> indicates that a proxy was involved, then rewrite
+ * <b>conn</b>-\>address to describe our best guess of the address that
+ * originated this HTTP request. */
+static void
+http_set_address_origin(const char *headers, connection_t *conn)
+{
+  char *fwd;
+
+  fwd = http_get_header(headers, "Forwarded-For: ");
+  if (!fwd)
+    fwd = http_get_header(headers, "X-Forwarded-For: ");
+  if (fwd) {
+    struct in_addr in;
+    if (!tor_inet_aton(fwd, &in) || is_internal_IP(ntohl(in.s_addr), 0)) {
+      log_debug(LD_DIR, "Ignoring unrecognized or internal IP %s",
+                escaped(fwd));
+      tor_free(fwd);
+      return;
+    }
+    tor_free(conn->address);
+    conn->address = tor_strdup(fwd);
+    tor_free(fwd);
+  }
+}
+
+/** Parse an HTTP response string <b>headers</b> of the form
+ * \verbatim
+ * "HTTP/1.\%d \%d\%s\r\n...".
+ * \endverbatim
+ *
+ * If it's well-formed, assign the status code to *<b>code</b> and
+ * return 0.  Otherwise, return -1.
+ *
+ * On success: If <b>date</b> is provided, set *date to the Date
+ * header in the http headers, or 0 if no such header is found.  If
+ * <b>compression</b> is provided, set *<b>compression</b> to the
+ * compression method given in the Content-Encoding header, or 0 if no
+ * such header is found, or -1 if the value of the header is not
+ * recognized.  If <b>reason</b> is provided, strdup the reason string
+ * into it.
+ */
+int
+parse_http_response(const char *headers, int *code, time_t *date,
+                    compress_method_t *compression, char **reason)
+{
+  unsigned n1, n2;
+  char datestr[RFC1123_TIME_LEN+1];
+  smartlist_t *parsed_headers;
+  tor_assert(headers);
+  tor_assert(code);
+
+  while (TOR_ISSPACE(*headers)) headers++; /* tolerate leading whitespace */
+
+  if (tor_sscanf(headers, "HTTP/1.%u %u", &n1, &n2) < 2 ||
+      (n1 != 0 && n1 != 1) ||
+      (n2 < 100 || n2 >= 600)) {
+    log_warn(LD_HTTP,"Failed to parse header %s",escaped(headers));
+    return -1;
+  }
+  *code = n2;
+
+  parsed_headers = smartlist_new();
+  smartlist_split_string(parsed_headers, headers, "\n",
+                         SPLIT_SKIP_SPACE|SPLIT_IGNORE_BLANK, -1);
+  if (reason) {
+    smartlist_t *status_line_elements = smartlist_new();
+    tor_assert(smartlist_len(parsed_headers));
+    smartlist_split_string(status_line_elements,
+                           smartlist_get(parsed_headers, 0),
+                           " ", SPLIT_SKIP_SPACE|SPLIT_IGNORE_BLANK, 3);
+    tor_assert(smartlist_len(status_line_elements) <= 3);
+    if (smartlist_len(status_line_elements) == 3) {
+      *reason = smartlist_get(status_line_elements, 2);
+      smartlist_set(status_line_elements, 2, NULL); /* Prevent free */
+    }
+    SMARTLIST_FOREACH(status_line_elements, char *, cp, tor_free(cp));
+    smartlist_free(status_line_elements);
+  }
+  if (date) {
+    *date = 0;
+    SMARTLIST_FOREACH(parsed_headers, const char *, s,
+      if (!strcmpstart(s, "Date: ")) {
+        strlcpy(datestr, s+6, sizeof(datestr));
+        /* This will do nothing on failure, so we don't need to check
+           the result.   We shouldn't warn, since there are many other valid
+           date formats besides the one we use. */
+        parse_rfc1123_time(datestr, date);
+        break;
+      });
+  }
+  if (compression) {
+    const char *enc = NULL;
+    SMARTLIST_FOREACH(parsed_headers, const char *, s,
+      if (!strcmpstart(s, "Content-Encoding: ")) {
+        enc = s+18; break;
+      });
+    if (!enc || !strcmp(enc, "identity")) {
+      *compression = NO_METHOD;
+    } else if (!strcmp(enc, "deflate") || !strcmp(enc, "x-deflate")) {
+      *compress
