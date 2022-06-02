@@ -1501,4 +1501,254 @@ parse_http_response(const char *headers, int *code, time_t *date,
     if (!enc || !strcmp(enc, "identity")) {
       *compression = NO_METHOD;
     } else if (!strcmp(enc, "deflate") || !strcmp(enc, "x-deflate")) {
-      *compress
+      *compression = ZLIB_METHOD;
+    } else if (!strcmp(enc, "gzip") || !strcmp(enc, "x-gzip")) {
+      *compression = GZIP_METHOD;
+    } else {
+      log_info(LD_HTTP, "Unrecognized content encoding: %s. Trying to deal.",
+               escaped(enc));
+      *compression = UNKNOWN_METHOD;
+    }
+  }
+  SMARTLIST_FOREACH(parsed_headers, char *, s, tor_free(s));
+  smartlist_free(parsed_headers);
+
+  return 0;
+}
+
+/** Return true iff <b>body</b> doesn't start with a plausible router or
+ * running-list or directory opening.  This is a sign of possible compression.
+ **/
+static int
+body_is_plausible(const char *body, size_t len, int purpose)
+{
+  int i;
+  if (len == 0)
+    return 1; /* empty bodies don't need decompression */
+  if (len < 32)
+    return 0;
+  if (purpose == DIR_PURPOSE_FETCH_MICRODESC) {
+    return (!strcmpstart(body,"onion-key"));
+  }
+  if (purpose != DIR_PURPOSE_FETCH_RENDDESC) {
+    if (!strcmpstart(body,"router") ||
+        !strcmpstart(body,"signed-directory") ||
+        !strcmpstart(body,"network-status") ||
+        !strcmpstart(body,"running-routers"))
+    return 1;
+    for (i=0;i<32;++i) {
+      if (!TOR_ISPRINT(body[i]) && !TOR_ISSPACE(body[i]))
+        return 0;
+    }
+    return 1;
+  } else {
+    return 1;
+  }
+}
+
+/** Called when we've just fetched a bunch of router descriptors in
+ * <b>body</b>.  The list <b>which</b>, if present, holds digests for
+ * descriptors we requested: descriptor digests if <b>descriptor_digests</b>
+ * is true, or identity digests otherwise.  Parse the descriptors, validate
+ * them, and annotate them as having purpose <b>purpose</b> and as having been
+ * downloaded from <b>source</b>.
+ *
+ * Return the number of routers actually added. */
+static int
+load_downloaded_routers(const char *body, smartlist_t *which,
+                        int descriptor_digests,
+                        int router_purpose,
+                        const char *source)
+{
+  char buf[256];
+  char time_buf[ISO_TIME_LEN+1];
+  int added = 0;
+  int general = router_purpose == ROUTER_PURPOSE_GENERAL;
+  format_iso_time(time_buf, time(NULL));
+  tor_assert(source);
+
+  if (tor_snprintf(buf, sizeof(buf),
+                   "@downloaded-at %s\n"
+                   "@source %s\n"
+                   "%s%s%s", time_buf, escaped(source),
+                   !general ? "@purpose " : "",
+                   !general ? router_purpose_to_string(router_purpose) : "",
+                   !general ? "\n" : "")<0)
+    return added;
+
+  added = router_load_routers_from_string(body, NULL, SAVED_NOWHERE, which,
+                                  descriptor_digests, buf);
+  if (general)
+    control_event_bootstrap(BOOTSTRAP_STATUS_LOADING_DESCRIPTORS,
+                            count_loading_descriptors_progress());
+  return added;
+}
+
+/** We are a client, and we've finished reading the server's
+ * response. Parse it and act appropriately.
+ *
+ * If we're still happy with using this directory server in the future, return
+ * 0. Otherwise return -1; and the caller should consider trying the request
+ * again.
+ *
+ * The caller will take care of marking the connection for close.
+ */
+static int
+connection_dir_client_reached_eof(dir_connection_t *conn)
+{
+  char *body;
+  char *headers;
+  char *reason = NULL;
+  size_t body_len = 0, orig_len = 0;
+  int status_code;
+  time_t date_header = 0;
+  long delta;
+  compress_method_t compression;
+  int plausible;
+  int skewed = 0;
+  int allow_partial = (conn->base_.purpose == DIR_PURPOSE_FETCH_SERVERDESC ||
+                       conn->base_.purpose == DIR_PURPOSE_FETCH_EXTRAINFO ||
+                       conn->base_.purpose == DIR_PURPOSE_FETCH_MICRODESC);
+  int was_compressed = 0;
+  time_t now = time(NULL);
+  int src_code;
+
+  switch (connection_fetch_from_buf_http(TO_CONN(conn),
+                              &headers, MAX_HEADERS_SIZE,
+                              &body, &body_len, MAX_DIR_DL_SIZE,
+                              allow_partial)) {
+    case -1: /* overflow */
+      log_warn(LD_PROTOCOL,
+               "'fetch' response too large (server '%s:%d'). Closing.",
+               conn->base_.address, conn->base_.port);
+      return -1;
+    case 0:
+      log_info(LD_HTTP,
+               "'fetch' response not all here, but we're at eof. Closing.");
+      return -1;
+    /* case 1, fall through */
+  }
+  orig_len = body_len;
+
+  if (parse_http_response(headers, &status_code, &date_header,
+                          &compression, &reason) < 0) {
+    log_warn(LD_HTTP,"Unparseable headers (server '%s:%d'). Closing.",
+             conn->base_.address, conn->base_.port);
+    tor_free(body); tor_free(headers);
+    return -1;
+  }
+  if (!reason) reason = tor_strdup("[no reason given]");
+
+  log_debug(LD_DIR,
+            "Received response from directory server '%s:%d': %d %s "
+            "(purpose: %d)",
+            conn->base_.address, conn->base_.port, status_code,
+            escaped(reason),
+            conn->base_.purpose);
+
+  /* now check if it's got any hints for us about our IP address. */
+  if (conn->dirconn_direct) {
+    char *guess = http_get_header(headers, X_ADDRESS_HEADER);
+    if (guess) {
+      router_new_address_suggestion(guess, conn);
+      tor_free(guess);
+    }
+  }
+
+  if (date_header > 0) {
+    /* The date header was written very soon after we sent our request,
+     * so compute the skew as the difference between sending the request
+     * and the date header.  (We used to check now-date_header, but that's
+     * inaccurate if we spend a lot of time downloading.)
+     */
+    delta = conn->base_.timestamp_lastwritten - date_header;
+    if (labs(delta)>ALLOW_DIRECTORY_TIME_SKEW) {
+      char dbuf[64];
+      int trusted = router_digest_is_trusted_dir(conn->identity_digest);
+      format_time_interval(dbuf, sizeof(dbuf), delta);
+      log_fn(trusted ? LOG_WARN : LOG_INFO,
+             LD_HTTP,
+             "Received directory with skewed time (server '%s:%d'): "
+             "It seems that our clock is %s by %s, or that theirs is %s. "
+             "Tor requires an accurate clock to work: please check your time, "
+             "timezone, and date settings.",
+             conn->base_.address, conn->base_.port,
+             delta>0 ? "ahead" : "behind", dbuf,
+             delta>0 ? "behind" : "ahead");
+      skewed = 1; /* don't check the recommended-versions line */
+      if (trusted)
+        control_event_general_status(LOG_WARN,
+                                 "CLOCK_SKEW SKEW=%ld SOURCE=DIRSERV:%s:%d",
+                                 delta, conn->base_.address, conn->base_.port);
+    } else {
+      log_debug(LD_HTTP, "Time on received directory is within tolerance; "
+                "we are %ld seconds skewed.  (That's okay.)", delta);
+    }
+  }
+  (void) skewed; /* skewed isn't used yet. */
+
+  if (status_code == 503) {
+    routerstatus_t *rs;
+    dir_server_t *ds;
+    const char *id_digest = conn->identity_digest;
+    log_info(LD_DIR,"Received http status code %d (%s) from server "
+             "'%s:%d'. I'll try again soon.",
+             status_code, escaped(reason), conn->base_.address,
+             conn->base_.port);
+    if ((rs = router_get_mutable_consensus_status_by_id(id_digest)))
+      rs->last_dir_503_at = now;
+    if ((ds = router_get_fallback_dirserver_by_digest(id_digest)))
+      ds->fake_status.last_dir_503_at = now;
+
+    tor_free(body); tor_free(headers); tor_free(reason);
+    return -1;
+  }
+
+  plausible = body_is_plausible(body, body_len, conn->base_.purpose);
+  if (compression != NO_METHOD || !plausible) {
+    char *new_body = NULL;
+    size_t new_len = 0;
+    compress_method_t guessed = detect_compression_method(body, body_len);
+    if (compression == UNKNOWN_METHOD || guessed != compression) {
+      /* Tell the user if we don't believe what we're told about compression.*/
+      const char *description1, *description2;
+      if (compression == ZLIB_METHOD)
+        description1 = "as deflated";
+      else if (compression == GZIP_METHOD)
+        description1 = "as gzipped";
+      else if (compression == NO_METHOD)
+        description1 = "as uncompressed";
+      else
+        description1 = "with an unknown Content-Encoding";
+      if (guessed == ZLIB_METHOD)
+        description2 = "deflated";
+      else if (guessed == GZIP_METHOD)
+        description2 = "gzipped";
+      else if (!plausible)
+        description2 = "confusing binary junk";
+      else
+        description2 = "uncompressed";
+
+      log_info(LD_HTTP, "HTTP body from server '%s:%d' was labeled %s, "
+               "but it seems to be %s.%s",
+               conn->base_.address, conn->base_.port, description1,
+               description2,
+               (compression>0 && guessed>0)?"  Trying both.":"");
+    }
+    /* Try declared compression first if we can. */
+    if (compression == GZIP_METHOD  || compression == ZLIB_METHOD)
+      tor_gzip_uncompress(&new_body, &new_len, body, body_len, compression,
+                          !allow_partial, LOG_PROTOCOL_WARN);
+    /* Okay, if that didn't work, and we think that it was compressed
+     * differently, try that. */
+    if (!new_body &&
+        (guessed == GZIP_METHOD || guessed == ZLIB_METHOD) &&
+        compression != guessed)
+      tor_gzip_uncompress(&new_body, &new_len, body, body_len, guessed,
+                          !allow_partial, LOG_PROTOCOL_WARN);
+    /* If we're pretty sure that we have a compressed directory, and
+     * we didn't manage to uncompress it, then warn and bail. */
+    if (!plausible && !new_body) {
+      log_fn(LOG_PROTOCOL_WARN, LD_HTTP,
+             "Unable to decompress HTTP body (server '%s:%d').",
+             conn->base_.address, conn->ba
