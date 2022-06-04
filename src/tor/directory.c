@@ -1751,4 +1751,218 @@ connection_dir_client_reached_eof(dir_connection_t *conn)
     if (!plausible && !new_body) {
       log_fn(LOG_PROTOCOL_WARN, LD_HTTP,
              "Unable to decompress HTTP body (server '%s:%d').",
-             conn->base_.address, conn->ba
+             conn->base_.address, conn->base_.port);
+      tor_free(body); tor_free(headers); tor_free(reason);
+      return -1;
+    }
+    if (new_body) {
+      tor_free(body);
+      body = new_body;
+      body_len = new_len;
+      was_compressed = 1;
+    }
+  }
+
+  if (conn->base_.purpose == DIR_PURPOSE_FETCH_CONSENSUS) {
+    int r;
+    const char *flavname = conn->requested_resource;
+    if (status_code != 200) {
+      int severity = (status_code == 304) ? LOG_INFO : LOG_WARN;
+      tor_log(severity, LD_DIR,
+          "Received http status code %d (%s) from server "
+          "'%s:%d' while fetching consensus directory.",
+           status_code, escaped(reason), conn->base_.address,
+           conn->base_.port);
+      tor_free(body); tor_free(headers); tor_free(reason);
+      networkstatus_consensus_download_failed(status_code, flavname);
+      return -1;
+    }
+    log_info(LD_DIR,"Received consensus directory (size %d) from server "
+             "'%s:%d'", (int)body_len, conn->base_.address, conn->base_.port);
+    if ((r=networkstatus_set_current_consensus(body, flavname, 0))<0) {
+      log_fn(r<-1?LOG_WARN:LOG_INFO, LD_DIR,
+             "Unable to load %s consensus directory downloaded from "
+             "server '%s:%d'. I'll try again soon.",
+             flavname, conn->base_.address, conn->base_.port);
+      tor_free(body); tor_free(headers); tor_free(reason);
+      networkstatus_consensus_download_failed(0, flavname);
+      return -1;
+    }
+    /* launches router downloads as needed */
+    routers_update_all_from_networkstatus(now, 3);
+    update_microdescs_from_networkstatus(now);
+    update_microdesc_downloads(now);
+    directory_info_has_arrived(now, 0);
+    log_info(LD_DIR, "Successfully loaded consensus.");
+  }
+
+  if (conn->base_.purpose == DIR_PURPOSE_FETCH_CERTIFICATE) {
+    if (status_code != 200) {
+      log_warn(LD_DIR,
+          "Received http status code %d (%s) from server "
+          "'%s:%d' while fetching \"/tor/keys/%s\".",
+           status_code, escaped(reason), conn->base_.address,
+           conn->base_.port, conn->requested_resource);
+      connection_dir_download_cert_failed(conn, status_code);
+      tor_free(body); tor_free(headers); tor_free(reason);
+      return -1;
+    }
+    log_info(LD_DIR,"Received authority certificates (size %d) from server "
+             "'%s:%d'", (int)body_len, conn->base_.address, conn->base_.port);
+
+    /*
+     * Tell trusted_dirs_load_certs_from_string() whether it was by fp
+     * or fp-sk pair.
+     */
+    src_code = -1;
+    if (!strcmpstart(conn->requested_resource, "fp/")) {
+      src_code = TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST;
+    } else if (!strcmpstart(conn->requested_resource, "fp-sk/")) {
+      src_code = TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_SK_DIGEST;
+    }
+
+    if (src_code != -1) {
+      if (trusted_dirs_load_certs_from_string(body, src_code, 1)<0) {
+        log_warn(LD_DIR, "Unable to parse fetched certificates");
+        /* if we fetched more than one and only some failed, the successful
+         * ones got flushed to disk so it's safe to call this on them */
+        connection_dir_download_cert_failed(conn, status_code);
+      } else {
+        directory_info_has_arrived(now, 0);
+        log_info(LD_DIR, "Successfully loaded certificates from fetch.");
+      }
+    } else {
+      log_warn(LD_DIR,
+               "Couldn't figure out what to do with fetched certificates for "
+               "unknown resource %s",
+               conn->requested_resource);
+      connection_dir_download_cert_failed(conn, status_code);
+    }
+  }
+  if (conn->base_.purpose == DIR_PURPOSE_FETCH_STATUS_VOTE) {
+    const char *msg;
+    int st;
+    log_info(LD_DIR,"Got votes (size %d) from server %s:%d",
+             (int)body_len, conn->base_.address, conn->base_.port);
+    if (status_code != 200) {
+      log_warn(LD_DIR,
+             "Received http status code %d (%s) from server "
+             "'%s:%d' while fetching \"/tor/status-vote/next/%s.z\".",
+             status_code, escaped(reason), conn->base_.address,
+             conn->base_.port, conn->requested_resource);
+      tor_free(body); tor_free(headers); tor_free(reason);
+      return -1;
+    }
+    dirvote_add_vote(body, &msg, &st);
+    if (st > 299) {
+      log_warn(LD_DIR, "Error adding retrieved vote: %s", msg);
+    } else {
+      log_info(LD_DIR, "Added vote(s) successfully [msg: %s]", msg);
+    }
+  }
+  if (conn->base_.purpose == DIR_PURPOSE_FETCH_DETACHED_SIGNATURES) {
+    const char *msg = NULL;
+    log_info(LD_DIR,"Got detached signatures (size %d) from server %s:%d",
+             (int)body_len, conn->base_.address, conn->base_.port);
+    if (status_code != 200) {
+      log_warn(LD_DIR,
+        "Received http status code %d (%s) from server '%s:%d' while fetching "
+        "\"/tor/status-vote/next/consensus-signatures.z\".",
+             status_code, escaped(reason), conn->base_.address,
+             conn->base_.port);
+      tor_free(body); tor_free(headers); tor_free(reason);
+      return -1;
+    }
+    if (dirvote_add_signatures(body, conn->base_.address, &msg)<0) {
+      log_warn(LD_DIR, "Problem adding detached signatures from %s:%d: %s",
+               conn->base_.address, conn->base_.port, msg?msg:"???");
+    }
+  }
+
+  if (conn->base_.purpose == DIR_PURPOSE_FETCH_SERVERDESC ||
+      conn->base_.purpose == DIR_PURPOSE_FETCH_EXTRAINFO) {
+    int was_ei = conn->base_.purpose == DIR_PURPOSE_FETCH_EXTRAINFO;
+    smartlist_t *which = NULL;
+    int n_asked_for = 0;
+    int descriptor_digests = conn->requested_resource &&
+                             !strcmpstart(conn->requested_resource,"d/");
+    log_info(LD_DIR,"Received %s (size %d) from server '%s:%d'",
+             was_ei ? "extra server info" : "server info",
+             (int)body_len, conn->base_.address, conn->base_.port);
+    if (conn->requested_resource &&
+        (!strcmpstart(conn->requested_resource,"d/") ||
+         !strcmpstart(conn->requested_resource,"fp/"))) {
+      which = smartlist_new();
+      dir_split_resource_into_fingerprints(conn->requested_resource +
+                                             (descriptor_digests ? 2 : 3),
+                                           which, NULL, 0);
+      n_asked_for = smartlist_len(which);
+    }
+    if (status_code != 200) {
+      int dir_okay = status_code == 404 ||
+        (status_code == 400 && !strcmp(reason, "Servers unavailable."));
+      /* 404 means that it didn't have them; no big deal.
+       * Older (pre-0.1.1.8) servers said 400 Servers unavailable instead. */
+      log_fn(dir_okay ? LOG_INFO : LOG_WARN, LD_DIR,
+             "Received http status code %d (%s) from server '%s:%d' "
+             "while fetching \"/tor/server/%s\". I'll try again soon.",
+             status_code, escaped(reason), conn->base_.address,
+             conn->base_.port, conn->requested_resource);
+      if (!which) {
+        connection_dir_download_routerdesc_failed(conn);
+      } else {
+        dir_routerdesc_download_failed(which, status_code,
+                                       conn->router_purpose,
+                                       was_ei, descriptor_digests);
+        SMARTLIST_FOREACH(which, char *, cp, tor_free(cp));
+        smartlist_free(which);
+      }
+      tor_free(body); tor_free(headers); tor_free(reason);
+      return dir_okay ? 0 : -1;
+    }
+    /* Learn the routers, assuming we requested by fingerprint or "all"
+     * or "authority".
+     *
+     * We use "authority" to fetch our own descriptor for
+     * testing, and to fetch bridge descriptors for bootstrapping. Ignore
+     * the output of "authority" requests unless we are using bridges,
+     * since otherwise they'll be the response from reachability tests,
+     * and we don't really want to add that to our routerlist. */
+    if (which || (conn->requested_resource &&
+                  (!strcmpstart(conn->requested_resource, "all") ||
+                   (!strcmpstart(conn->requested_resource, "authority") &&
+                    get_options()->UseBridges)))) {
+      /* as we learn from them, we remove them from 'which' */
+      if (was_ei) {
+        router_load_extrainfo_from_string(body, NULL, SAVED_NOWHERE, which,
+                                          descriptor_digests);
+      } else {
+        //router_load_routers_from_string(body, NULL, SAVED_NOWHERE, which,
+        //                       descriptor_digests, conn->router_purpose);
+        if (load_downloaded_routers(body, which, descriptor_digests,
+                                conn->router_purpose,
+                                conn->base_.address))
+          directory_info_has_arrived(now, 0);
+      }
+    }
+    if (which) { /* mark remaining ones as failed */
+      log_info(LD_DIR, "Received %d/%d %s requested from %s:%d",
+               n_asked_for-smartlist_len(which), n_asked_for,
+               was_ei ? "extra-info documents" : "router descriptors",
+               conn->base_.address, (int)conn->base_.port);
+      if (smartlist_len(which)) {
+        dir_routerdesc_download_failed(which, status_code,
+                                       conn->router_purpose,
+                                       was_ei, descriptor_digests);
+      }
+      SMARTLIST_FOREACH(which, char *, cp, tor_free(cp));
+      smartlist_free(which);
+    }
+    if (directory_conn_is_self_reachability_test(conn))
+      router_dirport_found_reachable();
+  }
+  if (conn->base_.purpose == DIR_PURPOSE_FETCH_MICRODESC) {
+    smartlist_t *which = NULL;
+    log_info(LD_DIR,"Received answer to microdescriptor request (status %d, "
+             "size %d) from server '%s:%d'",
+             status_code
