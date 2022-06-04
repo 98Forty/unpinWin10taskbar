@@ -2186,4 +2186,267 @@ connection_dir_client_reached_eof(dir_connection_t *conn)
         SEND_HS_DESC_FAILED_EVENT();
         break;
       case 400:
-        log_warn(LD_REND, "Fetching v2 rendezvou
+        log_warn(LD_REND, "Fetching v2 rendezvous descriptor failed: "
+                 "http status 400 (%s). Dirserver didn't like our "
+                 "v2 rendezvous query? Retrying at another directory.",
+                 escaped(reason));
+        SEND_HS_DESC_FAILED_EVENT();
+        break;
+      default:
+        log_warn(LD_REND, "Fetching v2 rendezvous descriptor failed: "
+                 "http status %d (%s) response unexpected while "
+                 "fetching v2 hidden service descriptor (server '%s:%d'). "
+                 "Retrying at another directory.",
+                 status_code, escaped(reason), conn->base_.address,
+                 conn->base_.port);
+        SEND_HS_DESC_FAILED_EVENT();
+        break;
+    }
+  }
+
+  if (conn->base_.purpose == DIR_PURPOSE_UPLOAD_RENDDESC ||
+      conn->base_.purpose == DIR_PURPOSE_UPLOAD_RENDDESC_V2) {
+    log_info(LD_REND,"Uploaded rendezvous descriptor (status %d "
+             "(%s))",
+             status_code, escaped(reason));
+    switch (status_code) {
+      case 200:
+        log_info(LD_REND,
+                 "Uploading rendezvous descriptor: finished with status "
+                 "200 (%s)", escaped(reason));
+        break;
+      case 400:
+        log_warn(LD_REND,"http status 400 (%s) response from dirserver "
+                 "'%s:%d'. Malformed rendezvous descriptor?",
+                 escaped(reason), conn->base_.address, conn->base_.port);
+        break;
+      default:
+        log_warn(LD_REND,"http status %d (%s) response unexpected (server "
+                 "'%s:%d').",
+                 status_code, escaped(reason), conn->base_.address,
+                 conn->base_.port);
+        break;
+    }
+  }
+  note_client_request(conn->base_.purpose, was_compressed, orig_len);
+  tor_free(body); tor_free(headers); tor_free(reason);
+  return 0;
+}
+
+/** Called when a directory connection reaches EOF. */
+int
+connection_dir_reached_eof(dir_connection_t *conn)
+{
+  int retval;
+  if (conn->base_.state != DIR_CONN_STATE_CLIENT_READING) {
+    log_info(LD_HTTP,"conn reached eof, not reading. [state=%d] Closing.",
+             conn->base_.state);
+    connection_close_immediate(TO_CONN(conn)); /* error: give up on flushing */
+    connection_mark_for_close(TO_CONN(conn));
+    return -1;
+  }
+
+  retval = connection_dir_client_reached_eof(conn);
+  if (retval == 0) /* success */
+    conn->base_.state = DIR_CONN_STATE_CLIENT_FINISHED;
+  connection_mark_for_close(TO_CONN(conn));
+  return retval;
+}
+
+/** If any directory object is arriving, and it's over 10MB large, we're
+ * getting DoS'd.  (As of 0.1.2.x, raw directories are about 1MB, and we never
+ * ask for more than 96 router descriptors at a time.)
+ */
+#define MAX_DIRECTORY_OBJECT_SIZE (10*(1<<20))
+
+/** Read handler for directory connections.  (That's connections <em>to</em>
+ * directory servers and connections <em>at</em> directory servers.)
+ */
+int
+connection_dir_process_inbuf(dir_connection_t *conn)
+{
+  tor_assert(conn);
+  tor_assert(conn->base_.type == CONN_TYPE_DIR);
+
+  /* Directory clients write, then read data until they receive EOF;
+   * directory servers read data until they get an HTTP command, then
+   * write their response (when it's finished flushing, they mark for
+   * close).
+   */
+
+  /* If we're on the dirserver side, look for a command. */
+  if (conn->base_.state == DIR_CONN_STATE_SERVER_COMMAND_WAIT) {
+    if (directory_handle_command(conn) < 0) {
+      connection_mark_for_close(TO_CONN(conn));
+      return -1;
+    }
+    return 0;
+  }
+
+  if (connection_get_inbuf_len(TO_CONN(conn)) > MAX_DIRECTORY_OBJECT_SIZE) {
+    log_warn(LD_HTTP, "Too much data received from directory connection: "
+             "denial of service attempt, or you need to upgrade?");
+    connection_mark_for_close(TO_CONN(conn));
+    return -1;
+  }
+
+  if (!conn->base_.inbuf_reached_eof)
+    log_debug(LD_HTTP,"Got data, not eof. Leaving on inbuf.");
+  return 0;
+}
+
+/** Called when we're about to finally unlink and free a directory connection:
+ * perform necessary accounting and cleanup */
+void
+connection_dir_about_to_close(dir_connection_t *dir_conn)
+{
+  connection_t *conn = TO_CONN(dir_conn);
+
+  if (conn->state < DIR_CONN_STATE_CLIENT_FINISHED) {
+    /* It's a directory connection and connecting or fetching
+     * failed: forget about this router, and maybe try again. */
+    connection_dir_request_failed(dir_conn);
+  }
+  /* If we were trying to fetch a v2 rend desc and did not succeed,
+   * retry as needed. (If a fetch is successful, the connection state
+   * is changed to DIR_PURPOSE_HAS_FETCHED_RENDDESC to mark that
+   * refetching is unnecessary.) */
+  if (conn->purpose == DIR_PURPOSE_FETCH_RENDDESC_V2 &&
+      dir_conn->rend_data &&
+      strlen(dir_conn->rend_data->onion_address) == REND_SERVICE_ID_LEN_BASE32)
+    rend_client_refetch_v2_renddesc(dir_conn->rend_data);
+}
+
+/** Create an http response for the client <b>conn</b> out of
+ * <b>status</b> and <b>reason_phrase</b>. Write it to <b>conn</b>.
+ */
+static void
+write_http_status_line(dir_connection_t *conn, int status,
+                       const char *reason_phrase)
+{
+  char buf[256];
+  if (tor_snprintf(buf, sizeof(buf), "HTTP/1.0 %d %s\r\n\r\n",
+      status, reason_phrase ? reason_phrase : "OK") < 0) {
+    log_warn(LD_BUG,"status line too long.");
+    return;
+  }
+  connection_write_to_buf(buf, strlen(buf), TO_CONN(conn));
+}
+
+/** Write the header for an HTTP/1.0 response onto <b>conn</b>-\>outbuf,
+ * with <b>type</b> as the Content-Type.
+ *
+ * If <b>length</b> is nonnegative, it is the Content-Length.
+ * If <b>encoding</b> is provided, it is the Content-Encoding.
+ * If <b>cache_lifetime</b> is greater than 0, the content may be cached for
+ * up to cache_lifetime seconds.  Otherwise, the content may not be cached. */
+static void
+write_http_response_header_impl(dir_connection_t *conn, ssize_t length,
+                           const char *type, const char *encoding,
+                           const char *extra_headers,
+                           long cache_lifetime)
+{
+  char date[RFC1123_TIME_LEN+1];
+  char tmp[1024];
+  char *cp;
+  time_t now = time(NULL);
+
+  tor_assert(conn);
+
+  format_rfc1123_time(date, now);
+  cp = tmp;
+  tor_snprintf(cp, sizeof(tmp),
+               "HTTP/1.0 200 OK\r\nDate: %s\r\n",
+               date);
+  cp += strlen(tmp);
+  if (type) {
+    tor_snprintf(cp, sizeof(tmp)-(cp-tmp), "Content-Type: %s\r\n", type);
+    cp += strlen(cp);
+  }
+  if (!is_local_addr(&conn->base_.addr)) {
+    /* Don't report the source address for a nearby/private connection.
+     * Otherwise we tend to mis-report in cases where incoming ports are
+     * being forwarded to a Tor server running behind the firewall. */
+    tor_snprintf(cp, sizeof(tmp)-(cp-tmp),
+                 X_ADDRESS_HEADER "%s\r\n", conn->base_.address);
+    cp += strlen(cp);
+  }
+  if (encoding) {
+    tor_snprintf(cp, sizeof(tmp)-(cp-tmp),
+                 "Content-Encoding: %s\r\n", encoding);
+    cp += strlen(cp);
+  }
+  if (length >= 0) {
+    tor_snprintf(cp, sizeof(tmp)-(cp-tmp),
+                 "Content-Length: %ld\r\n", (long)length);
+    cp += strlen(cp);
+  }
+  if (cache_lifetime > 0) {
+    char expbuf[RFC1123_TIME_LEN+1];
+    format_rfc1123_time(expbuf, now + cache_lifetime);
+    /* We could say 'Cache-control: max-age=%d' here if we start doing
+     * http/1.1 */
+    tor_snprintf(cp, sizeof(tmp)-(cp-tmp),
+                 "Expires: %s\r\n", expbuf);
+    cp += strlen(cp);
+  } else if (cache_lifetime == 0) {
+    /* We could say 'Cache-control: no-cache' here if we start doing
+     * http/1.1 */
+    strlcpy(cp, "Pragma: no-cache\r\n", sizeof(tmp)-(cp-tmp));
+    cp += strlen(cp);
+  }
+  if (extra_headers) {
+    strlcpy(cp, extra_headers, sizeof(tmp)-(cp-tmp));
+    cp += strlen(cp);
+  }
+  if (sizeof(tmp)-(cp-tmp) > 3)
+    memcpy(cp, "\r\n", 3);
+  else
+    tor_assert(0);
+  connection_write_to_buf(tmp, strlen(tmp), TO_CONN(conn));
+}
+
+/** As write_http_response_header_impl, but sets encoding and content-typed
+ * based on whether the response will be <b>compressed</b> or not. */
+static void
+write_http_response_header(dir_connection_t *conn, ssize_t length,
+                           int compressed, long cache_lifetime)
+{
+  write_http_response_header_impl(conn, length,
+                          compressed?"application/octet-stream":"text/plain",
+                          compressed?"deflate":"identity",
+                             NULL,
+                             cache_lifetime);
+}
+
+#if defined(INSTRUMENT_DOWNLOADS) || defined(RUNNING_DOXYGEN)
+/* DOCDOC */
+typedef struct request_t {
+  uint64_t bytes; /**< How many bytes have we transferred? */
+  uint64_t count; /**< How many requests have we made? */
+} request_t;
+
+/** Map used to keep track of how much data we've up/downloaded in what kind
+ * of request.  Maps from request type to pointer to request_t. */
+static strmap_t *request_map = NULL;
+
+/** Record that a client request of <b>purpose</b> was made, and that
+ * <b>bytes</b> bytes of possibly <b>compressed</b> data were sent/received.
+ * Used to keep track of how much we've up/downloaded in what kind of
+ * request. */
+static void
+note_client_request(int purpose, int compressed, size_t bytes)
+{
+  char *key;
+  const char *kind = NULL;
+  switch (purpose) {
+    case DIR_PURPOSE_FETCH_CONSENSUS:     kind = "dl/consensus"; break;
+    case DIR_PURPOSE_FETCH_CERTIFICATE:   kind = "dl/cert"; break;
+    case DIR_PURPOSE_FETCH_STATUS_VOTE:   kind = "dl/vote"; break;
+    case DIR_PURPOSE_FETCH_DETACHED_SIGNATURES: kind = "dl/detached_sig";
+         break;
+    case DIR_PURPOSE_FETCH_SERVERDESC:    kind = "dl/server"; break;
+    case DIR_PURPOSE_FETCH_EXTRAINFO:     kind = "dl/extra"; break;
+    case DIR_PURPOSE_UPLOAD_DIR:          kind = "dl/ul-dir"; break;
+    case DIR_PURPOSE_UPLOAD_VOTE:         kind = "dl/ul-vote"; break;
+    case DIR_PURPOSE_UPLOAD_SIGNATURES:   kind = "dl/ul-si
