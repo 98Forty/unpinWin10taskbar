@@ -2449,4 +2449,315 @@ note_client_request(int purpose, int compressed, size_t bytes)
     case DIR_PURPOSE_FETCH_EXTRAINFO:     kind = "dl/extra"; break;
     case DIR_PURPOSE_UPLOAD_DIR:          kind = "dl/ul-dir"; break;
     case DIR_PURPOSE_UPLOAD_VOTE:         kind = "dl/ul-vote"; break;
-    case DIR_PURPOSE_UPLOAD_SIGNATURES:   kind = "dl/ul-si
+    case DIR_PURPOSE_UPLOAD_SIGNATURES:   kind = "dl/ul-sig"; break;
+    case DIR_PURPOSE_FETCH_RENDDESC:      kind = "dl/rend"; break;
+    case DIR_PURPOSE_FETCH_RENDDESC_V2:   kind = "dl/rend2"; break;
+    case DIR_PURPOSE_UPLOAD_RENDDESC:     kind = "dl/ul-rend"; break;
+    case DIR_PURPOSE_UPLOAD_RENDDESC_V2:  kind = "dl/ul-rend2"; break;
+  }
+  if (kind) {
+    tor_asprintf(&key, "%s%s", kind, compressed?".z":"");
+  } else {
+    tor_asprintf(&key, "unknown purpose (%d)%s",
+                 purpose, compressed?".z":"");
+  }
+  note_request(key, bytes);
+  tor_free(key);
+}
+
+/** Helper: initialize the request map to instrument downloads. */
+static void
+ensure_request_map_initialized(void)
+{
+  if (!request_map)
+    request_map = strmap_new();
+}
+
+/** Called when we just transmitted or received <b>bytes</b> worth of data
+ * because of a request of type <b>key</b> (an arbitrary identifier): adds
+ * <b>bytes</b> to the total associated with key. */
+void
+note_request(const char *key, size_t bytes)
+{
+  request_t *r;
+  ensure_request_map_initialized();
+
+  r = strmap_get(request_map, key);
+  if (!r) {
+    r = tor_malloc_zero(sizeof(request_t));
+    strmap_set(request_map, key, r);
+  }
+  r->bytes += bytes;
+  r->count++;
+}
+
+/** Return a newly allocated string holding a summary of bytes used per
+ * request type. */
+char *
+directory_dump_request_log(void)
+{
+  smartlist_t *lines;
+  char *result;
+  strmap_iter_t *iter;
+
+  ensure_request_map_initialized();
+
+  lines = smartlist_new();
+
+  for (iter = strmap_iter_init(request_map);
+       !strmap_iter_done(iter);
+       iter = strmap_iter_next(request_map, iter)) {
+    const char *key;
+    void *val;
+    request_t *r;
+    strmap_iter_get(iter, &key, &val);
+    r = val;
+    smartlist_add_asprintf(lines, "%s  "U64_FORMAT"  "U64_FORMAT"\n",
+                 key, U64_PRINTF_ARG(r->bytes), U64_PRINTF_ARG(r->count));
+  }
+  smartlist_sort_strings(lines);
+  result = smartlist_join_strings(lines, "", 0, NULL);
+  SMARTLIST_FOREACH(lines, char *, cp, tor_free(cp));
+  smartlist_free(lines);
+  return result;
+}
+#else
+static void
+note_client_request(int purpose, int compressed, size_t bytes)
+{
+  (void)purpose;
+  (void)compressed;
+  (void)bytes;
+}
+
+void
+note_request(const char *key, size_t bytes)
+{
+  (void)key;
+  (void)bytes;
+}
+
+char *
+directory_dump_request_log(void)
+{
+  return tor_strdup("Not supported.");
+}
+#endif
+
+/** Decide whether a client would accept the consensus we have.
+ *
+ * Clients can say they only want a consensus if it's signed by more
+ * than half the authorities in a list.  They pass this list in
+ * the url as "...consensus/<b>fpr</b>+<b>fpr</b>+<b>fpr</b>".
+ *
+ * <b>fpr</b> may be an abbreviated fingerprint, i.e. only a left substring
+ * of the full authority identity digest. (Only strings of even length,
+ * i.e. encodings of full bytes, are handled correctly.  In the case
+ * of an odd number of hex digits the last one is silently ignored.)
+ *
+ * Returns 1 if more than half of the requested authorities signed the
+ * consensus, 0 otherwise.
+ */
+int
+client_likes_consensus(networkstatus_t *v, const char *want_url)
+{
+  smartlist_t *want_authorities = smartlist_new();
+  int need_at_least;
+  int have = 0;
+
+  dir_split_resource_into_fingerprints(want_url, want_authorities, NULL, 0);
+  need_at_least = smartlist_len(want_authorities)/2+1;
+  SMARTLIST_FOREACH_BEGIN(want_authorities, const char *, d) {
+    char want_digest[DIGEST_LEN];
+    size_t want_len = strlen(d)/2;
+    if (want_len > DIGEST_LEN)
+      want_len = DIGEST_LEN;
+
+    if (base16_decode(want_digest, DIGEST_LEN, d, want_len*2) < 0) {
+      log_fn(LOG_PROTOCOL_WARN, LD_DIR,
+             "Failed to decode requested authority digest %s.", d);
+      continue;
+    };
+
+    SMARTLIST_FOREACH_BEGIN(v->voters, networkstatus_voter_info_t *, vi) {
+      if (smartlist_len(vi->sigs) &&
+          tor_memeq(vi->identity_digest, want_digest, want_len)) {
+        have++;
+        break;
+      };
+    } SMARTLIST_FOREACH_END(vi);
+
+    /* early exit, if we already have enough */
+    if (have >= need_at_least)
+      break;
+  } SMARTLIST_FOREACH_END(d);
+
+  SMARTLIST_FOREACH(want_authorities, char *, d, tor_free(d));
+  smartlist_free(want_authorities);
+  return (have >= need_at_least);
+}
+
+/** Helper function: called when a dirserver gets a complete HTTP GET
+ * request.  Look for a request for a directory or for a rendezvous
+ * service descriptor.  On finding one, write a response into
+ * conn-\>outbuf.  If the request is unrecognized, send a 400.
+ * Always return 0. */
+static int
+directory_handle_command_get(dir_connection_t *conn, const char *headers,
+                             const char *req_body, size_t req_body_len)
+{
+  size_t dlen;
+  char *url, *url_mem, *header;
+  const or_options_t *options = get_options();
+  time_t if_modified_since = 0;
+  int compressed;
+  size_t url_len;
+
+  /* We ignore the body of a GET request. */
+  (void)req_body;
+  (void)req_body_len;
+
+  log_debug(LD_DIRSERV,"Received GET command.");
+
+  conn->base_.state = DIR_CONN_STATE_SERVER_WRITING;
+
+  if (parse_http_url(headers, &url) < 0) {
+    write_http_status_line(conn, 400, "Bad request");
+    return 0;
+  }
+  if ((header = http_get_header(headers, "If-Modified-Since: "))) {
+    struct tm tm;
+    if (parse_http_time(header, &tm) == 0) {
+      if (tor_timegm(&tm, &if_modified_since)<0)
+        if_modified_since = 0;
+    }
+    /* The correct behavior on a malformed If-Modified-Since header is to
+     * act as if no If-Modified-Since header had been given. */
+    tor_free(header);
+  }
+  log_debug(LD_DIRSERV,"rewritten url as '%s'.", url);
+
+  url_mem = url;
+  url_len = strlen(url);
+  compressed = url_len > 2 && !strcmp(url+url_len-2, ".z");
+  if (compressed) {
+    url[url_len-2] = '\0';
+    url_len -= 2;
+  }
+
+  if (!strcmp(url,"/tor/")) {
+    const char *frontpage = get_dirportfrontpage();
+
+    if (frontpage) {
+      dlen = strlen(frontpage);
+      /* Let's return a disclaimer page (users shouldn't use V1 anymore,
+         and caches don't fetch '/', so this is safe). */
+
+      /* [We don't check for write_bucket_low here, since we want to serve
+       *  this page no matter what.] */
+      note_request(url, dlen);
+      write_http_response_header_impl(conn, dlen, "text/html", "identity",
+                                      NULL, DIRPORTFRONTPAGE_CACHE_LIFETIME);
+      connection_write_to_buf(frontpage, dlen, TO_CONN(conn));
+      goto done;
+    }
+    /* if no disclaimer file, fall through and continue */
+  }
+
+  if (!strcmp(url,"/tor/") || !strcmp(url,"/tor/dir")) { /* v1 dir fetch */
+    cached_dir_t *d = dirserv_get_directory();
+
+    if (!d) {
+      log_info(LD_DIRSERV,"Client asked for the mirrored directory, but we "
+               "don't have a good one yet. Sending 503 Dir not available.");
+      write_http_status_line(conn, 503, "Directory unavailable");
+      goto done;
+    }
+    if (d->published < if_modified_since) {
+      write_http_status_line(conn, 304, "Not modified");
+      goto done;
+    }
+
+    dlen = compressed ? d->dir_z_len : d->dir_len;
+
+    if (global_write_bucket_low(TO_CONN(conn), dlen, 1)) {
+      log_debug(LD_DIRSERV,
+               "Client asked for the mirrored directory, but we've been "
+               "writing too many bytes lately. Sending 503 Dir busy.");
+      write_http_status_line(conn, 503, "Directory busy, try again later");
+      goto done;
+    }
+
+    note_request(url, dlen);
+
+    log_debug(LD_DIRSERV,"Dumping %sdirectory to client.",
+              compressed?"compressed ":"");
+    write_http_response_header(conn, dlen, compressed,
+                          FULL_DIR_CACHE_LIFETIME);
+    conn->cached_dir = d;
+    conn->cached_dir_offset = 0;
+    if (!compressed)
+      conn->zlib_state = tor_zlib_new(0, ZLIB_METHOD);
+    ++d->refcnt;
+
+    /* Prime the connection with some data. */
+    conn->dir_spool_src = DIR_SPOOL_CACHED_DIR;
+    connection_dirserv_flushed_some(conn);
+    goto done;
+  }
+
+  if (!strcmp(url,"/tor/running-routers")) { /* running-routers fetch */
+    cached_dir_t *d = dirserv_get_runningrouters();
+    if (!d) {
+      write_http_status_line(conn, 503, "Directory unavailable");
+      goto done;
+    }
+    if (d->published < if_modified_since) {
+      write_http_status_line(conn, 304, "Not modified");
+      goto done;
+    }
+    dlen = compressed ? d->dir_z_len : d->dir_len;
+
+    if (global_write_bucket_low(TO_CONN(conn), dlen, 1)) {
+      log_info(LD_DIRSERV,
+               "Client asked for running-routers, but we've been "
+               "writing too many bytes lately. Sending 503 Dir busy.");
+      write_http_status_line(conn, 503, "Directory busy, try again later");
+      goto done;
+    }
+    note_request(url, dlen);
+    write_http_response_header(conn, dlen, compressed,
+                 RUNNINGROUTERS_CACHE_LIFETIME);
+    connection_write_to_buf(compressed ? d->dir_z : d->dir, dlen,
+                            TO_CONN(conn));
+    goto done;
+  }
+
+  if (!strcmpstart(url, "/tor/status-vote/current/consensus")) {
+    /* v3 network status fetch. */
+    smartlist_t *dir_fps = smartlist_new();
+    const char *request_type = NULL;
+    long lifetime = NETWORKSTATUS_CACHE_LIFETIME;
+
+    if (1) {
+      networkstatus_t *v;
+      time_t now = time(NULL);
+      const char *want_fps = NULL;
+      char *flavor = NULL;
+      int flav = FLAV_NS;
+      #define CONSENSUS_URL_PREFIX "/tor/status-vote/current/consensus/"
+      #define CONSENSUS_FLAVORED_PREFIX "/tor/status-vote/current/consensus-"
+      /* figure out the flavor if any, and who we wanted to sign the thing */
+      if (!strcmpstart(url, CONSENSUS_FLAVORED_PREFIX)) {
+        const char *f, *cp;
+        f = url + strlen(CONSENSUS_FLAVORED_PREFIX);
+        cp = strchr(f, '/');
+        if (cp) {
+          want_fps = cp+1;
+          flavor = tor_strndup(f, cp-f);
+        } else {
+          flavor = tor_strdup(f);
+        }
+        flav = networkstatus_parse_flavor_name(flavor);
+        if (flav < 0)
+  
