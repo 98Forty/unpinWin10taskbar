@@ -2760,4 +2760,255 @@ directory_handle_command_get(dir_connection_t *conn, const char *headers,
         }
         flav = networkstatus_parse_flavor_name(flavor);
         if (flav < 0)
-  
+          flav = FLAV_NS;
+      } else {
+        if (!strcmpstart(url, CONSENSUS_URL_PREFIX))
+          want_fps = url+strlen(CONSENSUS_URL_PREFIX);
+      }
+
+      v = networkstatus_get_latest_consensus_by_flavor(flav);
+
+      if (v && want_fps &&
+          !client_likes_consensus(v, want_fps)) {
+        write_http_status_line(conn, 404, "Consensus not signed by sufficient "
+                                          "number of requested authorities");
+        smartlist_free(dir_fps);
+        geoip_note_ns_response(GEOIP_REJECT_NOT_ENOUGH_SIGS);
+        tor_free(flavor);
+        goto done;
+      }
+
+      {
+        char *fp = tor_malloc_zero(DIGEST_LEN);
+        if (flavor)
+          strlcpy(fp, flavor, DIGEST_LEN);
+        tor_free(flavor);
+        smartlist_add(dir_fps, fp);
+      }
+      request_type = compressed?"v3.z":"v3";
+      lifetime = (v && v->fresh_until > now) ? v->fresh_until - now : 0;
+    }
+
+    if (!smartlist_len(dir_fps)) { /* we failed to create/cache cp */
+      write_http_status_line(conn, 503, "Network status object unavailable");
+      smartlist_free(dir_fps);
+      geoip_note_ns_response(GEOIP_REJECT_UNAVAILABLE);
+      goto done;
+    }
+
+    if (!dirserv_remove_old_statuses(dir_fps, if_modified_since)) {
+      write_http_status_line(conn, 404, "Not found");
+      SMARTLIST_FOREACH(dir_fps, char *, cp, tor_free(cp));
+      smartlist_free(dir_fps);
+      geoip_note_ns_response(GEOIP_REJECT_NOT_FOUND);
+      goto done;
+    } else if (!smartlist_len(dir_fps)) {
+      write_http_status_line(conn, 304, "Not modified");
+      SMARTLIST_FOREACH(dir_fps, char *, cp, tor_free(cp));
+      smartlist_free(dir_fps);
+      geoip_note_ns_response(GEOIP_REJECT_NOT_MODIFIED);
+      goto done;
+    }
+
+    dlen = dirserv_estimate_data_size(dir_fps, 0, compressed);
+    if (global_write_bucket_low(TO_CONN(conn), dlen, 2)) {
+      log_debug(LD_DIRSERV,
+               "Client asked for network status lists, but we've been "
+               "writing too many bytes lately. Sending 503 Dir busy.");
+      write_http_status_line(conn, 503, "Directory busy, try again later");
+      SMARTLIST_FOREACH(dir_fps, char *, fp, tor_free(fp));
+      smartlist_free(dir_fps);
+
+      geoip_note_ns_response(GEOIP_REJECT_BUSY);
+      goto done;
+    }
+
+    if (1) {
+      struct in_addr in;
+      tor_addr_t addr;
+      if (tor_inet_aton((TO_CONN(conn))->address, &in)) {
+        tor_addr_from_ipv4h(&addr, ntohl(in.s_addr));
+        geoip_note_client_seen(GEOIP_CLIENT_NETWORKSTATUS,
+                               &addr, NULL,
+                               time(NULL));
+        geoip_note_ns_response(GEOIP_SUCCESS);
+        /* Note that a request for a network status has started, so that we
+         * can measure the download time later on. */
+        if (conn->dirreq_id)
+          geoip_start_dirreq(conn->dirreq_id, dlen, DIRREQ_TUNNELED);
+        else
+          geoip_start_dirreq(TO_CONN(conn)->global_identifier, dlen,
+                             DIRREQ_DIRECT);
+      }
+    }
+
+    // note_request(request_type,dlen);
+    (void) request_type;
+    write_http_response_header(conn, -1, compressed,
+                               smartlist_len(dir_fps) == 1 ? lifetime : 0);
+    conn->fingerprint_stack = dir_fps;
+    if (! compressed)
+      conn->zlib_state = tor_zlib_new(0, ZLIB_METHOD);
+
+    /* Prime the connection with some data. */
+    conn->dir_spool_src = DIR_SPOOL_NETWORKSTATUS;
+    connection_dirserv_flushed_some(conn);
+    goto done;
+  }
+
+  if (!strcmpstart(url,"/tor/status-vote/current/") ||
+      !strcmpstart(url,"/tor/status-vote/next/")) {
+    /* XXXX If-modified-since is only implemented for the current
+     * consensus: that's probably fine, since it's the only vote document
+     * people fetch much. */
+    int current;
+    ssize_t body_len = 0;
+    ssize_t estimated_len = 0;
+    smartlist_t *items = smartlist_new();
+    smartlist_t *dir_items = smartlist_new();
+    int lifetime = 60; /* XXXX023 should actually use vote intervals. */
+    url += strlen("/tor/status-vote/");
+    current = !strcmpstart(url, "current/");
+    url = strchr(url, '/');
+    tor_assert(url);
+    ++url;
+    if (!strcmp(url, "consensus")) {
+      const char *item;
+      tor_assert(!current); /* we handle current consensus specially above,
+                             * since it wants to be spooled. */
+      if ((item = dirvote_get_pending_consensus(FLAV_NS)))
+        smartlist_add(items, (char*)item);
+    } else if (!current && !strcmp(url, "consensus-signatures")) {
+      /* XXXX the spec says that we should implement
+       * current/consensus-signatures too.  It doesn't seem to be needed,
+       * though. */
+      const char *item;
+      if ((item=dirvote_get_pending_detached_signatures()))
+        smartlist_add(items, (char*)item);
+    } else if (!strcmp(url, "authority")) {
+      const cached_dir_t *d;
+      int flags = DGV_BY_ID |
+        (current ? DGV_INCLUDE_PREVIOUS : DGV_INCLUDE_PENDING);
+      if ((d=dirvote_get_vote(NULL, flags)))
+        smartlist_add(dir_items, (cached_dir_t*)d);
+    } else {
+      const cached_dir_t *d;
+      smartlist_t *fps = smartlist_new();
+      int flags;
+      if (!strcmpstart(url, "d/")) {
+        url += 2;
+        flags = DGV_INCLUDE_PENDING | DGV_INCLUDE_PREVIOUS;
+      } else {
+        flags = DGV_BY_ID |
+          (current ? DGV_INCLUDE_PREVIOUS : DGV_INCLUDE_PENDING);
+      }
+      dir_split_resource_into_fingerprints(url, fps, NULL,
+                                           DSR_HEX|DSR_SORT_UNIQ);
+      SMARTLIST_FOREACH(fps, char *, fp, {
+          if ((d = dirvote_get_vote(fp, flags)))
+            smartlist_add(dir_items, (cached_dir_t*)d);
+          tor_free(fp);
+        });
+      smartlist_free(fps);
+    }
+    if (!smartlist_len(dir_items) && !smartlist_len(items)) {
+      write_http_status_line(conn, 404, "Not found");
+      goto vote_done;
+    }
+    SMARTLIST_FOREACH(dir_items, cached_dir_t *, d,
+                      body_len += compressed ? d->dir_z_len : d->dir_len);
+    estimated_len += body_len;
+    SMARTLIST_FOREACH(items, const char *, item, {
+        size_t ln = strlen(item);
+        if (compressed) {
+          estimated_len += ln/2;
+        } else {
+          body_len += ln; estimated_len += ln;
+        }
+      });
+
+    if (global_write_bucket_low(TO_CONN(conn), estimated_len, 2)) {
+      write_http_status_line(conn, 503, "Directory busy, try again later.");
+      goto vote_done;
+    }
+    write_http_response_header(conn, body_len ? body_len : -1, compressed,
+                 lifetime);
+
+    if (smartlist_len(items)) {
+      if (compressed) {
+        conn->zlib_state = tor_zlib_new(1, ZLIB_METHOD);
+        SMARTLIST_FOREACH(items, const char *, c,
+                 connection_write_to_buf_zlib(c, strlen(c), conn, 0));
+        connection_write_to_buf_zlib("", 0, conn, 1);
+      } else {
+        SMARTLIST_FOREACH(items, const char *, c,
+                         connection_write_to_buf(c, strlen(c), TO_CONN(conn)));
+      }
+    } else {
+      SMARTLIST_FOREACH(dir_items, cached_dir_t *, d,
+          connection_write_to_buf(compressed ? d->dir_z : d->dir,
+                                  compressed ? d->dir_z_len : d->dir_len,
+                                  TO_CONN(conn)));
+    }
+  vote_done:
+    smartlist_free(items);
+    smartlist_free(dir_items);
+    goto done;
+  }
+
+  if (!strcmpstart(url, "/tor/micro/d/")) {
+    smartlist_t *fps = smartlist_new();
+
+    dir_split_resource_into_fingerprints(url+strlen("/tor/micro/d/"),
+                                      fps, NULL,
+                                      DSR_DIGEST256|DSR_BASE64|DSR_SORT_UNIQ);
+
+    if (!dirserv_have_any_microdesc(fps)) {
+      write_http_status_line(conn, 404, "Not found");
+      SMARTLIST_FOREACH(fps, char *, fp, tor_free(fp));
+      smartlist_free(fps);
+      goto done;
+    }
+    dlen = dirserv_estimate_microdesc_size(fps, compressed);
+    if (global_write_bucket_low(TO_CONN(conn), dlen, 2)) {
+      log_info(LD_DIRSERV,
+               "Client asked for server descriptors, but we've been "
+               "writing too many bytes lately. Sending 503 Dir busy.");
+      write_http_status_line(conn, 503, "Directory busy, try again later");
+      SMARTLIST_FOREACH(fps, char *, fp, tor_free(fp));
+      smartlist_free(fps);
+      goto done;
+    }
+
+    write_http_response_header(conn, -1, compressed, MICRODESC_CACHE_LIFETIME);
+    conn->dir_spool_src = DIR_SPOOL_MICRODESC;
+    conn->fingerprint_stack = fps;
+
+    if (compressed)
+      conn->zlib_state = tor_zlib_new(1, ZLIB_METHOD);
+
+    connection_dirserv_flushed_some(conn);
+    goto done;
+  }
+
+  if (!strcmpstart(url,"/tor/server/") ||
+      (!options->BridgeAuthoritativeDir &&
+       !options->BridgeRelay && !strcmpstart(url,"/tor/extra/"))) {
+    int res;
+    const char *msg;
+    const char *request_type = NULL;
+    int cache_lifetime = 0;
+    int is_extra = !strcmpstart(url,"/tor/extra/");
+    url += is_extra ? strlen("/tor/extra/") : strlen("/tor/server/");
+    conn->fingerprint_stack = smartlist_new();
+    res = dirserv_get_routerdesc_fingerprints(conn->fingerprint_stack, url,
+                                          &msg,
+                                          !connection_dir_is_encrypted(conn),
+                                          is_extra);
+
+    if (!strcmpstart(url, "fp/")) {
+      request_type = compressed?"/tor/server/fp.z":"/tor/server/fp";
+      if (smartlist_len(conn->fingerprint_stack) == 1)
+        cache_lifetime = ROUTERDESC_CACHE_LIFETIME;
+    } else if (!strcmpstart(url, "authority")) {
+      request_type = compressed?"/tor/server
