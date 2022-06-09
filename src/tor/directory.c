@@ -3011,4 +3011,257 @@ directory_handle_command_get(dir_connection_t *conn, const char *headers,
       if (smartlist_len(conn->fingerprint_stack) == 1)
         cache_lifetime = ROUTERDESC_CACHE_LIFETIME;
     } else if (!strcmpstart(url, "authority")) {
-      request_type = compressed?"/tor/server
+      request_type = compressed?"/tor/server/authority.z":
+        "/tor/server/authority";
+      cache_lifetime = ROUTERDESC_CACHE_LIFETIME;
+    } else if (!strcmpstart(url, "all")) {
+      request_type = compressed?"/tor/server/all.z":"/tor/server/all";
+      cache_lifetime = FULL_DIR_CACHE_LIFETIME;
+    } else if (!strcmpstart(url, "d/")) {
+      request_type = compressed?"/tor/server/d.z":"/tor/server/d";
+      if (smartlist_len(conn->fingerprint_stack) == 1)
+        cache_lifetime = ROUTERDESC_BY_DIGEST_CACHE_LIFETIME;
+    } else {
+      request_type = "/tor/server/?";
+    }
+    (void) request_type; /* usable for note_request. */
+    if (!strcmpstart(url, "d/"))
+      conn->dir_spool_src =
+        is_extra ? DIR_SPOOL_EXTRA_BY_DIGEST : DIR_SPOOL_SERVER_BY_DIGEST;
+    else
+      conn->dir_spool_src =
+        is_extra ? DIR_SPOOL_EXTRA_BY_FP : DIR_SPOOL_SERVER_BY_FP;
+
+    if (!dirserv_have_any_serverdesc(conn->fingerprint_stack,
+                                     conn->dir_spool_src)) {
+      res = -1;
+      msg = "Not found";
+    }
+
+    if (res < 0)
+      write_http_status_line(conn, 404, msg);
+    else {
+      dlen = dirserv_estimate_data_size(conn->fingerprint_stack,
+                                        1, compressed);
+      if (global_write_bucket_low(TO_CONN(conn), dlen, 2)) {
+        log_info(LD_DIRSERV,
+                 "Client asked for server descriptors, but we've been "
+                 "writing too many bytes lately. Sending 503 Dir busy.");
+        write_http_status_line(conn, 503, "Directory busy, try again later");
+        conn->dir_spool_src = DIR_SPOOL_NONE;
+        goto done;
+      }
+      write_http_response_header(conn, -1, compressed, cache_lifetime);
+      if (compressed)
+        conn->zlib_state = tor_zlib_new(1, ZLIB_METHOD);
+      /* Prime the connection with some data. */
+      connection_dirserv_flushed_some(conn);
+    }
+    goto done;
+  }
+
+  if (!strcmpstart(url,"/tor/keys/")) {
+    smartlist_t *certs = smartlist_new();
+    ssize_t len = -1;
+    if (!strcmp(url, "/tor/keys/all")) {
+      authority_cert_get_all(certs);
+    } else if (!strcmp(url, "/tor/keys/authority")) {
+      authority_cert_t *cert = get_my_v3_authority_cert();
+      if (cert)
+        smartlist_add(certs, cert);
+    } else if (!strcmpstart(url, "/tor/keys/fp/")) {
+      smartlist_t *fps = smartlist_new();
+      dir_split_resource_into_fingerprints(url+strlen("/tor/keys/fp/"),
+                                           fps, NULL,
+                                           DSR_HEX|DSR_SORT_UNIQ);
+      SMARTLIST_FOREACH(fps, char *, d, {
+          authority_cert_t *c = authority_cert_get_newest_by_id(d);
+          if (c) smartlist_add(certs, c);
+          tor_free(d);
+      });
+      smartlist_free(fps);
+    } else if (!strcmpstart(url, "/tor/keys/sk/")) {
+      smartlist_t *fps = smartlist_new();
+      dir_split_resource_into_fingerprints(url+strlen("/tor/keys/sk/"),
+                                           fps, NULL,
+                                           DSR_HEX|DSR_SORT_UNIQ);
+      SMARTLIST_FOREACH(fps, char *, d, {
+          authority_cert_t *c = authority_cert_get_by_sk_digest(d);
+          if (c) smartlist_add(certs, c);
+          tor_free(d);
+      });
+      smartlist_free(fps);
+    } else if (!strcmpstart(url, "/tor/keys/fp-sk/")) {
+      smartlist_t *fp_sks = smartlist_new();
+      dir_split_resource_into_fingerprint_pairs(url+strlen("/tor/keys/fp-sk/"),
+                                                fp_sks);
+      SMARTLIST_FOREACH(fp_sks, fp_pair_t *, pair, {
+          authority_cert_t *c = authority_cert_get_by_digests(pair->first,
+                                                              pair->second);
+          if (c) smartlist_add(certs, c);
+          tor_free(pair);
+      });
+      smartlist_free(fp_sks);
+    } else {
+      write_http_status_line(conn, 400, "Bad request");
+      goto keys_done;
+    }
+    if (!smartlist_len(certs)) {
+      write_http_status_line(conn, 404, "Not found");
+      goto keys_done;
+    }
+    SMARTLIST_FOREACH(certs, authority_cert_t *, c,
+      if (c->cache_info.published_on < if_modified_since)
+        SMARTLIST_DEL_CURRENT(certs, c));
+    if (!smartlist_len(certs)) {
+      write_http_status_line(conn, 304, "Not modified");
+      goto keys_done;
+    }
+    len = 0;
+    SMARTLIST_FOREACH(certs, authority_cert_t *, c,
+                      len += c->cache_info.signed_descriptor_len);
+
+    if (global_write_bucket_low(TO_CONN(conn), compressed?len/2:len, 2)) {
+      write_http_status_line(conn, 503, "Directory busy, try again later.");
+      goto keys_done;
+    }
+
+    write_http_response_header(conn, compressed?-1:len, compressed, 60*60);
+    if (compressed) {
+      conn->zlib_state = tor_zlib_new(1, ZLIB_METHOD);
+      SMARTLIST_FOREACH(certs, authority_cert_t *, c,
+            connection_write_to_buf_zlib(c->cache_info.signed_descriptor_body,
+                                         c->cache_info.signed_descriptor_len,
+                                         conn, 0));
+      connection_write_to_buf_zlib("", 0, conn, 1);
+    } else {
+      SMARTLIST_FOREACH(certs, authority_cert_t *, c,
+            connection_write_to_buf(c->cache_info.signed_descriptor_body,
+                                    c->cache_info.signed_descriptor_len,
+                                    TO_CONN(conn)));
+    }
+  keys_done:
+    smartlist_free(certs);
+    goto done;
+  }
+
+  if (options->HidServDirectoryV2 &&
+      connection_dir_is_encrypted(conn) &&
+       !strcmpstart(url,"/tor/rendezvous2/")) {
+    /* Handle v2 rendezvous descriptor fetch request. */
+    const char *descp;
+    const char *query = url + strlen("/tor/rendezvous2/");
+    if (strlen(query) == REND_DESC_ID_V2_LEN_BASE32) {
+      log_info(LD_REND, "Got a v2 rendezvous descriptor request for ID '%s'",
+               safe_str(query));
+      switch (rend_cache_lookup_v2_desc_as_dir(query, &descp)) {
+        case 1: /* valid */
+          write_http_response_header(conn, strlen(descp), 0, 0);
+          connection_write_to_buf(descp, strlen(descp), TO_CONN(conn));
+          break;
+        case 0: /* well-formed but not present */
+          write_http_status_line(conn, 404, "Not found");
+          break;
+        case -1: /* not well-formed */
+          write_http_status_line(conn, 400, "Bad request");
+          break;
+      }
+    } else { /* not well-formed */
+      write_http_status_line(conn, 400, "Bad request");
+    }
+    goto done;
+  }
+
+  if (options->HSAuthoritativeDir && !strcmpstart(url,"/tor/rendezvous/")) {
+    /* rendezvous descriptor fetch */
+    const char *descp;
+    size_t desc_len;
+    const char *query = url+strlen("/tor/rendezvous/");
+
+    log_info(LD_REND, "Handling rendezvous descriptor get");
+    switch (rend_cache_lookup_desc(query, 0, &descp, &desc_len)) {
+      case 1: /* valid */
+        write_http_response_header_impl(conn, desc_len,
+                                        "application/octet-stream",
+                                        NULL, NULL, 0);
+        note_request("/tor/rendezvous?/", desc_len);
+        /* need to send descp separately, because it may include NULs */
+        connection_write_to_buf(descp, desc_len, TO_CONN(conn));
+        break;
+      case 0: /* well-formed but not present */
+        write_http_status_line(conn, 404, "Not found");
+        break;
+      case -1: /* not well-formed */
+        write_http_status_line(conn, 400, "Bad request");
+        break;
+    }
+    goto done;
+  }
+
+  if (options->BridgeAuthoritativeDir &&
+      options->BridgePassword_AuthDigest_ &&
+      connection_dir_is_encrypted(conn) &&
+      !strcmp(url,"/tor/networkstatus-bridges")) {
+    char *status;
+    char digest[DIGEST256_LEN];
+
+    header = http_get_header(headers, "Authorization: Basic ");
+    if (header)
+      crypto_digest256(digest, header, strlen(header), DIGEST_SHA256);
+
+    /* now make sure the password is there and right */
+    if (!header ||
+        tor_memneq(digest,
+                   options->BridgePassword_AuthDigest_, DIGEST256_LEN)) {
+      write_http_status_line(conn, 404, "Not found");
+      tor_free(header);
+      goto done;
+    }
+    tor_free(header);
+
+    /* all happy now. send an answer. */
+    status = networkstatus_getinfo_by_purpose("bridge", time(NULL));
+    dlen = strlen(status);
+    write_http_response_header(conn, dlen, 0, 0);
+    connection_write_to_buf(status, dlen, TO_CONN(conn));
+    tor_free(status);
+    goto done;
+  }
+
+  if (!strcmpstart(url,"/tor/bytes.txt")) {
+    char *bytes = directory_dump_request_log();
+    size_t len = strlen(bytes);
+    write_http_response_header(conn, len, 0, 0);
+    connection_write_to_buf(bytes, len, TO_CONN(conn));
+    tor_free(bytes);
+    goto done;
+  }
+
+  if (!strcmp(url,"/tor/robots.txt")) { /* /robots.txt will have been
+                                           rewritten to /tor/robots.txt */
+    char robots[] = "User-agent: *\r\nDisallow: /\r\n";
+    size_t len = strlen(robots);
+    write_http_response_header(conn, len, 0, ROBOTS_CACHE_LIFETIME);
+    connection_write_to_buf(robots, len, TO_CONN(conn));
+    goto done;
+  }
+
+  if (!strcmp(url,"/tor/dbg-stability.txt")) {
+    const char *stability;
+    size_t len;
+    if (options->BridgeAuthoritativeDir ||
+        ! authdir_mode_tests_reachability(options) ||
+        ! (stability = rep_hist_get_router_stability_doc(time(NULL)))) {
+      write_http_status_line(conn, 404, "Not found.");
+      goto done;
+    }
+
+    len = strlen(stability);
+    write_http_response_header(conn, len, 0, 0);
+    connection_write_to_buf(stability, len, TO_CONN(conn));
+    goto done;
+  }
+
+#if defined(EXPORTMALLINFO) && defined(HAVE_MALLOC_H) && defined(HAVE_MALLINFO)
+#define ADD_MALLINFO_LINE(x) do {                               \
+    smartlist
