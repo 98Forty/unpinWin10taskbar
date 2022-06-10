@@ -3264,4 +3264,281 @@ directory_handle_command_get(dir_connection_t *conn, const char *headers,
 
 #if defined(EXPORTMALLINFO) && defined(HAVE_MALLOC_H) && defined(HAVE_MALLINFO)
 #define ADD_MALLINFO_LINE(x) do {                               \
-    smartlist
+    smartlist_add_asprintf(lines, "%s %d\n", #x, mi.x);        \
+  }while(0);
+
+  if (!strcmp(url,"/tor/mallinfo.txt") &&
+      (tor_addr_eq_ipv4h(&conn->base_.addr, 0x7f000001ul))) {
+    char *result;
+    size_t len;
+    struct mallinfo mi;
+    smartlist_t *lines;
+
+    memset(&mi, 0, sizeof(mi));
+    mi = mallinfo();
+    lines = smartlist_new();
+
+    ADD_MALLINFO_LINE(arena)
+    ADD_MALLINFO_LINE(ordblks)
+    ADD_MALLINFO_LINE(smblks)
+    ADD_MALLINFO_LINE(hblks)
+    ADD_MALLINFO_LINE(hblkhd)
+    ADD_MALLINFO_LINE(usmblks)
+    ADD_MALLINFO_LINE(fsmblks)
+    ADD_MALLINFO_LINE(uordblks)
+    ADD_MALLINFO_LINE(fordblks)
+    ADD_MALLINFO_LINE(keepcost)
+
+    result = smartlist_join_strings(lines, "", 0, NULL);
+    SMARTLIST_FOREACH(lines, char *, cp, tor_free(cp));
+    smartlist_free(lines);
+
+    len = strlen(result);
+    write_http_response_header(conn, len, 0, 0);
+    connection_write_to_buf(result, len, TO_CONN(conn));
+    tor_free(result);
+    goto done;
+  }
+#endif
+
+  /* we didn't recognize the url */
+  write_http_status_line(conn, 404, "Not found");
+
+ done:
+  tor_free(url_mem);
+  return 0;
+}
+
+/** Helper function: called when a dirserver gets a complete HTTP POST
+ * request.  Look for an uploaded server descriptor or rendezvous
+ * service descriptor.  On finding one, process it and write a
+ * response into conn-\>outbuf.  If the request is unrecognized, send a
+ * 400.  Always return 0. */
+static int
+directory_handle_command_post(dir_connection_t *conn, const char *headers,
+                              const char *body, size_t body_len)
+{
+  char *url = NULL;
+  const or_options_t *options = get_options();
+
+  log_debug(LD_DIRSERV,"Received POST command.");
+
+  conn->base_.state = DIR_CONN_STATE_SERVER_WRITING;
+
+  if (parse_http_url(headers, &url) < 0) {
+    write_http_status_line(conn, 400, "Bad request");
+    return 0;
+  }
+  log_debug(LD_DIRSERV,"rewritten url as '%s'.", url);
+
+  /* Handle v2 rendezvous service publish request. */
+  if (options->HidServDirectoryV2 &&
+      connection_dir_is_encrypted(conn) &&
+      !strcmpstart(url,"/tor/rendezvous2/publish")) {
+    switch (rend_cache_store_v2_desc_as_dir(body)) {
+      case -2:
+        log_info(LD_REND, "Rejected v2 rend descriptor (length %d) from %s "
+                 "since we're not currently a hidden service directory.",
+                 (int)body_len, conn->base_.address);
+        write_http_status_line(conn, 503, "Currently not acting as v2 "
+                               "hidden service directory");
+        break;
+      case -1:
+        log_warn(LD_REND, "Rejected v2 rend descriptor (length %d) from %s.",
+                 (int)body_len, conn->base_.address);
+        write_http_status_line(conn, 400,
+                               "Invalid v2 service descriptor rejected");
+        break;
+      default:
+        write_http_status_line(conn, 200, "Service descriptor (v2) stored");
+        log_info(LD_REND, "Handled v2 rendezvous descriptor post: accepted");
+    }
+    goto done;
+  }
+
+  if (!authdir_mode(options)) {
+    /* we just provide cached directories; we don't want to
+     * receive anything. */
+    write_http_status_line(conn, 400, "Nonauthoritative directory does not "
+                           "accept posted server descriptors");
+    goto done;
+  }
+
+  if (authdir_mode_handles_descs(options, -1) &&
+      !strcmp(url,"/tor/")) { /* server descriptor post */
+    const char *msg = "[None]";
+    uint8_t purpose = authdir_mode_bridge(options) ?
+                      ROUTER_PURPOSE_BRIDGE : ROUTER_PURPOSE_GENERAL;
+    was_router_added_t r = dirserv_add_multiple_descriptors(body, purpose,
+                                             conn->base_.address, &msg);
+    tor_assert(msg);
+    if (WRA_WAS_ADDED(r))
+      dirserv_get_directory(); /* rebuild and write to disk */
+
+    if (r == ROUTER_ADDED_NOTIFY_GENERATOR) {
+      /* Accepted with a message. */
+      log_info(LD_DIRSERV,
+               "Problematic router descriptor or extra-info from %s "
+               "(\"%s\").",
+               conn->base_.address, msg);
+      write_http_status_line(conn, 400, msg);
+    } else if (r == ROUTER_ADDED_SUCCESSFULLY) {
+      write_http_status_line(conn, 200, msg);
+    } else if (WRA_WAS_OUTDATED(r)) {
+      write_http_response_header_impl(conn, -1, NULL, NULL,
+                                      "X-Descriptor-Not-New: Yes\r\n", -1);
+    } else {
+      log_info(LD_DIRSERV,
+               "Rejected router descriptor or extra-info from %s "
+               "(\"%s\").",
+               conn->base_.address, msg);
+      write_http_status_line(conn, 400, msg);
+    }
+    goto done;
+  }
+
+  if (options->HSAuthoritativeDir &&
+      !strcmpstart(url,"/tor/rendezvous/publish")) {
+    /* rendezvous descriptor post */
+    log_info(LD_REND, "Handling rendezvous descriptor post.");
+    if (rend_cache_store(body, body_len, 1, NULL) < 0) {
+      log_fn(LOG_PROTOCOL_WARN, LD_DIRSERV,
+             "Rejected rend descriptor (length %d) from %s.",
+             (int)body_len, conn->base_.address);
+      write_http_status_line(conn, 400,
+                             "Invalid v0 service descriptor rejected");
+    } else {
+      write_http_status_line(conn, 200, "Service descriptor (v0) stored");
+    }
+    goto done;
+  }
+
+  if (authdir_mode_v3(options) &&
+      !strcmp(url,"/tor/post/vote")) { /* v3 networkstatus vote */
+    const char *msg = "OK";
+    int status;
+    if (dirvote_add_vote(body, &msg, &status)) {
+      write_http_status_line(conn, status, "Vote stored");
+    } else {
+      tor_assert(msg);
+      log_warn(LD_DIRSERV, "Rejected vote from %s (\"%s\").",
+               conn->base_.address, msg);
+      write_http_status_line(conn, status, msg);
+    }
+    goto done;
+  }
+
+  if (authdir_mode_v3(options) &&
+      !strcmp(url,"/tor/post/consensus-signature")) { /* sigs on consensus. */
+    const char *msg = NULL;
+    if (dirvote_add_signatures(body, conn->base_.address, &msg)>=0) {
+      write_http_status_line(conn, 200, msg?msg:"Signatures stored");
+    } else {
+      log_warn(LD_DIR, "Unable to store signatures posted by %s: %s",
+               conn->base_.address, msg?msg:"???");
+      write_http_status_line(conn, 400, msg?msg:"Unable to store signatures");
+    }
+    goto done;
+  }
+
+  /* we didn't recognize the url */
+  write_http_status_line(conn, 404, "Not found");
+
+ done:
+  tor_free(url);
+  return 0;
+}
+
+/** Called when a dirserver receives data on a directory connection;
+ * looks for an HTTP request.  If the request is complete, remove it
+ * from the inbuf, try to process it; otherwise, leave it on the
+ * buffer.  Return a 0 on success, or -1 on error.
+ */
+static int
+directory_handle_command(dir_connection_t *conn)
+{
+  char *headers=NULL, *body=NULL;
+  size_t body_len=0;
+  int r;
+
+  tor_assert(conn);
+  tor_assert(conn->base_.type == CONN_TYPE_DIR);
+
+  switch (connection_fetch_from_buf_http(TO_CONN(conn),
+                              &headers, MAX_HEADERS_SIZE,
+                              &body, &body_len, MAX_DIR_UL_SIZE, 0)) {
+    case -1: /* overflow */
+      log_warn(LD_DIRSERV,
+               "Request too large from address '%s' to DirPort. Closing.",
+               safe_str(conn->base_.address));
+      return -1;
+    case 0:
+      log_debug(LD_DIRSERV,"command not all here yet.");
+      return 0;
+    /* case 1, fall through */
+  }
+
+  http_set_address_origin(headers, TO_CONN(conn));
+  //log_debug(LD_DIRSERV,"headers %s, body %s.", headers, body);
+
+  if (!strncasecmp(headers,"GET",3))
+    r = directory_handle_command_get(conn, headers, body, body_len);
+  else if (!strncasecmp(headers,"POST",4))
+    r = directory_handle_command_post(conn, headers, body, body_len);
+  else {
+    log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
+           "Got headers %s with unknown command. Closing.",
+           escaped(headers));
+    r = -1;
+  }
+
+  tor_free(headers); tor_free(body);
+  return r;
+}
+
+/** Write handler for directory connections; called when all data has
+ * been flushed.  Close the connection or wait for a response as
+ * appropriate.
+ */
+int
+connection_dir_finished_flushing(dir_connection_t *conn)
+{
+  tor_assert(conn);
+  tor_assert(conn->base_.type == CONN_TYPE_DIR);
+
+  /* Note that we have finished writing the directory response. For direct
+   * connections this means we're done, for tunneled connections its only
+   * an intermediate step. */
+  if (conn->dirreq_id)
+    geoip_change_dirreq_state(conn->dirreq_id, DIRREQ_TUNNELED,
+                              DIRREQ_FLUSHING_DIR_CONN_FINISHED);
+  else
+    geoip_change_dirreq_state(TO_CONN(conn)->global_identifier,
+                              DIRREQ_DIRECT,
+                              DIRREQ_FLUSHING_DIR_CONN_FINISHED);
+  switch (conn->base_.state) {
+    case DIR_CONN_STATE_CONNECTING:
+    case DIR_CONN_STATE_CLIENT_SENDING:
+      log_debug(LD_DIR,"client finished sending command.");
+      conn->base_.state = DIR_CONN_STATE_CLIENT_READING;
+      return 0;
+    case DIR_CONN_STATE_SERVER_WRITING:
+      if (conn->dir_spool_src != DIR_SPOOL_NONE) {
+#ifdef USE_BUFFEREVENTS
+        /* This can happen with paired bufferevents, since a paired connection
+         * can flush immediately when you write to it, making the subsequent
+         * check in connection_handle_write_cb() decide that the connection
+         * is flushed. */
+        log_debug(LD_DIRSERV, "Emptied a dirserv buffer, but still spooling.");
+#else
+        log_warn(LD_BUG, "Emptied a dirserv buffer, but it's still spooling!");
+        connection_mark_for_close(TO_CONN(conn));
+#endif
+      } else {
+        log_debug(LD_DIRSERV, "Finished writing server response. Closing.");
+        connection_mark_for_close(TO_CONN(conn));
+      }
+      return 0;
+    default:
+      log_warn(LD_BUG,"called in unexpected state %d.",
+              
