@@ -3809,4 +3809,86 @@ dir_split_resource_into_fingerprint_pairs(const char *res,
  * If (flags & DSR_HEX), then delete all elements that aren't hex digests, and
  * decode the rest.  If (flags & DSR_BASE64), then use "-" rather than "+" as
  * a separator, delete all the elements that aren't base64-encoded digests,
- * and decode the rest.  If (flags & DSR_DIGEST256), thes
+ * and decode the rest.  If (flags & DSR_DIGEST256), these digests should be
+ * 256 bits long; else they should be 160.
+ *
+ * If (flags & DSR_SORT_UNIQ), then sort the list and remove all duplicates.
+ */
+int
+dir_split_resource_into_fingerprints(const char *resource,
+                                     smartlist_t *fp_out, int *compressed_out,
+                                     int flags)
+{
+  const int decode_hex = flags & DSR_HEX;
+  const int decode_base64 = flags & DSR_BASE64;
+  const int digests_are_256 = flags & DSR_DIGEST256;
+  const int sort_uniq = flags & DSR_SORT_UNIQ;
+
+  const int digest_len = digests_are_256 ? DIGEST256_LEN : DIGEST_LEN;
+  const int hex_digest_len = digests_are_256 ?
+    HEX_DIGEST256_LEN : HEX_DIGEST_LEN;
+  const int base64_digest_len = digests_are_256 ?
+    BASE64_DIGEST256_LEN : BASE64_DIGEST_LEN;
+  smartlist_t *fp_tmp = smartlist_new();
+
+  tor_assert(!(decode_hex && decode_base64));
+  tor_assert(fp_out);
+
+  smartlist_split_string(fp_tmp, resource, decode_base64?"-":"+", 0, 0);
+  if (compressed_out)
+    *compressed_out = 0;
+  if (smartlist_len(fp_tmp)) {
+    char *last = smartlist_get(fp_tmp,smartlist_len(fp_tmp)-1);
+    size_t last_len = strlen(last);
+    if (last_len > 2 && !strcmp(last+last_len-2, ".z")) {
+      last[last_len-2] = '\0';
+      if (compressed_out)
+        *compressed_out = 1;
+    }
+  }
+  if (decode_hex || decode_base64) {
+    const size_t encoded_len = decode_hex ? hex_digest_len : base64_digest_len;
+    int i;
+    char *cp, *d = NULL;
+    for (i = 0; i < smartlist_len(fp_tmp); ++i) {
+      cp = smartlist_get(fp_tmp, i);
+      if (strlen(cp) != encoded_len) {
+        log_info(LD_DIR,
+                 "Skipping digest %s with non-standard length.", escaped(cp));
+        smartlist_del_keeporder(fp_tmp, i--);
+        goto again;
+      }
+      d = tor_malloc_zero(digest_len);
+      if (decode_hex ?
+          (base16_decode(d, digest_len, cp, hex_digest_len)<0) :
+          (base64_decode(d, digest_len, cp, base64_digest_len)<0)) {
+          log_info(LD_DIR, "Skipping non-decodable digest %s", escaped(cp));
+          smartlist_del_keeporder(fp_tmp, i--);
+          goto again;
+      }
+      smartlist_set(fp_tmp, i, d);
+      d = NULL;
+    again:
+      tor_free(cp);
+      tor_free(d);
+    }
+  }
+  if (sort_uniq) {
+    if (decode_hex || decode_base64) {
+      if (digests_are_256) {
+        smartlist_sort_digests256(fp_tmp);
+        smartlist_uniq_digests256(fp_tmp);
+      } else {
+        smartlist_sort_digests(fp_tmp);
+        smartlist_uniq_digests(fp_tmp);
+      }
+    } else {
+      smartlist_sort_strings(fp_tmp);
+      smartlist_uniq_strings(fp_tmp);
+    }
+  }
+  smartlist_add_all(fp_out, fp_tmp);
+  smartlist_free(fp_tmp);
+  return 0;
+}
+
