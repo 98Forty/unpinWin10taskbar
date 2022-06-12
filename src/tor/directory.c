@@ -3541,4 +3541,272 @@ connection_dir_finished_flushing(dir_connection_t *conn)
       return 0;
     default:
       log_warn(LD_BUG,"called in unexpected state %d.",
-              
+               conn->base_.state);
+      tor_fragile_assert();
+      return -1;
+  }
+  return 0;
+}
+
+/** Connected handler for directory connections: begin sending data to the
+ * server */
+int
+connection_dir_finished_connecting(dir_connection_t *conn)
+{
+  tor_assert(conn);
+  tor_assert(conn->base_.type == CONN_TYPE_DIR);
+  tor_assert(conn->base_.state == DIR_CONN_STATE_CONNECTING);
+
+  log_debug(LD_HTTP,"Dir connection to router %s:%u established.",
+            conn->base_.address,conn->base_.port);
+
+  conn->base_.state = DIR_CONN_STATE_CLIENT_SENDING; /* start flushing conn */
+  return 0;
+}
+
+/** Decide which download schedule we want to use based on descriptor type
+ * in <b>dls</b> and whether we are acting as directory <b>server</b>, and
+ * then return a list of int pointers defining download delays in seconds.
+ * Helper function for download_status_increment_failure() and
+ * download_status_reset(). */
+static const smartlist_t *
+find_dl_schedule_and_len(download_status_t *dls, int server)
+{
+  switch (dls->schedule) {
+    case DL_SCHED_GENERIC:
+      if (server)
+        return get_options()->TestingServerDownloadSchedule;
+      else
+        return get_options()->TestingClientDownloadSchedule;
+    case DL_SCHED_CONSENSUS:
+      if (server)
+        return get_options()->TestingServerConsensusDownloadSchedule;
+      else
+        return get_options()->TestingClientConsensusDownloadSchedule;
+    case DL_SCHED_BRIDGE:
+      return get_options()->TestingBridgeDownloadSchedule;
+    default:
+      tor_assert(0);
+  }
+}
+
+/** Called when an attempt to download <b>dls</b> has failed with HTTP status
+ * <b>status_code</b>.  Increment the failure count (if the code indicates a
+ * real failure) and set <b>dls</b>-\>next_attempt_at to an appropriate time
+ * in the future. */
+time_t
+download_status_increment_failure(download_status_t *dls, int status_code,
+                                  const char *item, int server, time_t now)
+{
+  const smartlist_t *schedule;
+  int increment;
+  tor_assert(dls);
+  if (status_code != 503 || server) {
+    if (dls->n_download_failures < IMPOSSIBLE_TO_DOWNLOAD-1)
+      ++dls->n_download_failures;
+  }
+
+  schedule = find_dl_schedule_and_len(dls, server);
+
+  if (dls->n_download_failures < smartlist_len(schedule))
+    increment = *(int *)smartlist_get(schedule, dls->n_download_failures);
+  else if (dls->n_download_failures == IMPOSSIBLE_TO_DOWNLOAD)
+    increment = INT_MAX;
+  else
+    increment = *(int *)smartlist_get(schedule, smartlist_len(schedule) - 1);
+
+  if (increment < INT_MAX)
+    dls->next_attempt_at = now+increment;
+  else
+    dls->next_attempt_at = TIME_MAX;
+
+  if (item) {
+    if (increment == 0)
+      log_debug(LD_DIR, "%s failed %d time(s); I'll try again immediately.",
+                item, (int)dls->n_download_failures);
+    else if (dls->next_attempt_at < TIME_MAX)
+      log_debug(LD_DIR, "%s failed %d time(s); I'll try again in %d seconds.",
+                item, (int)dls->n_download_failures,
+                (int)(dls->next_attempt_at-now));
+    else
+      log_debug(LD_DIR, "%s failed %d time(s); Giving up for a while.",
+                item, (int)dls->n_download_failures);
+  }
+  return dls->next_attempt_at;
+}
+
+/** Reset <b>dls</b> so that it will be considered downloadable
+ * immediately, and/or to show that we don't need it anymore.
+ *
+ * (We find the zeroth element of the download schedule, and set
+ * next_attempt_at to be the appropriate offset from 'now'. In most
+ * cases this means setting it to 'now', so the item will be immediately
+ * downloadable; in the case of bridge descriptors, the zeroth element
+ * is an hour from now.) */
+void
+download_status_reset(download_status_t *dls)
+{
+  const smartlist_t *schedule = find_dl_schedule_and_len(
+                          dls, get_options()->DirPort_set);
+
+  dls->n_download_failures = 0;
+  dls->next_attempt_at = time(NULL) + *(int *)smartlist_get(schedule, 0);
+}
+
+/** Return the number of failures on <b>dls</b> since the last success (if
+ * any). */
+int
+download_status_get_n_failures(const download_status_t *dls)
+{
+  return dls->n_download_failures;
+}
+
+/** Called when one or more routerdesc (or extrainfo, if <b>was_extrainfo</b>)
+ * fetches have failed (with uppercase fingerprints listed in <b>failed</b>,
+ * either as descriptor digests or as identity digests based on
+ * <b>was_descriptor_digests</b>).
+ */
+static void
+dir_routerdesc_download_failed(smartlist_t *failed, int status_code,
+                               int router_purpose,
+                               int was_extrainfo, int was_descriptor_digests)
+{
+  char digest[DIGEST_LEN];
+  time_t now = time(NULL);
+  int server = directory_fetches_from_authorities(get_options());
+  if (!was_descriptor_digests) {
+    if (router_purpose == ROUTER_PURPOSE_BRIDGE) {
+      tor_assert(!was_extrainfo);
+      connection_dir_retry_bridges(failed);
+    }
+    return; /* FFFF should implement for other-than-router-purpose someday */
+  }
+  SMARTLIST_FOREACH_BEGIN(failed, const char *, cp) {
+    download_status_t *dls = NULL;
+    if (base16_decode(digest, DIGEST_LEN, cp, strlen(cp)) < 0) {
+      log_warn(LD_BUG, "Malformed fingerprint in list: %s", escaped(cp));
+      continue;
+    }
+    if (was_extrainfo) {
+      signed_descriptor_t *sd =
+        router_get_by_extrainfo_digest(digest);
+      if (sd)
+        dls = &sd->ei_dl_status;
+    } else {
+      dls = router_get_dl_status_by_descriptor_digest(digest);
+    }
+    if (!dls || dls->n_download_failures >=
+                get_options()->TestingDescriptorMaxDownloadTries)
+      continue;
+    download_status_increment_failure(dls, status_code, cp, server, now);
+  } SMARTLIST_FOREACH_END(cp);
+
+  /* No need to relaunch descriptor downloads here: we already do it
+   * every 10 or 60 seconds (FOO_DESCRIPTOR_RETRY_INTERVAL) in onion_main.c. */
+}
+
+/** Called when a connection to download microdescriptors has failed in whole
+ * or in part. <b>failed</b> is a list of every microdesc digest we didn't
+ * get. <b>status_code</b> is the http status code we received. Reschedule the
+ * microdesc downloads as appropriate. */
+static void
+dir_microdesc_download_failed(smartlist_t *failed,
+                              int status_code)
+{
+  networkstatus_t *consensus
+    = networkstatus_get_latest_consensus_by_flavor(FLAV_MICRODESC);
+  routerstatus_t *rs;
+  download_status_t *dls;
+  time_t now = time(NULL);
+  int server = directory_fetches_from_authorities(get_options());
+
+  if (! consensus)
+    return;
+  SMARTLIST_FOREACH_BEGIN(failed, const char *, d) {
+    rs = router_get_mutable_consensus_status_by_descriptor_digest(consensus,d);
+    if (!rs)
+      continue;
+    dls = &rs->dl_status;
+    if (dls->n_download_failures >=
+        get_options()->TestingMicrodescMaxDownloadTries)
+      continue;
+    {
+      char buf[BASE64_DIGEST256_LEN+1];
+      digest256_to_base64(buf, d);
+      download_status_increment_failure(dls, status_code, buf,
+                                        server, now);
+    }
+  } SMARTLIST_FOREACH_END(d);
+}
+
+/** Helper.  Compare two fp_pair_t objects, and return negative, 0, or
+ * positive as appropriate. */
+static int
+compare_pairs_(const void **a, const void **b)
+{
+  const fp_pair_t *fp1 = *a, *fp2 = *b;
+  int r;
+  if ((r = fast_memcmp(fp1->first, fp2->first, DIGEST_LEN)))
+    return r;
+  else
+    return fast_memcmp(fp1->second, fp2->second, DIGEST_LEN);
+}
+
+/** Divide a string <b>res</b> of the form FP1-FP2+FP3-FP4...[.z], where each
+ * FP is a hex-encoded fingerprint, into a sequence of distinct sorted
+ * fp_pair_t. Skip malformed pairs. On success, return 0 and add those
+ * fp_pair_t into <b>pairs_out</b>.  On failure, return -1. */
+int
+dir_split_resource_into_fingerprint_pairs(const char *res,
+                                          smartlist_t *pairs_out)
+{
+  smartlist_t *pairs_tmp = smartlist_new();
+  smartlist_t *pairs_result = smartlist_new();
+
+  smartlist_split_string(pairs_tmp, res, "+", 0, 0);
+  if (smartlist_len(pairs_tmp)) {
+    char *last = smartlist_get(pairs_tmp,smartlist_len(pairs_tmp)-1);
+    size_t last_len = strlen(last);
+    if (last_len > 2 && !strcmp(last+last_len-2, ".z")) {
+      last[last_len-2] = '\0';
+    }
+  }
+  SMARTLIST_FOREACH_BEGIN(pairs_tmp, char *, cp) {
+    if (strlen(cp) != HEX_DIGEST_LEN*2+1) {
+      log_info(LD_DIR,
+             "Skipping digest pair %s with non-standard length.", escaped(cp));
+    } else if (cp[HEX_DIGEST_LEN] != '-') {
+      log_info(LD_DIR,
+             "Skipping digest pair %s with missing dash.", escaped(cp));
+    } else {
+      fp_pair_t pair;
+      if (base16_decode(pair.first, DIGEST_LEN, cp, HEX_DIGEST_LEN)<0 ||
+          base16_decode(pair.second,
+                        DIGEST_LEN, cp+HEX_DIGEST_LEN+1, HEX_DIGEST_LEN)<0) {
+        log_info(LD_DIR, "Skipping non-decodable digest pair %s", escaped(cp));
+      } else {
+        smartlist_add(pairs_result, tor_memdup(&pair, sizeof(pair)));
+      }
+    }
+    tor_free(cp);
+  } SMARTLIST_FOREACH_END(cp);
+  smartlist_free(pairs_tmp);
+
+  /* Uniq-and-sort */
+  smartlist_sort(pairs_result, compare_pairs_);
+  smartlist_uniq(pairs_result, compare_pairs_, tor_free_);
+
+  smartlist_add_all(pairs_out, pairs_result);
+  smartlist_free(pairs_result);
+  return 0;
+}
+
+/** Given a directory <b>resource</b> request, containing zero
+ * or more strings separated by plus signs, followed optionally by ".z", store
+ * the strings, in order, into <b>fp_out</b>.  If <b>compressed_out</b> is
+ * non-NULL, set it to 1 if the resource ends in ".z", else set it to 0.
+ *
+ * If (flags & DSR_HEX), then delete all elements that aren't hex digests, and
+ * decode the rest.  If (flags & DSR_BASE64), then use "-" rather than "+" as
+ * a separator, delete all the elements that aren't base64-encoded digests,
+ * and decode the rest.  If (flags & DSR_DIGEST256), thes
