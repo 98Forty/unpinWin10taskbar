@@ -199,4 +199,313 @@ nodelist_add_microdesc(microdesc_t *md)
     if (node->md)
       node->md->held_by_nodes--;
     node->md = md;
-    md->held_by_nodes++
+    md->held_by_nodes++;
+  }
+  return node;
+}
+
+/** Tell the nodelist that the current usable consensus is <b>ns</b>.
+ * This makes the nodelist change all of the routerstatus entries for
+ * the nodes, drop nodes that no longer have enough info to get used,
+ * and grab microdescriptors into nodes as appropriate.
+ */
+void
+nodelist_set_consensus(networkstatus_t *ns)
+{
+  const or_options_t *options = get_options();
+  int authdir = authdir_mode_v3(options);
+  int client = !server_mode(options);
+
+  init_nodelist();
+  if (ns->flavor == FLAV_MICRODESC)
+    (void) get_microdesc_cache(); /* Make sure it exists first. */
+
+  SMARTLIST_FOREACH(the_nodelist->nodes, node_t *, node,
+                    node->rs = NULL);
+
+  SMARTLIST_FOREACH_BEGIN(ns->routerstatus_list, routerstatus_t *, rs) {
+    node_t *node = node_get_or_create(rs->identity_digest);
+    node->rs = rs;
+    if (ns->flavor == FLAV_MICRODESC) {
+      if (node->md == NULL ||
+          tor_memneq(node->md->digest,rs->descriptor_digest,DIGEST256_LEN)) {
+        if (node->md)
+          node->md->held_by_nodes--;
+        node->md = microdesc_cache_lookup_by_digest256(NULL,
+                                                       rs->descriptor_digest);
+        if (node->md)
+          node->md->held_by_nodes++;
+      }
+    }
+
+    node_set_country(node);
+
+    /* If we're not an authdir, believe others. */
+    if (!authdir) {
+      node->is_valid = rs->is_valid;
+      node->is_running = rs->is_flagged_running;
+      node->is_fast = rs->is_fast;
+      node->is_stable = rs->is_stable;
+      node->is_possible_guard = rs->is_possible_guard;
+      node->is_exit = rs->is_exit;
+      node->is_bad_directory = rs->is_bad_directory;
+      node->is_bad_exit = rs->is_bad_exit;
+      node->is_hs_dir = rs->is_hs_dir;
+      node->ipv6_preferred = 0;
+      if (client && options->ClientPreferIPv6ORPort == 1 &&
+          (tor_addr_is_null(&rs->ipv6_addr) == 0 ||
+           (node->md && tor_addr_is_null(&node->md->ipv6_addr) == 0)))
+        node->ipv6_preferred = 1;
+    }
+
+  } SMARTLIST_FOREACH_END(rs);
+
+  nodelist_purge();
+
+  if (! authdir) {
+    SMARTLIST_FOREACH_BEGIN(the_nodelist->nodes, node_t *, node) {
+      /* We have no routerstatus for this router. Clear flags so we can skip
+       * it, maybe.*/
+      if (!node->rs) {
+        tor_assert(node->ri); /* if it had only an md, or nothing, purge
+                               * would have removed it. */
+        if (node->ri->purpose == ROUTER_PURPOSE_GENERAL) {
+          /* Clear all flags. */
+          node->is_valid = node->is_running = node->is_hs_dir =
+            node->is_fast = node->is_stable =
+            node->is_possible_guard = node->is_exit =
+            node->is_bad_exit = node->is_bad_directory =
+            node->ipv6_preferred = 0;
+        }
+      }
+    } SMARTLIST_FOREACH_END(node);
+  }
+}
+
+/** Helper: return true iff a node has a usable amount of information*/
+static INLINE int
+node_is_usable(const node_t *node)
+{
+  return (node->rs) || (node->ri);
+}
+
+/** Tell the nodelist that <b>md</b> is no longer a microdescriptor for the
+ * node with <b>identity_digest</b>. */
+void
+nodelist_remove_microdesc(const char *identity_digest, microdesc_t *md)
+{
+  node_t *node = node_get_mutable_by_id(identity_digest);
+  if (node && node->md == md) {
+    node->md = NULL;
+    md->held_by_nodes--;
+  }
+}
+
+/** Tell the nodelist that <b>ri</b> is no longer in the routerlist. */
+void
+nodelist_remove_routerinfo(routerinfo_t *ri)
+{
+  node_t *node = node_get_mutable_by_id(ri->cache_info.identity_digest);
+  if (node && node->ri == ri) {
+    node->ri = NULL;
+    if (! node_is_usable(node)) {
+      nodelist_drop_node(node, 1);
+      node_free(node);
+    }
+  }
+}
+
+/** Remove <b>node</b> from the nodelist.  (Asserts that it was there to begin
+ * with.) */
+static void
+nodelist_drop_node(node_t *node, int remove_from_ht)
+{
+  node_t *tmp;
+  int idx;
+  if (remove_from_ht) {
+    tmp = HT_REMOVE(nodelist_map, &the_nodelist->nodes_by_id, node);
+    tor_assert(tmp == node);
+  }
+
+  idx = node->nodelist_idx;
+  tor_assert(idx >= 0);
+
+  tor_assert(node == smartlist_get(the_nodelist->nodes, idx));
+  smartlist_del(the_nodelist->nodes, idx);
+  if (idx < smartlist_len(the_nodelist->nodes)) {
+    tmp = smartlist_get(the_nodelist->nodes, idx);
+    tmp->nodelist_idx = idx;
+  }
+  node->nodelist_idx = -1;
+}
+
+/** Release storage held by <b>node</b>  */
+static void
+node_free(node_t *node)
+{
+  if (!node)
+    return;
+  if (node->md)
+    node->md->held_by_nodes--;
+  tor_assert(node->nodelist_idx == -1);
+  tor_free(node);
+}
+
+/** Remove all entries from the nodelist that don't have enough info to be
+ * usable for anything. */
+void
+nodelist_purge(void)
+{
+  node_t **iter;
+  if (PREDICT_UNLIKELY(the_nodelist == NULL))
+    return;
+
+  /* Remove the non-usable nodes. */
+  for (iter = HT_START(nodelist_map, &the_nodelist->nodes_by_id); iter; ) {
+    node_t *node = *iter;
+
+    if (node->md && !node->rs) {
+      /* An md is only useful if there is an rs. */
+      node->md->held_by_nodes--;
+      node->md = NULL;
+    }
+
+    if (node_is_usable(node)) {
+      iter = HT_NEXT(nodelist_map, &the_nodelist->nodes_by_id, iter);
+    } else {
+      iter = HT_NEXT_RMV(nodelist_map, &the_nodelist->nodes_by_id, iter);
+      nodelist_drop_node(node, 0);
+      node_free(node);
+    }
+  }
+  nodelist_assert_ok();
+}
+
+/** Release all storage held by the nodelist. */
+void
+nodelist_free_all(void)
+{
+  if (PREDICT_UNLIKELY(the_nodelist == NULL))
+    return;
+
+  HT_CLEAR(nodelist_map, &the_nodelist->nodes_by_id);
+  SMARTLIST_FOREACH_BEGIN(the_nodelist->nodes, node_t *, node) {
+    node->nodelist_idx = -1;
+    node_free(node);
+  } SMARTLIST_FOREACH_END(node);
+
+  smartlist_free(the_nodelist->nodes);
+
+  tor_free(the_nodelist);
+}
+
+/** Check that the nodelist is internally consistent, and consistent with
+ * the directory info it's derived from.
+ */
+void
+nodelist_assert_ok(void)
+{
+  routerlist_t *rl = router_get_routerlist();
+  networkstatus_t *ns = networkstatus_get_latest_consensus();
+  digestmap_t *dm;
+
+  if (!the_nodelist)
+    return;
+
+  dm = digestmap_new();
+
+  /* every routerinfo in rl->routers should be in the nodelist. */
+  if (rl) {
+    SMARTLIST_FOREACH_BEGIN(rl->routers, routerinfo_t *, ri) {
+      const node_t *node = node_get_by_id(ri->cache_info.identity_digest);
+      tor_assert(node && node->ri == ri);
+      tor_assert(fast_memeq(ri->cache_info.identity_digest,
+                             node->identity, DIGEST_LEN));
+      tor_assert(! digestmap_get(dm, node->identity));
+      digestmap_set(dm, node->identity, (void*)node);
+    } SMARTLIST_FOREACH_END(ri);
+  }
+
+  /* every routerstatus in ns should be in the nodelist */
+  if (ns) {
+    SMARTLIST_FOREACH_BEGIN(ns->routerstatus_list, routerstatus_t *, rs) {
+      const node_t *node = node_get_by_id(rs->identity_digest);
+      tor_assert(node && node->rs == rs);
+      tor_assert(fast_memeq(rs->identity_digest, node->identity, DIGEST_LEN));
+      digestmap_set(dm, node->identity, (void*)node);
+      if (ns->flavor == FLAV_MICRODESC) {
+        /* If it's a microdesc consensus, every entry that has a
+         * microdescriptor should be in the nodelist.
+         */
+        microdesc_t *md =
+          microdesc_cache_lookup_by_digest256(NULL, rs->descriptor_digest);
+        tor_assert(md == node->md);
+        if (md)
+          tor_assert(md->held_by_nodes >= 1);
+      }
+    } SMARTLIST_FOREACH_END(rs);
+  }
+
+  /* The nodelist should have no other entries, and its entries should be
+   * well-formed. */
+  SMARTLIST_FOREACH_BEGIN(the_nodelist->nodes, node_t *, node) {
+    tor_assert(digestmap_get(dm, node->identity) != NULL);
+    tor_assert(node_sl_idx == node->nodelist_idx);
+  } SMARTLIST_FOREACH_END(node);
+
+  tor_assert((long)smartlist_len(the_nodelist->nodes) ==
+             (long)HT_SIZE(&the_nodelist->nodes_by_id));
+
+  digestmap_free(dm, NULL);
+}
+
+/** Return a list of a node_t * for every node we know about.  The caller
+ * MUST NOT modify the list. (You can set and clear flags in the nodes if
+ * you must, but you must not add or remove nodes.) */
+smartlist_t *
+nodelist_get_list(void)
+{
+  init_nodelist();
+  return the_nodelist->nodes;
+}
+
+/** Given a hex-encoded nickname of the format DIGEST, $DIGEST, $DIGEST=name,
+ * or $DIGEST~name, return the node with the matching identity digest and
+ * nickname (if any).  Return NULL if no such node exists, or if <b>hex_id</b>
+ * is not well-formed. */
+const node_t *
+node_get_by_hex_id(const char *hex_id)
+{
+  char digest_buf[DIGEST_LEN];
+  char nn_buf[MAX_NICKNAME_LEN+1];
+  char nn_char='\0';
+
+  if (hex_digest_nickname_decode(hex_id, digest_buf, &nn_char, nn_buf)==0) {
+    const node_t *node = node_get_by_id(digest_buf);
+    if (!node)
+      return NULL;
+    if (nn_char) {
+      const char *real_name = node_get_nickname(node);
+      if (!real_name || strcasecmp(real_name, nn_buf))
+        return NULL;
+      if (nn_char == '=') {
+        const char *named_id =
+          networkstatus_get_router_digest_by_nickname(nn_buf);
+        if (!named_id || tor_memneq(named_id, digest_buf, DIGEST_LEN))
+          return NULL;
+      }
+    }
+    return node;
+  }
+
+  return NULL;
+}
+
+/** Given a nickname (possibly verbose, possibly a hexadecimal digest), return
+ * the corresponding node_t, or NULL if none exists.  Warn the user if
+ * <b>warn_if_unnamed</b> is set, and they have specified a router by
+ * nickname, but the Named flag isn't set for that router. */
+const node_t *
+node_get_by_nickname(const char *nickname, int warn_if_unnamed)
+{
+ 
