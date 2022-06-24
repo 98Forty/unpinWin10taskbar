@@ -508,4 +508,340 @@ node_get_by_hex_id(const char *hex_id)
 const node_t *
 node_get_by_nickname(const char *nickname, int warn_if_unnamed)
 {
- 
+  const node_t *node;
+  if (!the_nodelist)
+    return NULL;
+
+  /* Handle these cases: DIGEST, $DIGEST, $DIGEST=name, $DIGEST~name. */
+  if ((node = node_get_by_hex_id(nickname)) != NULL)
+      return node;
+
+  if (!strcasecmp(nickname, UNNAMED_ROUTER_NICKNAME))
+    return NULL;
+
+  /* Okay, so if we get here, the nickname is just a nickname.  Is there
+   * a binding for it in the consensus? */
+  {
+    const char *named_id =
+      networkstatus_get_router_digest_by_nickname(nickname);
+    if (named_id)
+      return node_get_by_id(named_id);
+  }
+
+  /* Is it marked as owned-by-someone-else? */
+  if (networkstatus_nickname_is_unnamed(nickname)) {
+    log_info(LD_GENERAL, "The name %s is listed as Unnamed: there is some "
+             "router that holds it, but not one listed in the current "
+             "consensus.", escaped(nickname));
+    return NULL;
+  }
+
+  /* Okay, so the name is not canonical for anybody. */
+  {
+    smartlist_t *matches = smartlist_new();
+    const node_t *choice = NULL;
+
+    SMARTLIST_FOREACH_BEGIN(the_nodelist->nodes, node_t *, node) {
+      if (!strcasecmp(node_get_nickname(node), nickname))
+        smartlist_add(matches, node);
+    } SMARTLIST_FOREACH_END(node);
+
+    if (smartlist_len(matches)>1 && warn_if_unnamed) {
+      int any_unwarned = 0;
+      SMARTLIST_FOREACH_BEGIN(matches, node_t *, node) {
+        if (!node->name_lookup_warned) {
+          node->name_lookup_warned = 1;
+          any_unwarned = 1;
+        }
+      } SMARTLIST_FOREACH_END(node);
+
+      if (any_unwarned) {
+        log_warn(LD_CONFIG, "There are multiple matches for the name %s, "
+                 "but none is listed as Named in the directory consensus. "
+                 "Choosing one arbitrarily.", nickname);
+      }
+    } else if (smartlist_len(matches)>1 && warn_if_unnamed) {
+      char fp[HEX_DIGEST_LEN+1];
+      node_t *node = smartlist_get(matches, 0);
+      if (node->name_lookup_warned) {
+        base16_encode(fp, sizeof(fp), node->identity, DIGEST_LEN);
+        log_warn(LD_CONFIG,
+                 "You specified a server \"%s\" by name, but the directory "
+                 "authorities do not have any key registered for this "
+                 "nickname -- so it could be used by any server, not just "
+                 "the one you meant. "
+                 "To make sure you get the same server in the future, refer "
+                 "to it by key, as \"$%s\".", nickname, fp);
+        node->name_lookup_warned = 1;
+      }
+    }
+
+    if (smartlist_len(matches))
+      choice = smartlist_get(matches, 0);
+
+    smartlist_free(matches);
+    return choice;
+  }
+}
+
+/** Return the nickname of <b>node</b>, or NULL if we can't find one. */
+const char *
+node_get_nickname(const node_t *node)
+{
+  tor_assert(node);
+  if (node->rs)
+    return node->rs->nickname;
+  else if (node->ri)
+    return node->ri->nickname;
+  else
+    return NULL;
+}
+
+/** Return true iff the nickname of <b>node</b> is canonical, based on the
+ * latest consensus. */
+int
+node_is_named(const node_t *node)
+{
+  const char *named_id;
+  const char *nickname = node_get_nickname(node);
+  if (!nickname)
+    return 0;
+  named_id = networkstatus_get_router_digest_by_nickname(nickname);
+  if (!named_id)
+    return 0;
+  return tor_memeq(named_id, node->identity, DIGEST_LEN);
+}
+
+/** Return true iff <b>node</b> appears to be a directory authority or
+ * directory cache */
+int
+node_is_dir(const node_t *node)
+{
+  if (node->rs)
+    return node->rs->dir_port != 0;
+  else if (node->ri)
+    return node->ri->dir_port != 0;
+  else
+    return 0;
+}
+
+/** Return true iff <b>node</b> has either kind of usable descriptor -- that
+ * is, a routerdescriptor or a microdescriptor. */
+int
+node_has_descriptor(const node_t *node)
+{
+  return (node->ri ||
+          (node->rs && node->md));
+}
+
+/** Return the router_purpose of <b>node</b>. */
+int
+node_get_purpose(const node_t *node)
+{
+  if (node->ri)
+    return node->ri->purpose;
+  else
+    return ROUTER_PURPOSE_GENERAL;
+}
+
+/** Compute the verbose ("extended") nickname of <b>node</b> and store it
+ * into the MAX_VERBOSE_NICKNAME_LEN+1 character buffer at
+ * <b>verbose_name_out</b> */
+void
+node_get_verbose_nickname(const node_t *node,
+                          char *verbose_name_out)
+{
+  const char *nickname = node_get_nickname(node);
+  int is_named = node_is_named(node);
+  verbose_name_out[0] = '$';
+  base16_encode(verbose_name_out+1, HEX_DIGEST_LEN+1, node->identity,
+                DIGEST_LEN);
+  if (!nickname)
+    return;
+  verbose_name_out[1+HEX_DIGEST_LEN] = is_named ? '=' : '~';
+  strlcpy(verbose_name_out+1+HEX_DIGEST_LEN+1, nickname, MAX_NICKNAME_LEN+1);
+}
+
+/** Compute the verbose ("extended") nickname of node with
+ * given <b>id_digest</b> and store it into the MAX_VERBOSE_NICKNAME_LEN+1
+ * character buffer at <b>verbose_name_out</b>
+ *
+ * If node_get_by_id() returns NULL, base 16 encoding of
+ * <b>id_digest</b> is returned instead. */
+void
+node_get_verbose_nickname_by_id(const char *id_digest,
+                                char *verbose_name_out)
+{
+  const node_t *node = node_get_by_id(id_digest);
+  if (!node) {
+    verbose_name_out[0] = '$';
+    base16_encode(verbose_name_out+1, HEX_DIGEST_LEN+1, id_digest, DIGEST_LEN);
+  } else {
+    node_get_verbose_nickname(node, verbose_name_out);
+  }
+}
+
+/** Return true iff it seems that <b>node</b> allows circuits to exit
+ * through it directlry from the client. */
+int
+node_allows_single_hop_exits(const node_t *node)
+{
+  if (node && node->ri)
+    return node->ri->allow_single_hop_exits;
+  else
+    return 0;
+}
+
+/** Return true iff it seems that <b>node</b> has an exit policy that doesn't
+ * actually permit anything to exit, or we don't know its exit policy */
+int
+node_exit_policy_rejects_all(const node_t *node)
+{
+  if (node->rejects_all)
+    return 1;
+
+  if (node->ri)
+    return node->ri->policy_is_reject_star;
+  else if (node->md)
+    return node->md->exit_policy == NULL ||
+      short_policy_is_reject_star(node->md->exit_policy);
+  else
+    return 1;
+}
+
+/** Return true iff the exit policy for <b>node</b> is such that we can treat
+ * rejecting an address of type <b>family</b> unexpectedly as a sign of that
+ * node's failure. */
+int
+node_exit_policy_is_exact(const node_t *node, sa_family_t family)
+{
+  if (family == AF_UNSPEC) {
+    return 1; /* Rejecting an address but not telling us what address
+               * is a bad sign. */
+  } else if (family == AF_INET) {
+    return node->ri != NULL;
+  } else if (family == AF_INET6) {
+    return 0;
+  }
+  tor_fragile_assert();
+  return 1;
+}
+
+/** Return list of tor_addr_port_t with all OR ports (in the sense IP
+ * addr + TCP port) for <b>node</b>.  Caller must free all elements
+ * using tor_free() and free the list using smartlist_free().
+ *
+ * XXX this is potentially a memory fragmentation hog -- if on
+ * critical path consider the option of having the caller allocate the
+ * memory
+ */
+smartlist_t *
+node_get_all_orports(const node_t *node)
+{
+  smartlist_t *sl = smartlist_new();
+
+  if (node->ri != NULL) {
+    if (node->ri->addr != 0) {
+      tor_addr_port_t *ap = tor_malloc(sizeof(tor_addr_port_t));
+      tor_addr_from_ipv4h(&ap->addr, node->ri->addr);
+      ap->port = node->ri->or_port;
+      smartlist_add(sl, ap);
+    }
+    if (!tor_addr_is_null(&node->ri->ipv6_addr)) {
+      tor_addr_port_t *ap = tor_malloc(sizeof(tor_addr_port_t));
+      tor_addr_copy(&ap->addr, &node->ri->ipv6_addr);
+      ap->port = node->ri->or_port;
+      smartlist_add(sl, ap);
+    }
+  } else if (node->rs != NULL) {
+      tor_addr_port_t *ap = tor_malloc(sizeof(tor_addr_port_t));
+      tor_addr_from_ipv4h(&ap->addr, node->rs->addr);
+      ap->port = node->rs->or_port;
+      smartlist_add(sl, ap);
+  }
+
+  return sl;
+}
+
+/** Wrapper around node_get_prim_orport for backward
+    compatibility.  */
+void
+node_get_addr(const node_t *node, tor_addr_t *addr_out)
+{
+  tor_addr_port_t ap;
+  node_get_prim_orport(node, &ap);
+  tor_addr_copy(addr_out, &ap.addr);
+}
+
+/** Return the host-order IPv4 address for <b>node</b>, or 0 if it doesn't
+ * seem to have one.  */
+uint32_t
+node_get_prim_addr_ipv4h(const node_t *node)
+{
+  if (node->ri) {
+    return node->ri->addr;
+  } else if (node->rs) {
+    return node->rs->addr;
+  }
+  return 0;
+}
+
+/** Copy a string representation of an IP address for <b>node</b> into
+ * the <b>len</b>-byte buffer at <b>buf</b>.  */
+void
+node_get_address_string(const node_t *node, char *buf, size_t len)
+{
+  if (node->ri) {
+    strlcpy(buf, node->ri->address, len);
+  } else if (node->rs) {
+    tor_addr_t addr;
+    tor_addr_from_ipv4h(&addr, node->rs->addr);
+    tor_addr_to_str(buf, &addr, len, 0);
+  } else {
+    buf[0] = '\0';
+  }
+}
+
+/** Return <b>node</b>'s declared uptime, or -1 if it doesn't seem to have
+ * one. */
+long
+node_get_declared_uptime(const node_t *node)
+{
+  if (node->ri)
+    return node->ri->uptime;
+  else
+    return -1;
+}
+
+/** Return <b>node</b>'s platform string, or NULL if we don't know it. */
+const char *
+node_get_platform(const node_t *node)
+{
+  /* If we wanted, we could record the version in the routerstatus_t, since
+   * the consensus lists it.  We don't, though, so this function just won't
+   * work with microdescriptors. */
+  if (node->ri)
+    return node->ri->platform;
+  else
+    return NULL;
+}
+
+/** Return <b>node</b>'s time of publication, or 0 if we don't have one. */
+time_t
+node_get_published_on(const node_t *node)
+{
+  if (node->ri)
+    return node->ri->cache_info.published_on;
+  else
+    return 0;
+}
+
+/** Return true iff <b>node</b> is one representing this router. */
+int
+node_is_me(const node_t *node)
+{
+  return router_digest_is_me(node->identity);
+}
+
+/** Return <b>node</b> declared family (as a list of names), or NULL if
+ * the node did
