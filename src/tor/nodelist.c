@@ -1154,4 +1154,270 @@ router_find_exact_exit_enclave(const char *address, uint16_t port)
   const or_options_t *options = get_options();
 
   if (!tor_inet_aton(address, &in))
-    return NULL; 
+    return NULL; /* it's not an IP already */
+  addr = ntohl(in.s_addr);
+
+  tor_addr_from_ipv4h(&a, addr);
+
+  SMARTLIST_FOREACH(nodelist_get_list(), const node_t *, node, {
+    if (node_get_addr_ipv4h(node) == addr &&
+        node->is_running &&
+        compare_tor_addr_to_node_policy(&a, port, node) ==
+          ADDR_POLICY_ACCEPTED &&
+        !routerset_contains_node(options->ExcludeExitNodesUnion_, node))
+      return node;
+  });
+  return NULL;
+}
+
+/** Return 1 if <b>router</b> is not suitable for these parameters, else 0.
+ * If <b>need_uptime</b> is non-zero, we require a minimum uptime.
+ * If <b>need_capacity</b> is non-zero, we require a minimum advertised
+ * bandwidth.
+ * If <b>need_guard</b>, we require that the router is a possible entry guard.
+ */
+int
+node_is_unreliable(const node_t *node, int need_uptime,
+                   int need_capacity, int need_guard)
+{
+  if (need_uptime && !node->is_stable)
+    return 1;
+  if (need_capacity && !node->is_fast)
+    return 1;
+  if (need_guard && !node->is_possible_guard)
+    return 1;
+  return 0;
+}
+
+/** Return 1 if all running sufficiently-stable routers we can use will reject
+ * addr:port. Return 0 if any might accept it. */
+int
+router_exit_policy_all_nodes_reject(const tor_addr_t *addr, uint16_t port,
+                                    int need_uptime)
+{
+  addr_policy_result_t r;
+
+  SMARTLIST_FOREACH_BEGIN(nodelist_get_list(), const node_t *, node) {
+    if (node->is_running &&
+        !node_is_unreliable(node, need_uptime, 0, 0)) {
+
+      r = compare_tor_addr_to_node_policy(addr, port, node);
+
+      if (r != ADDR_POLICY_REJECTED && r != ADDR_POLICY_PROBABLY_REJECTED)
+        return 0; /* this one could be ok. good enough. */
+    }
+  } SMARTLIST_FOREACH_END(node);
+  return 1; /* all will reject. */
+}
+
+/** Mark the router with ID <b>digest</b> as running or non-running
+ * in our routerlist. */
+void
+router_set_status(const char *digest, int up)
+{
+  node_t *node;
+  tor_assert(digest);
+
+  SMARTLIST_FOREACH(router_get_fallback_dir_servers(),
+                    dir_server_t *, d,
+                    if (tor_memeq(d->digest, digest, DIGEST_LEN))
+                      d->is_running = up);
+
+  SMARTLIST_FOREACH(router_get_trusted_dir_servers(),
+                    dir_server_t *, d,
+                    if (tor_memeq(d->digest, digest, DIGEST_LEN))
+                      d->is_running = up);
+
+  node = node_get_mutable_by_id(digest);
+  if (node) {
+#if 0
+    log_debug(LD_DIR,"Marking router %s as %s.",
+              node_describe(node), up ? "up" : "down");
+#endif
+    if (!up && node_is_me(node) && !net_is_disabled())
+      log_warn(LD_NET, "We just marked ourself as down. Are your external "
+               "addresses reachable?");
+    node->is_running = up;
+  }
+
+  router_dir_info_changed();
+}
+
+/** True iff, the last time we checked whether we had enough directory info
+ * to build circuits, the answer was "yes". */
+static int have_min_dir_info = 0;
+/** True iff enough has changed since the last time we checked whether we had
+ * enough directory info to build circuits that our old answer can no longer
+ * be trusted. */
+static int need_to_update_have_min_dir_info = 1;
+/** String describing what we're missing before we have enough directory
+ * info. */
+static char dir_info_status[256] = "";
+
+/** Return true iff we have enough networkstatus and router information to
+ * start building circuits.  Right now, this means "more than half the
+ * networkstatus documents, and at least 1/4 of expected routers." */
+//XXX should consider whether we have enough exiting nodes here.
+int
+router_have_minimum_dir_info(void)
+{
+  if (PREDICT_UNLIKELY(need_to_update_have_min_dir_info)) {
+    update_router_have_minimum_dir_info();
+    need_to_update_have_min_dir_info = 0;
+  }
+  return have_min_dir_info;
+}
+
+/** Called when our internal view of the directory has changed.  This can be
+ * when the authorities change, networkstatuses change, the list of routerdescs
+ * changes, or number of running routers changes.
+ */
+void
+router_dir_info_changed(void)
+{
+  need_to_update_have_min_dir_info = 1;
+  rend_hsdir_routers_changed();
+}
+
+/** Return a string describing what we're missing before we have enough
+ * directory info. */
+const char *
+get_dir_info_status_string(void)
+{
+  return dir_info_status;
+}
+
+/** Iterate over the servers listed in <b>consensus</b>, and count how many of
+ * them seem like ones we'd use, and how many of <em>those</em> we have
+ * descriptors for.  Store the former in *<b>num_usable</b> and the latter in
+ * *<b>num_present</b>.  If <b>in_set</b> is non-NULL, only consider those
+ * routers in <b>in_set</b>.  If <b>exit_only</b> is true, only consider nodes
+ * with the Exit flag.  If *descs_out is present, add a node_t for each
+ * usable descriptor to it.
+ */
+static void
+count_usable_descriptors(int *num_present, int *num_usable,
+                         smartlist_t *descs_out,
+                         const networkstatus_t *consensus,
+                         const or_options_t *options, time_t now,
+                         routerset_t *in_set, int exit_only)
+{
+  const int md = (consensus->flavor == FLAV_MICRODESC);
+  *num_present = 0, *num_usable=0;
+
+  SMARTLIST_FOREACH_BEGIN(consensus->routerstatus_list, routerstatus_t *, rs)
+    {
+       const node_t *node = node_get_by_id(rs->identity_digest);
+       if (!node)
+         continue; /* This would be a bug: every entry in the consensus is
+                    * supposed to have a node. */
+       if (exit_only && ! rs->is_exit)
+         continue;
+       if (in_set && ! routerset_contains_routerstatus(in_set, rs, -1))
+         continue;
+       if (client_would_use_router(rs, now, options)) {
+         const char * const digest = rs->descriptor_digest;
+         int present;
+         ++*num_usable; /* the consensus says we want it. */
+         if (md)
+           present = NULL != microdesc_cache_lookup_by_digest256(NULL, digest);
+         else
+           present = NULL != router_get_by_descriptor_digest(digest);
+         if (present) {
+           /* we have the descriptor listed in the consensus. */
+           ++*num_present;
+         }
+         if (descs_out)
+           smartlist_add(descs_out, (node_t*)node);
+       }
+     }
+  SMARTLIST_FOREACH_END(rs);
+
+  log_debug(LD_DIR, "%d usable, %d present (%s%s).",
+            *num_usable, *num_present,
+            md ? "microdesc" : "desc", exit_only ? " exits" : "s");
+}
+
+/** Return an estimate of which fraction of usable paths through the Tor
+ * network we have available for use. */
+static double
+compute_frac_paths_available(const networkstatus_t *consensus,
+                             const or_options_t *options, time_t now,
+                             int *num_present_out, int *num_usable_out,
+                             char **status_out)
+{
+  smartlist_t *guards = smartlist_new();
+  smartlist_t *mid    = smartlist_new();
+  smartlist_t *exits  = smartlist_new();
+  smartlist_t *myexits= smartlist_new();
+  smartlist_t *myexits_unflagged = smartlist_new();
+  double f_guard, f_mid, f_exit, f_myexit, f_myexit_unflagged;
+  int np, nu; /* Ignored */
+  const int authdir = authdir_mode_v3(options);
+
+  count_usable_descriptors(num_present_out, num_usable_out,
+                           mid, consensus, options, now, NULL, 0);
+  if (options->EntryNodes) {
+    count_usable_descriptors(&np, &nu, guards, consensus, options, now,
+                             options->EntryNodes, 0);
+  } else {
+    SMARTLIST_FOREACH(mid, const node_t *, node, {
+      if (authdir) {
+        if (node->rs && node->rs->is_possible_guard)
+          smartlist_add(guards, (node_t*)node);
+      } else {
+        if (node->is_possible_guard)
+          smartlist_add(guards, (node_t*)node);
+      }
+    });
+  }
+
+  /* All nodes with exit flag */
+  count_usable_descriptors(&np, &nu, exits, consensus, options, now,
+                           NULL, 1);
+  /* All nodes with exit flag in ExitNodes option */
+  count_usable_descriptors(&np, &nu, myexits, consensus, options, now,
+                           options->ExitNodes, 1);
+  /* Now compute the nodes in the ExitNodes option where which we don't know
+   * what their exit policy is, or we know it permits something. */
+  count_usable_descriptors(&np, &nu, myexits_unflagged,
+                           consensus, options, now,
+                           options->ExitNodes, 0);
+  SMARTLIST_FOREACH_BEGIN(myexits_unflagged, const node_t *, node) {
+    if (node_has_descriptor(node) && node_exit_policy_rejects_all(node))
+      SMARTLIST_DEL_CURRENT(myexits_unflagged, node);
+  } SMARTLIST_FOREACH_END(node);
+
+  f_guard = frac_nodes_with_descriptors(guards, WEIGHT_FOR_GUARD);
+  f_mid   = frac_nodes_with_descriptors(mid,    WEIGHT_FOR_MID);
+  f_exit  = frac_nodes_with_descriptors(exits,  WEIGHT_FOR_EXIT);
+  f_myexit= frac_nodes_with_descriptors(myexits,WEIGHT_FOR_EXIT);
+  f_myexit_unflagged=
+            frac_nodes_with_descriptors(myexits_unflagged,WEIGHT_FOR_EXIT);
+
+  /* If our ExitNodes list has eliminated every possible Exit node, and there
+   * were some possible Exit nodes, then instead consider nodes that permit
+   * exiting to some ports. */
+  if (smartlist_len(myexits) == 0 &&
+      smartlist_len(myexits_unflagged)) {
+    f_myexit = f_myexit_unflagged;
+  }
+
+  smartlist_free(guards);
+  smartlist_free(mid);
+  smartlist_free(exits);
+  smartlist_free(myexits);
+  smartlist_free(myexits_unflagged);
+
+  /* This is a tricky point here: we don't want to make it easy for a
+   * directory to trickle exits to us until it learns which exits we have
+   * configured, so require that we have a threshold both of total exits
+   * and usable exits. */
+  if (f_myexit < f_exit)
+    f_exit = f_myexit;
+
+  if (status_out)
+    tor_asprintf(status_out,
+                 "%d%% of guards bw, "
+                 "%d%% of midpoint bw, and "
+                 "%d%% of e
