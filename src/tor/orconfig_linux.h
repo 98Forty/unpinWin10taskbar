@@ -439,4 +439,183 @@
 /* #undef INSTRUMENT_DOWNLOADS */
 
 /* name of the syslog facility */
-#define LOGFACILITY LOG_DA
+#define LOGFACILITY LOG_DAEMON
+
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#define LT_OBJDIR ".libs/"
+
+/* Define to 1 iff malloc(0) returns a pointer */
+#define MALLOC_ZERO_WORKS 1
+
+/* Define to 1 if we are building with UPnP. */
+/* #undef MINIUPNPC */
+
+/* libminiupnpc version 1.5 found */
+/* #undef MINIUPNPC15 */
+
+/* Define to 1 if we are building with nat-pmp. */
+/* #undef NAT_PMP */
+
+/* Define to 1 if your C compiler doesn't accept -c and -o together. */
+/* #undef NO_MINUS_C_MINUS_O */
+
+/* Define to 1 iff memset(0) sets pointers to NULL */
+#define NULL_REP_IS_ZERO_BYTES 1
+
+/* "Define to handle pf on OpenBSD properly" */
+/* #undef OPENBSD */
+
+/* Name of package */
+#define PACKAGE "tor"
+
+/* Define to the address where bug reports for this package should be sent. */
+#define PACKAGE_BUGREPORT ""
+
+/* Define to the full name of this package. */
+#define PACKAGE_NAME "tor"
+
+/* Define to the full name and version of this package. */
+#define PACKAGE_STRING "tor 0.2.5.1-alpha-dev"
+
+/* Define to the one symbol short name of this package. */
+#define PACKAGE_TARNAME "tor"
+
+/* Define to the home page for this package. */
+#define PACKAGE_URL ""
+
+/* Define to the version of this package. */
+#define PACKAGE_VERSION "0.2.5.1-alpha-dev"
+
+/* How to access the PC from a struct ucontext */
+/* #define PC_FROM_UCONTEXT uc_mcontext.gregs[REG_RIP] */
+
+/* Define to 1 iff right-shifting a negative value performs sign-extension */
+#define RSHIFT_DOES_SIGN_EXTEND 1
+
+/* The size of `cell_t', as computed by sizeof. */
+#define SIZEOF_CELL_T 0
+
+/* The size of `char', as computed by sizeof. */
+#define SIZEOF_CHAR 1
+
+/* The size of `int', as computed by sizeof. */
+#define SIZEOF_INT 4
+
+/* The size of `int16_t', as computed by sizeof. */
+#define SIZEOF_INT16_T 2
+
+/* The size of `int32_t', as computed by sizeof. */
+#define SIZEOF_INT32_T 4
+
+/* The size of `int64_t', as computed by sizeof. */
+#define SIZEOF_INT64_T 8
+
+/* The size of `int8_t', as computed by sizeof. */
+#define SIZEOF_INT8_T 1
+
+/* The size of `intptr_t', as computed by sizeof. */
+#define SIZEOF_INTPTR_T 8
+
+/* The size of `long', as computed by sizeof. */
+#define SIZEOF_LONG 8
+
+/* The size of `long long', as computed by sizeof. */
+#define SIZEOF_LONG_LONG 8
+
+/* The size of `pid_t', as computed by sizeof. */
+#define SIZEOF_PID_T 4
+
+/* The size of `short', as computed by sizeof. */
+#define SIZEOF_SHORT 2
+
+/* The size of `size_t', as computed by sizeof. */
+#define SIZEOF_SIZE_T 8
+
+/* The size of `socklen_t', as computed by sizeof. */
+#define SIZEOF_SOCKLEN_T 4
+
+/* The size of `time_t', as computed by sizeof. */
+#define SIZEOF_TIME_T 8
+
+/* The size of `uint16_t', as computed by sizeof. */
+#define SIZEOF_UINT16_T 2
+
+/* The size of `uint32_t', as computed by sizeof. */
+#define SIZEOF_UINT32_T 4
+
+/* The size of `uint64_t', as computed by sizeof. */
+#define SIZEOF_UINT64_T 8
+
+/* The size of `uint8_t', as computed by sizeof. */
+#define SIZEOF_UINT8_T 1
+
+/* The size of `uintptr_t', as computed by sizeof. */
+#define SIZEOF_UINTPTR_T 8
+
+/* The size of `void *', as computed by sizeof. */
+#define SIZEOF_VOID_P 8
+
+/* The size of `__int64', as computed by sizeof. */
+#define SIZEOF___INT64 0
+
+/* Define to 1 if you have the ANSI C header files. */
+#define STDC_HEADERS 1
+
+/* Define if time_t is signed */
+#define TIME_T_IS_SIGNED 1
+
+/* Defined if we're going to use Libevent's buffered IO API */
+/* #undef USE_BUFFEREVENTS */
+
+/* Defined if we should use an internal curve25519_donna{,_c64} implementation
+   */
+#define USE_CURVE25519_DONNA 1
+
+/* Defined if we should use a curve25519 from nacl */
+/* #undef USE_CURVE25519_NACL */
+
+/* Debug memory allocation library */
+/* #undef USE_DMALLOC */
+
+/* "Define to enable transparent proxy support" */
+#define USE_TRANSPARENT 1
+
+/* Define to 1 iff we represent negative integers with two's complement */
+#define USING_TWOS_COMPLEMENT 1
+
+/* Version number of package */
+#define VERSION "0.2.5.1-alpha-dev"
+
+/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
+   significant byte first (like Motorola and SPARC, unlike Intel). */
+#if defined AC_APPLE_UNIVERSAL_BUILD
+# if defined __BIG_ENDIAN__
+#  define WORDS_BIGENDIAN 1
+# endif
+#else
+# ifndef WORDS_BIGENDIAN
+/* #  undef WORDS_BIGENDIAN */
+# endif
+#endif
+
+/* Number of bits in a file offset, on hosts where this is settable. */
+/* #undef _FILE_OFFSET_BITS */
+
+/* Define for large files, on AIX-style hosts. */
+/* #undef _LARGE_FILES */
+
+/* Define on some platforms to activate x_r() functions in time.h */
+/* #undef _REENTRANT */
+
+/* Define to `unsigned short' if <sys/types.h> does not define. */
+/* #undef u_int16_t */
+
+/* Define to `unsigned long' if <sys/types.h> does not define. */
+/* #undef u_int32_t */
+
+/* Define to `unsigned long long' if <sys/types.h> does not define. */
+/* #undef u_int64_t */
+
+/* Define to `unsigned char' if <sys/types.h> does not define. */
+/* #undef u_int8_t */
