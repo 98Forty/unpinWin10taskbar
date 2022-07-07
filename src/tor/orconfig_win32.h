@@ -181,4 +181,79 @@
 /* The size of a `int16_t', as computed by sizeof. */
 #undef SIZEOF_INT16_T
 
-/*
+/* The size of a `int32_t', as computed by sizeof. */
+#undef SIZEOF_INT32_T
+
+/* The size of a `int64_t', as computed by sizeof. */
+#undef SIZEOF_INT64_T
+
+/* The size of a `int8_t', as computed by sizeof. */
+#undef SIZEOF_INT8_T
+
+/* The size of a `long', as computed by sizeof. */
+#define SIZEOF_LONG 4
+
+/* The size of a `long long', as computed by sizeof. */
+#undef SIZEOF_LONG_LONG
+
+/* The size of `pid_t', as computed by sizeof. */
+#define SIZEOF_PID_T 0
+
+/* The size of a `short', as computed by sizeof. */
+#define SIZEOF_SHORT 2
+
+/* The size of a `time_t', as computed by sizeof. */
+#define SIZEOF_TIME_T 4
+
+/* The size of a `uint16_t', as computed by sizeof. */
+#undef SIZEOF_UINT16_T
+
+/* The size of a `uint32_t', as computed by sizeof. */
+#undef SIZEOF_UINT32_T
+
+/* The size of a `uint64_t', as computed by sizeof. */
+#undef SIZEOF_UINT64_T
+
+/* The size of a `uint8_t', as computed by sizeof. */
+#undef SIZEOF_UINT8_T
+
+/* The size of a `void *', as computed by sizeof. */
+#define SIZEOF_VOID_P 4
+
+/* The size of a `__int64', as computed by sizeof. */
+#define SIZEOF___INT64 8
+
+/* The sizeof a size_t, as computed by sizeof. */
+#define SIZEOF_SIZE_T 4
+
+/* Define to 1 if you have the ANSI C header files. */
+#define STDC_HEADERS
+
+/* Define to 1 if time_t is signed. */
+#define TIME_T_IS_SIGNED
+
+/* Define to 1 iff unaligned int access is allowed */
+#define UNALIGNED_INT_ACCESS_OK
+
+#define HAVE_EVENT_H
+
+/* Define to 1 iff we represent negative integers with two's complement */
+#define USING_TWOS_COMPLEMENT
+
+/* Version number of package */
+#define VERSION "0.2.5.1-alpha-dev"
+
+
+
+#define HAVE_STRUCT_SOCKADDR_IN6
+#define HAVE_STRUCT_IN6_ADDR
+#define RSHIFT_DOES_SIGN_EXTEND
+#define FLEXIBLE_ARRAY_MEMBER 0
+#define HAVE_EVENT2_EVENT_H
+#define SHARE_DATADIR ""
+#define HAVE_EVENT2_DNS_H
+#define HAVE_EVENT_BASE_LOOPEXIT
+#define CURVE25519_ENABLED
+#define USE_CURVE25519_DONNA
+
+#define ENUM_VALS_ARE_SIGNED 1
