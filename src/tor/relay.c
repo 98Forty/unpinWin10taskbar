@@ -284,4 +284,274 @@ circuit_receive_relay_cell(cell_t *cell, circuit_t *circ,
 
   ++stats_n_relay_cells_relayed; /* XXXX no longer quite accurate {cells}
                                   * we might kill the circ before we relay
-                                  * the
+                                  * the cells. */
+
+  append_cell_to_circuit_queue(circ, chan, cell, cell_direction, 0);
+  return 0;
+}
+
+/** Do the appropriate en/decryptions for <b>cell</b> arriving on
+ * <b>circ</b> in direction <b>cell_direction</b>.
+ *
+ * If cell_direction == CELL_DIRECTION_IN:
+ *   - If we're at the origin (we're the OP), for hops 1..N,
+ *     decrypt cell. If recognized, stop.
+ *   - Else (we're not the OP), encrypt one hop. Cell is not recognized.
+ *
+ * If cell_direction == CELL_DIRECTION_OUT:
+ *   - decrypt one hop. Check if recognized.
+ *
+ * If cell is recognized, set *recognized to 1, and set
+ * *layer_hint to the hop that recognized it.
+ *
+ * Return -1 to indicate that we should mark the circuit for close,
+ * else return 0.
+ */
+int
+relay_crypt(circuit_t *circ, cell_t *cell, cell_direction_t cell_direction,
+            crypt_path_t **layer_hint, char *recognized)
+{
+  relay_header_t rh;
+
+  tor_assert(circ);
+  tor_assert(cell);
+  tor_assert(recognized);
+  tor_assert(cell_direction == CELL_DIRECTION_IN ||
+             cell_direction == CELL_DIRECTION_OUT);
+
+  if (cell_direction == CELL_DIRECTION_IN) {
+    if (CIRCUIT_IS_ORIGIN(circ)) { /* We're at the beginning of the circuit.
+                                    * We'll want to do layered decrypts. */
+      crypt_path_t *thishop, *cpath = TO_ORIGIN_CIRCUIT(circ)->cpath;
+      thishop = cpath;
+      if (thishop->state != CPATH_STATE_OPEN) {
+        log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
+               "Relay cell before first created cell? Closing.");
+        return -1;
+      }
+      do { /* Remember: cpath is in forward order, that is, first hop first. */
+        tor_assert(thishop);
+
+        if (relay_crypt_one_payload(thishop->b_crypto, cell->payload, 0) < 0)
+          return -1;
+
+        relay_header_unpack(&rh, cell->payload);
+        if (rh.recognized == 0) {
+          /* it's possibly recognized. have to check digest to be sure. */
+          if (relay_digest_matches(thishop->b_digest, cell)) {
+            *recognized = 1;
+            *layer_hint = thishop;
+            return 0;
+          }
+        }
+
+        thishop = thishop->next;
+      } while (thishop != cpath && thishop->state == CPATH_STATE_OPEN);
+      log_fn(LOG_PROTOCOL_WARN, LD_OR,
+             "Incoming cell at client not recognized. Closing.");
+      return -1;
+    } else { /* we're in the middle. Just one crypt. */
+      if (relay_crypt_one_payload(TO_OR_CIRCUIT(circ)->p_crypto,
+                                  cell->payload, 1) < 0)
+        return -1;
+//      log_fn(LOG_DEBUG,"Skipping recognized check, because we're not "
+//             "the client.");
+    }
+  } else /* cell_direction == CELL_DIRECTION_OUT */ {
+    /* we're in the middle. Just one crypt. */
+
+    if (relay_crypt_one_payload(TO_OR_CIRCUIT(circ)->n_crypto,
+                                cell->payload, 0) < 0)
+      return -1;
+
+    relay_header_unpack(&rh, cell->payload);
+    if (rh.recognized == 0) {
+      /* it's possibly recognized. have to check digest to be sure. */
+      if (relay_digest_matches(TO_OR_CIRCUIT(circ)->n_digest, cell)) {
+        *recognized = 1;
+        return 0;
+      }
+    }
+  }
+  return 0;
+}
+
+/** Package a relay cell from an edge:
+ *  - Encrypt it to the right layer
+ *  - Append it to the appropriate cell_queue on <b>circ</b>.
+ */
+static int
+circuit_package_relay_cell(cell_t *cell, circuit_t *circ,
+                           cell_direction_t cell_direction,
+                           crypt_path_t *layer_hint, streamid_t on_stream,
+                           const char *filename, int lineno)
+{
+  channel_t *chan; /* where to send the cell */
+
+  if (cell_direction == CELL_DIRECTION_OUT) {
+    crypt_path_t *thishop; /* counter for repeated crypts */
+    chan = circ->n_chan;
+    if (!chan) {
+      log_warn(LD_BUG,"outgoing relay cell sent from %s:%d has n_chan==NULL."
+               " Dropping.", filename, lineno);
+      return 0; /* just drop it */
+    }
+    if (!CIRCUIT_IS_ORIGIN(circ)) {
+      log_warn(LD_BUG,"outgoing relay cell sent from %s:%d on non-origin "
+               "circ. Dropping.", filename, lineno);
+      return 0; /* just drop it */
+    }
+
+    relay_set_digest(layer_hint->f_digest, cell);
+
+    thishop = layer_hint;
+    /* moving from farthest to nearest hop */
+    do {
+      tor_assert(thishop);
+      /* XXXX RD This is a bug, right? */
+      log_debug(LD_OR,"crypting a layer of the relay cell.");
+      if (relay_crypt_one_payload(thishop->f_crypto, cell->payload, 1) < 0) {
+        return -1;
+      }
+
+      thishop = thishop->prev;
+    } while (thishop != TO_ORIGIN_CIRCUIT(circ)->cpath->prev);
+
+  } else { /* incoming cell */
+    or_circuit_t *or_circ;
+    if (CIRCUIT_IS_ORIGIN(circ)) {
+      /* We should never package an _incoming_ cell from the circuit
+       * origin; that means we messed up somewhere. */
+      log_warn(LD_BUG,"incoming relay cell at origin circuit. Dropping.");
+      assert_circuit_ok(circ);
+      return 0; /* just drop it */
+    }
+    or_circ = TO_OR_CIRCUIT(circ);
+    chan = or_circ->p_chan;
+    relay_set_digest(or_circ->p_digest, cell);
+    if (relay_crypt_one_payload(or_circ->p_crypto, cell->payload, 1) < 0)
+      return -1;
+  }
+  ++stats_n_relay_cells_relayed;
+
+  append_cell_to_circuit_queue(circ, chan, cell, cell_direction, on_stream);
+  return 0;
+}
+
+/** If cell's stream_id matches the stream_id of any conn that's
+ * attached to circ, return that conn, else return NULL.
+ */
+static edge_connection_t *
+relay_lookup_conn(circuit_t *circ, cell_t *cell,
+                  cell_direction_t cell_direction, crypt_path_t *layer_hint)
+{
+  edge_connection_t *tmpconn;
+  relay_header_t rh;
+
+  relay_header_unpack(&rh, cell->payload);
+
+  if (!rh.stream_id)
+    return NULL;
+
+  /* IN or OUT cells could have come from either direction, now
+   * that we allow rendezvous *to* an OP.
+   */
+
+  if (CIRCUIT_IS_ORIGIN(circ)) {
+    for (tmpconn = TO_ORIGIN_CIRCUIT(circ)->p_streams; tmpconn;
+         tmpconn=tmpconn->next_stream) {
+      if (rh.stream_id == tmpconn->stream_id &&
+          !tmpconn->base_.marked_for_close &&
+          tmpconn->cpath_layer == layer_hint) {
+        log_debug(LD_APP,"found conn for stream %d.", rh.stream_id);
+        return tmpconn;
+      }
+    }
+  } else {
+    for (tmpconn = TO_OR_CIRCUIT(circ)->n_streams; tmpconn;
+         tmpconn=tmpconn->next_stream) {
+      if (rh.stream_id == tmpconn->stream_id &&
+          !tmpconn->base_.marked_for_close) {
+        log_debug(LD_EXIT,"found conn for stream %d.", rh.stream_id);
+        if (cell_direction == CELL_DIRECTION_OUT ||
+            connection_edge_is_rendezvous_stream(tmpconn))
+          return tmpconn;
+      }
+    }
+    for (tmpconn = TO_OR_CIRCUIT(circ)->resolving_streams; tmpconn;
+         tmpconn=tmpconn->next_stream) {
+      if (rh.stream_id == tmpconn->stream_id &&
+          !tmpconn->base_.marked_for_close) {
+        log_debug(LD_EXIT,"found conn for stream %d.", rh.stream_id);
+        return tmpconn;
+      }
+    }
+  }
+  return NULL; /* probably a begin relay cell */
+}
+
+/** Pack the relay_header_t host-order structure <b>src</b> into
+ * network-order in the buffer <b>dest</b>. See tor-spec.txt for details
+ * about the wire format.
+ */
+void
+relay_header_pack(uint8_t *dest, const relay_header_t *src)
+{
+  set_uint8(dest, src->command);
+  set_uint16(dest+1, htons(src->recognized));
+  set_uint16(dest+3, htons(src->stream_id));
+  memcpy(dest+5, src->integrity, 4);
+  set_uint16(dest+9, htons(src->length));
+}
+
+/** Unpack the network-order buffer <b>src</b> into a host-order
+ * relay_header_t structure <b>dest</b>.
+ */
+void
+relay_header_unpack(relay_header_t *dest, const uint8_t *src)
+{
+  dest->command = get_uint8(src);
+  dest->recognized = ntohs(get_uint16(src+1));
+  dest->stream_id = ntohs(get_uint16(src+3));
+  memcpy(dest->integrity, src+5, 4);
+  dest->length = ntohs(get_uint16(src+9));
+}
+
+/** Convert the relay <b>command</b> into a human-readable string. */
+static const char *
+relay_command_to_string(uint8_t command)
+{
+  switch (command) {
+    case RELAY_COMMAND_BEGIN: return "BEGIN";
+    case RELAY_COMMAND_DATA: return "DATA";
+    case RELAY_COMMAND_END: return "END";
+    case RELAY_COMMAND_CONNECTED: return "CONNECTED";
+    case RELAY_COMMAND_SENDME: return "SENDME";
+    case RELAY_COMMAND_EXTEND: return "EXTEND";
+    case RELAY_COMMAND_EXTENDED: return "EXTENDED";
+    case RELAY_COMMAND_TRUNCATE: return "TRUNCATE";
+    case RELAY_COMMAND_TRUNCATED: return "TRUNCATED";
+    case RELAY_COMMAND_DROP: return "DROP";
+    case RELAY_COMMAND_RESOLVE: return "RESOLVE";
+    case RELAY_COMMAND_RESOLVED: return "RESOLVED";
+    case RELAY_COMMAND_BEGIN_DIR: return "BEGIN_DIR";
+    case RELAY_COMMAND_ESTABLISH_INTRO: return "ESTABLISH_INTRO";
+    case RELAY_COMMAND_ESTABLISH_RENDEZVOUS: return "ESTABLISH_RENDEZVOUS";
+    case RELAY_COMMAND_INTRODUCE1: return "INTRODUCE1";
+    case RELAY_COMMAND_INTRODUCE2: return "INTRODUCE2";
+    case RELAY_COMMAND_RENDEZVOUS1: return "RENDEZVOUS1";
+    case RELAY_COMMAND_RENDEZVOUS2: return "RENDEZVOUS2";
+    case RELAY_COMMAND_INTRO_ESTABLISHED: return "INTRO_ESTABLISHED";
+    case RELAY_COMMAND_RENDEZVOUS_ESTABLISHED:
+      return "RENDEZVOUS_ESTABLISHED";
+    case RELAY_COMMAND_INTRODUCE_ACK: return "INTRODUCE_ACK";
+    default: return "(unrecognized)";
+  }
+}
+
+/** Make a relay cell out of <b>relay_command</b> and <b>payload</b>, and send
+ * it onto the open circuit <b>circ</b>. <b>stream_id</b> is the ID on
+ * <b>circ</b> for the stream that's sending the relay cell, or 0 if it's a
+ * control cell.  <b>cpath_layer</b> is NULL for OR->OP cells, or the
+ * destination hop for OP->OR cells.
+ 
