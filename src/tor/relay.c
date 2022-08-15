@@ -554,4 +554,244 @@ relay_command_to_string(uint8_t command)
  * <b>circ</b> for the stream that's sending the relay cell, or 0 if it's a
  * control cell.  <b>cpath_layer</b> is NULL for OR->OP cells, or the
  * destination hop for OP->OR cells.
- 
+ *
+ * If you can't send the cell, mark the circuit for close and return -1. Else
+ * return 0.
+ */
+int
+relay_send_command_from_edge_(streamid_t stream_id, circuit_t *circ,
+                              uint8_t relay_command, const char *payload,
+                              size_t payload_len, crypt_path_t *cpath_layer,
+                              const char *filename, int lineno)
+{
+  cell_t cell;
+  relay_header_t rh;
+  cell_direction_t cell_direction;
+  /* XXXX NM Split this function into a separate versions per circuit type? */
+
+  tor_assert(circ);
+  tor_assert(payload_len <= RELAY_PAYLOAD_SIZE);
+
+  memset(&cell, 0, sizeof(cell_t));
+  cell.command = CELL_RELAY;
+  if (cpath_layer) {
+    cell.circ_id = circ->n_circ_id;
+    cell_direction = CELL_DIRECTION_OUT;
+  } else if (! CIRCUIT_IS_ORIGIN(circ)) {
+    cell.circ_id = TO_OR_CIRCUIT(circ)->p_circ_id;
+    cell_direction = CELL_DIRECTION_IN;
+  } else {
+    return -1;
+  }
+
+  memset(&rh, 0, sizeof(rh));
+  rh.command = relay_command;
+  rh.stream_id = stream_id;
+  rh.length = payload_len;
+  relay_header_pack(cell.payload, &rh);
+  if (payload_len)
+    memcpy(cell.payload+RELAY_HEADER_SIZE, payload, payload_len);
+
+  log_debug(LD_OR,"delivering %d cell %s.", relay_command,
+            cell_direction == CELL_DIRECTION_OUT ? "forward" : "backward");
+
+  /* If we are sending an END cell and this circuit is used for a tunneled
+   * directory request, advance its state. */
+  if (relay_command == RELAY_COMMAND_END && circ->dirreq_id)
+    geoip_change_dirreq_state(circ->dirreq_id, DIRREQ_TUNNELED,
+                              DIRREQ_END_CELL_SENT);
+
+  if (cell_direction == CELL_DIRECTION_OUT && circ->n_chan) {
+    /* if we're using relaybandwidthrate, this conn wants priority */
+    channel_timestamp_client(circ->n_chan);
+  }
+
+  if (cell_direction == CELL_DIRECTION_OUT) {
+    origin_circuit_t *origin_circ = TO_ORIGIN_CIRCUIT(circ);
+    if (origin_circ->remaining_relay_early_cells > 0 &&
+        (relay_command == RELAY_COMMAND_EXTEND ||
+         relay_command == RELAY_COMMAND_EXTEND2 ||
+         cpath_layer != origin_circ->cpath)) {
+      /* If we've got any relay_early cells left and (we're sending
+       * an extend cell or we're not talking to the first hop), use
+       * one of them.  Don't worry about the conn protocol version:
+       * append_cell_to_circuit_queue will fix it up. */
+      cell.command = CELL_RELAY_EARLY;
+      --origin_circ->remaining_relay_early_cells;
+      log_debug(LD_OR, "Sending a RELAY_EARLY cell; %d remaining.",
+                (int)origin_circ->remaining_relay_early_cells);
+      /* Memorize the command that is sent as RELAY_EARLY cell; helps debug
+       * task 878. */
+      origin_circ->relay_early_commands[
+          origin_circ->relay_early_cells_sent++] = relay_command;
+    } else if (relay_command == RELAY_COMMAND_EXTEND ||
+               relay_command == RELAY_COMMAND_EXTEND2) {
+      /* If no RELAY_EARLY cells can be sent over this circuit, log which
+       * commands have been sent as RELAY_EARLY cells before; helps debug
+       * task 878. */
+      smartlist_t *commands_list = smartlist_new();
+      int i = 0;
+      char *commands = NULL;
+      for (; i < origin_circ->relay_early_cells_sent; i++)
+        smartlist_add(commands_list, (char *)
+            relay_command_to_string(origin_circ->relay_early_commands[i]));
+      commands = smartlist_join_strings(commands_list, ",", 0, NULL);
+      log_warn(LD_BUG, "Uh-oh.  We're sending a RELAY_COMMAND_EXTEND cell, "
+               "but we have run out of RELAY_EARLY cells on that circuit. "
+               "Commands sent before: %s", commands);
+      tor_free(commands);
+      smartlist_free(commands_list);
+    }
+  }
+
+  if (circuit_package_relay_cell(&cell, circ, cell_direction, cpath_layer,
+                                 stream_id, filename, lineno) < 0) {
+    log_warn(LD_BUG,"circuit_package_relay_cell failed. Closing.");
+    circuit_mark_for_close(circ, END_CIRC_REASON_INTERNAL);
+    return -1;
+  }
+  return 0;
+}
+
+/** Make a relay cell out of <b>relay_command</b> and <b>payload</b>, and
+ * send it onto the open circuit <b>circ</b>. <b>fromconn</b> is the stream
+ * that's sending the relay cell, or NULL if it's a control cell.
+ * <b>cpath_layer</b> is NULL for OR->OP cells, or the destination hop
+ * for OP->OR cells.
+ *
+ * If you can't send the cell, mark the circuit for close and
+ * return -1. Else return 0.
+ */
+int
+connection_edge_send_command(edge_connection_t *fromconn,
+                             uint8_t relay_command, const char *payload,
+                             size_t payload_len)
+{
+  /* XXXX NM Split this function into a separate versions per circuit type? */
+  circuit_t *circ;
+  crypt_path_t *cpath_layer = fromconn->cpath_layer;
+  tor_assert(fromconn);
+  circ = fromconn->on_circuit;
+
+  if (fromconn->base_.marked_for_close) {
+    log_warn(LD_BUG,
+             "called on conn that's already marked for close at %s:%d.",
+             fromconn->base_.marked_for_close_file,
+             fromconn->base_.marked_for_close);
+    return 0;
+  }
+
+  if (!circ) {
+    if (fromconn->base_.type == CONN_TYPE_AP) {
+      log_info(LD_APP,"no circ. Closing conn.");
+      connection_mark_unattached_ap(EDGE_TO_ENTRY_CONN(fromconn),
+                                    END_STREAM_REASON_INTERNAL);
+    } else {
+      log_info(LD_EXIT,"no circ. Closing conn.");
+      fromconn->edge_has_sent_end = 1; /* no circ to send to */
+      fromconn->end_reason = END_STREAM_REASON_INTERNAL;
+      connection_mark_for_close(TO_CONN(fromconn));
+    }
+    return -1;
+  }
+
+  return relay_send_command_from_edge(fromconn->stream_id, circ,
+                                      relay_command, payload,
+                                      payload_len, cpath_layer);
+}
+
+/** How many times will I retry a stream that fails due to DNS
+ * resolve failure or misc error?
+ */
+#define MAX_RESOLVE_FAILURES 3
+
+/** Return 1 if reason is something that you should retry if you
+ * get the end cell before you've connected; else return 0. */
+static int
+edge_reason_is_retriable(int reason)
+{
+  return reason == END_STREAM_REASON_HIBERNATING ||
+         reason == END_STREAM_REASON_RESOURCELIMIT ||
+         reason == END_STREAM_REASON_EXITPOLICY ||
+         reason == END_STREAM_REASON_RESOLVEFAILED ||
+         reason == END_STREAM_REASON_MISC ||
+         reason == END_STREAM_REASON_NOROUTE;
+}
+
+/** Called when we receive an END cell on a stream that isn't open yet,
+ * from the client side.
+ * Arguments are as for connection_edge_process_relay_cell().
+ */
+static int
+connection_ap_process_end_not_open(
+    relay_header_t *rh, cell_t *cell, origin_circuit_t *circ,
+    entry_connection_t *conn, crypt_path_t *layer_hint)
+{
+  node_t *exitrouter;
+  int reason = *(cell->payload+RELAY_HEADER_SIZE);
+  int control_reason;
+  edge_connection_t *edge_conn = ENTRY_TO_EDGE_CONN(conn);
+  (void) layer_hint; /* unused */
+
+  if (rh->length > 0) {
+    if (reason == END_STREAM_REASON_TORPROTOCOL ||
+        reason == END_STREAM_REASON_INTERNAL ||
+        reason == END_STREAM_REASON_DESTROY) {
+      /* All three of these reasons could mean a failed tag
+       * hit the exit and it complained. Do not probe.
+       * Fail the circuit. */
+      circ->path_state = PATH_STATE_USE_FAILED;
+      return -END_CIRC_REASON_TORPROTOCOL;
+    } else {
+      /* Path bias: If we get a valid reason code from the exit,
+       * it wasn't due to tagging.
+       *
+       * We rely on recognized+digest being strong enough to make
+       * tags unlikely to allow us to get tagged, yet 'recognized'
+       * reason codes here. */
+      pathbias_mark_use_success(circ);
+    }
+  }
+
+  if (rh->length == 0) {
+    reason = END_STREAM_REASON_MISC;
+  }
+
+  control_reason = reason | END_STREAM_REASON_FLAG_REMOTE;
+
+  if (edge_reason_is_retriable(reason) &&
+      /* avoid retry if rend */
+      !connection_edge_is_rendezvous_stream(edge_conn)) {
+    const char *chosen_exit_digest =
+      circ->build_state->chosen_exit->identity_digest;
+    log_info(LD_APP,"Address '%s' refused due to '%s'. Considering retrying.",
+             safe_str(conn->socks_request->address),
+             stream_end_reason_to_string(reason));
+    exitrouter = node_get_mutable_by_id(chosen_exit_digest);
+    switch (reason) {
+      case END_STREAM_REASON_EXITPOLICY: {
+        tor_addr_t addr;
+        tor_addr_make_unspec(&addr);
+        if (rh->length >= 5) {
+          int ttl = -1;
+          tor_addr_make_unspec(&addr);
+          if (rh->length == 5 || rh->length == 9) {
+            tor_addr_from_ipv4n(&addr,
+                                get_uint32(cell->payload+RELAY_HEADER_SIZE+1));
+            if (rh->length == 9)
+              ttl = (int)ntohl(get_uint32(cell->payload+RELAY_HEADER_SIZE+5));
+          } else if (rh->length == 17 || rh->length == 21) {
+            tor_addr_from_ipv6_bytes(&addr,
+                                (char*)(cell->payload+RELAY_HEADER_SIZE+1));
+            if (rh->length == 21)
+              ttl = (int)ntohl(get_uint32(cell->payload+RELAY_HEADER_SIZE+17));
+          }
+          if (tor_addr_is_null(&addr)) {
+            log_info(LD_APP,"Address '%s' resolved to 0.0.0.0. Closing,",
+                     safe_str(conn->socks_request->address));
+            connection_mark_unattached_ap(conn, END_STREAM_REASON_TORPROTOCOL);
+            return 0;
+          }
+
+          if ((tor_addr_family(&addr) == AF_INET && !conn->ipv4_traffic_ok) ||
+              (tor_addr_family(&addr) == AF_INET6 && !conn->ipv6_traffic_ok)) 
