@@ -794,4 +794,246 @@ connection_ap_process_end_not_open(
           }
 
           if ((tor_addr_family(&addr) == AF_INET && !conn->ipv4_traffic_ok) ||
-              (tor_addr_family(&addr) == AF_INET6 && !conn->ipv6_traffic_ok)) 
+              (tor_addr_family(&addr) == AF_INET6 && !conn->ipv6_traffic_ok)) {
+            log_fn(LOG_PROTOCOL_WARN, LD_APP,
+                   "Got an EXITPOLICY failure on a connection with a "
+                   "mismatched family. Closing.");
+            connection_mark_unattached_ap(conn, END_STREAM_REASON_TORPROTOCOL);
+            return 0;
+          }
+          if (get_options()->ClientDNSRejectInternalAddresses &&
+              tor_addr_is_internal(&addr, 0)) {
+            log_info(LD_APP,"Address '%s' resolved to internal. Closing,",
+                     safe_str(conn->socks_request->address));
+            connection_mark_unattached_ap(conn, END_STREAM_REASON_TORPROTOCOL);
+            return 0;
+          }
+
+          client_dns_set_addressmap(conn,
+                                    conn->socks_request->address, &addr,
+                                    conn->chosen_exit_name, ttl);
+
+          {
+            char new_addr[TOR_ADDR_BUF_LEN];
+            tor_addr_to_str(new_addr, &addr, sizeof(new_addr), 1);
+            if (strcmp(conn->socks_request->address, new_addr)) {
+              strlcpy(conn->socks_request->address, new_addr,
+                      sizeof(conn->socks_request->address));
+              control_event_stream_status(conn, STREAM_EVENT_REMAP, 0);
+            }
+          }
+        }
+        /* check if he *ought* to have allowed it */
+
+        adjust_exit_policy_from_exitpolicy_failure(circ,
+                                                   conn,
+                                                   exitrouter,
+                                                   &addr);
+
+        if (conn->chosen_exit_optional ||
+            conn->chosen_exit_retries) {
+          /* stop wanting a specific exit */
+          conn->chosen_exit_optional = 0;
+          /* A non-zero chosen_exit_retries can happen if we set a
+           * TrackHostExits for this address under a port that the exit
+           * relay allows, but then try the same address with a different
+           * port that it doesn't allow to exit. We shouldn't unregister
+           * the mapping, since it is probably still wanted on the
+           * original port. But now we give away to the exit relay that
+           * we probably have a TrackHostExits on it. So be it. */
+          conn->chosen_exit_retries = 0;
+          tor_free(conn->chosen_exit_name); /* clears it */
+        }
+        if (connection_ap_detach_retriable(conn, circ, control_reason) >= 0)
+          return 0;
+        /* else, conn will get closed below */
+        break;
+      }
+      case END_STREAM_REASON_CONNECTREFUSED:
+        if (!conn->chosen_exit_optional)
+          break; /* break means it'll close, below */
+        /* Else fall through: expire this circuit, clear the
+         * chosen_exit_name field, and try again. */
+      case END_STREAM_REASON_RESOLVEFAILED:
+      case END_STREAM_REASON_TIMEOUT:
+      case END_STREAM_REASON_MISC:
+      case END_STREAM_REASON_NOROUTE:
+        if (client_dns_incr_failures(conn->socks_request->address)
+            < MAX_RESOLVE_FAILURES) {
+          /* We haven't retried too many times; reattach the connection. */
+          circuit_log_path(LOG_INFO,LD_APP,circ);
+          /* Mark this circuit "unusable for new streams". */
+          mark_circuit_unusable_for_new_conns(circ);
+
+          if (conn->chosen_exit_optional) {
+            /* stop wanting a specific exit */
+            conn->chosen_exit_optional = 0;
+            tor_free(conn->chosen_exit_name); /* clears it */
+          }
+          if (connection_ap_detach_retriable(conn, circ, control_reason) >= 0)
+            return 0;
+          /* else, conn will get closed below */
+        } else {
+          log_notice(LD_APP,
+                     "Have tried resolving or connecting to address '%s' "
+                     "at %d different places. Giving up.",
+                     safe_str(conn->socks_request->address),
+                     MAX_RESOLVE_FAILURES);
+          /* clear the failures, so it will have a full try next time */
+          client_dns_clear_failures(conn->socks_request->address);
+        }
+        break;
+      case END_STREAM_REASON_HIBERNATING:
+      case END_STREAM_REASON_RESOURCELIMIT:
+        if (exitrouter) {
+          policies_set_node_exitpolicy_to_reject_all(exitrouter);
+        }
+        if (conn->chosen_exit_optional) {
+          /* stop wanting a specific exit */
+          conn->chosen_exit_optional = 0;
+          tor_free(conn->chosen_exit_name); /* clears it */
+        }
+        if (connection_ap_detach_retriable(conn, circ, control_reason) >= 0)
+          return 0;
+        /* else, will close below */
+        break;
+    } /* end switch */
+    log_info(LD_APP,"Giving up on retrying; conn can't be handled.");
+  }
+
+  log_info(LD_APP,
+           "Edge got end (%s) before we're connected. Marking for close.",
+       stream_end_reason_to_string(rh->length > 0 ? reason : -1));
+  circuit_log_path(LOG_INFO,LD_APP,circ);
+  /* need to test because of detach_retriable */
+  if (!ENTRY_TO_CONN(conn)->marked_for_close)
+    connection_mark_unattached_ap(conn, control_reason);
+  return 0;
+}
+
+/** Called when we have gotten an END_REASON_EXITPOLICY failure on <b>circ</b>
+ * for <b>conn</b>, while attempting to connect via <b>node</b>.  If the node
+ * told us which address it rejected, then <b>addr</b> is that address;
+ * otherwise it is AF_UNSPEC.
+ *
+ * If we are sure the node should have allowed this address, mark the node as
+ * having a reject *:* exit policy.  Otherwise, mark the circuit as unusable
+ * for this particular address.
+ **/
+static void
+adjust_exit_policy_from_exitpolicy_failure(origin_circuit_t *circ,
+                                           entry_connection_t *conn,
+                                           node_t *node,
+                                           const tor_addr_t *addr)
+{
+  int make_reject_all = 0;
+  const sa_family_t family = tor_addr_family(addr);
+
+  if (node) {
+    tor_addr_t tmp;
+    int asked_for_family = tor_addr_parse(&tmp, conn->socks_request->address);
+    if (family == AF_UNSPEC) {
+      make_reject_all = 1;
+    } else if (node_exit_policy_is_exact(node, family) &&
+               asked_for_family != -1 && !conn->chosen_exit_name) {
+      make_reject_all = 1;
+    }
+
+    if (make_reject_all) {
+      log_info(LD_APP,
+               "Exitrouter %s seems to be more restrictive than its exit "
+               "policy. Not using this router as exit for now.",
+               node_describe(node));
+      policies_set_node_exitpolicy_to_reject_all(node);
+    }
+  }
+
+  if (family != AF_UNSPEC)
+    addr_policy_append_reject_addr(&circ->prepend_policy, addr);
+}
+
+/** Helper: change the socks_request-&gt;address field on conn to the
+ * dotted-quad representation of <b>new_addr</b>,
+ * and send an appropriate REMAP event. */
+static void
+remap_event_helper(entry_connection_t *conn, const tor_addr_t *new_addr)
+{
+  tor_addr_to_str(conn->socks_request->address, new_addr,
+                  sizeof(conn->socks_request->address),
+                  1);
+  control_event_stream_status(conn, STREAM_EVENT_REMAP,
+                              REMAP_STREAM_SOURCE_EXIT);
+}
+
+/** Extract the contents of a connected cell in <b>cell</b>, whose relay
+ * header has already been parsed into <b>rh</b>. On success, set
+ * <b>addr_out</b> to the address we're connected to, and <b>ttl_out</b> to
+ * the ttl of that address, in seconds, and return 0.  On failure, return
+ * -1. */
+STATIC int
+connected_cell_parse(const relay_header_t *rh, const cell_t *cell,
+                     tor_addr_t *addr_out, int *ttl_out)
+{
+  uint32_t bytes;
+  const uint8_t *payload = cell->payload + RELAY_HEADER_SIZE;
+
+  tor_addr_make_unspec(addr_out);
+  *ttl_out = -1;
+  if (rh->length == 0)
+    return 0;
+  if (rh->length < 4)
+    return -1;
+  bytes = ntohl(get_uint32(payload));
+
+  /* If bytes is 0, this is maybe a v6 address. Otherwise it's a v4 address */
+  if (bytes != 0) {
+    /* v4 address */
+    tor_addr_from_ipv4h(addr_out, bytes);
+    if (rh->length >= 8) {
+      bytes = ntohl(get_uint32(payload + 4));
+      if (bytes <= INT32_MAX)
+        *ttl_out = bytes;
+    }
+  } else {
+    if (rh->length < 25) /* 4 bytes of 0s, 1 addr, 16 ipv4, 4 ttl. */
+      return -1;
+    if (get_uint8(payload + 4) != 6)
+      return -1;
+    tor_addr_from_ipv6_bytes(addr_out, (char*)(payload + 5));
+    bytes = ntohl(get_uint32(payload + 21));
+    if (bytes <= INT32_MAX)
+      *ttl_out = (int) bytes;
+  }
+  return 0;
+}
+
+/** An incoming relay cell has arrived from circuit <b>circ</b> to
+ * stream <b>conn</b>.
+ *
+ * The arguments here are the same as in
+ * connection_edge_process_relay_cell() below; this function is called
+ * from there when <b>conn</b> is defined and not in an open state.
+ */
+static int
+connection_edge_process_relay_cell_not_open(
+    relay_header_t *rh, cell_t *cell, circuit_t *circ,
+    edge_connection_t *conn, crypt_path_t *layer_hint)
+{
+  if (rh->command == RELAY_COMMAND_END) {
+    if (CIRCUIT_IS_ORIGIN(circ) && conn->base_.type == CONN_TYPE_AP) {
+      return connection_ap_process_end_not_open(rh, cell,
+                                                TO_ORIGIN_CIRCUIT(circ),
+                                                EDGE_TO_ENTRY_CONN(conn),
+                                                layer_hint);
+    } else {
+      /* we just got an 'end', don't need to send one */
+      conn->edge_has_sent_end = 1;
+      conn->end_reason = *(cell->payload+RELAY_HEADER_SIZE) |
+                         END_STREAM_REASON_FLAG_REMOTE;
+      connection_mark_for_close(TO_CONN(conn));
+      return 0;
+    }
+  }
+
+  if (conn->base_.type == CONN_TYPE_AP &&
+      rh->command == RELAY_COMMAND
