@@ -1036,4 +1036,239 @@ connection_edge_process_relay_cell_not_open(
   }
 
   if (conn->base_.type == CONN_TYPE_AP &&
-      rh->command == RELAY_COMMAND
+      rh->command == RELAY_COMMAND_CONNECTED) {
+    tor_addr_t addr;
+    int ttl;
+    entry_connection_t *entry_conn = EDGE_TO_ENTRY_CONN(conn);
+    tor_assert(CIRCUIT_IS_ORIGIN(circ));
+    if (conn->base_.state != AP_CONN_STATE_CONNECT_WAIT) {
+      log_fn(LOG_PROTOCOL_WARN, LD_APP,
+             "Got 'connected' while not in state connect_wait. Dropping.");
+      return 0;
+    }
+    conn->base_.state = AP_CONN_STATE_OPEN;
+    log_info(LD_APP,"'connected' received after %d seconds.",
+             (int)(time(NULL) - conn->base_.timestamp_lastread));
+    if (connected_cell_parse(rh, cell, &addr, &ttl) < 0) {
+      log_fn(LOG_PROTOCOL_WARN, LD_APP,
+             "Got a badly formatted connected cell. Closing.");
+      connection_edge_end(conn, END_STREAM_REASON_TORPROTOCOL);
+      connection_mark_unattached_ap(entry_conn, END_STREAM_REASON_TORPROTOCOL);
+    }
+    if (tor_addr_family(&addr) != AF_UNSPEC) {
+      const sa_family_t family = tor_addr_family(&addr);
+      if (tor_addr_is_null(&addr) ||
+          (get_options()->ClientDNSRejectInternalAddresses &&
+           tor_addr_is_internal(&addr, 0))) {
+        log_info(LD_APP, "...but it claims the IP address was %s. Closing.",
+                 fmt_addr(&addr));
+        connection_edge_end(conn, END_STREAM_REASON_TORPROTOCOL);
+        connection_mark_unattached_ap(entry_conn,
+                                      END_STREAM_REASON_TORPROTOCOL);
+        return 0;
+      }
+
+      if ((family == AF_INET && ! entry_conn->ipv4_traffic_ok) ||
+          (family == AF_INET6 && ! entry_conn->ipv6_traffic_ok)) {
+        log_fn(LOG_PROTOCOL_WARN, LD_APP,
+               "Got a connected cell to %s with unsupported address family."
+               " Closing.", fmt_addr(&addr));
+        connection_edge_end(conn, END_STREAM_REASON_TORPROTOCOL);
+        connection_mark_unattached_ap(entry_conn,
+                                      END_STREAM_REASON_TORPROTOCOL);
+        return 0;
+      }
+
+      client_dns_set_addressmap(entry_conn,
+                                entry_conn->socks_request->address, &addr,
+                                entry_conn->chosen_exit_name, ttl);
+
+      remap_event_helper(entry_conn, &addr);
+    }
+    circuit_log_path(LOG_INFO,LD_APP,TO_ORIGIN_CIRCUIT(circ));
+    /* don't send a socks reply to transparent conns */
+    tor_assert(entry_conn->socks_request != NULL);
+    if (!entry_conn->socks_request->has_finished)
+      connection_ap_handshake_socks_reply(entry_conn, NULL, 0, 0);
+
+    /* Was it a linked dir conn? If so, a dir request just started to
+     * fetch something; this could be a bootstrap status milestone. */
+    log_debug(LD_APP, "considering");
+    if (TO_CONN(conn)->linked_conn &&
+        TO_CONN(conn)->linked_conn->type == CONN_TYPE_DIR) {
+      connection_t *dirconn = TO_CONN(conn)->linked_conn;
+      log_debug(LD_APP, "it is! %d", dirconn->purpose);
+      switch (dirconn->purpose) {
+        case DIR_PURPOSE_FETCH_CERTIFICATE:
+          if (consensus_is_waiting_for_certs())
+            control_event_bootstrap(BOOTSTRAP_STATUS_LOADING_KEYS, 0);
+          break;
+        case DIR_PURPOSE_FETCH_CONSENSUS:
+          control_event_bootstrap(BOOTSTRAP_STATUS_LOADING_STATUS, 0);
+          break;
+        case DIR_PURPOSE_FETCH_SERVERDESC:
+        case DIR_PURPOSE_FETCH_MICRODESC:
+          if (TO_DIR_CONN(dirconn)->router_purpose == ROUTER_PURPOSE_GENERAL)
+            control_event_bootstrap(BOOTSTRAP_STATUS_LOADING_DESCRIPTORS,
+                                    count_loading_descriptors_progress());
+          break;
+      }
+    }
+    /* This is definitely a success, so forget about any pending data we
+     * had sent. */
+    if (entry_conn->pending_optimistic_data) {
+      generic_buffer_free(entry_conn->pending_optimistic_data);
+      entry_conn->pending_optimistic_data = NULL;
+    }
+
+    /* handle anything that might have queued */
+    if (connection_edge_package_raw_inbuf(conn, 1, NULL) < 0) {
+      /* (We already sent an end cell if possible) */
+      connection_mark_for_close(TO_CONN(conn));
+      return 0;
+    }
+    return 0;
+  }
+  if (conn->base_.type == CONN_TYPE_AP &&
+      rh->command == RELAY_COMMAND_RESOLVED) {
+    int ttl;
+    int answer_len;
+    uint8_t answer_type;
+    entry_connection_t *entry_conn = EDGE_TO_ENTRY_CONN(conn);
+    if (conn->base_.state != AP_CONN_STATE_RESOLVE_WAIT) {
+      log_fn(LOG_PROTOCOL_WARN, LD_APP, "Got a 'resolved' cell while "
+             "not in state resolve_wait. Dropping.");
+      return 0;
+    }
+    tor_assert(SOCKS_COMMAND_IS_RESOLVE(entry_conn->socks_request->command));
+    answer_len = cell->payload[RELAY_HEADER_SIZE+1];
+    if (rh->length < 2 || answer_len+2>rh->length) {
+      log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
+             "Dropping malformed 'resolved' cell");
+      connection_mark_unattached_ap(entry_conn, END_STREAM_REASON_TORPROTOCOL);
+      return 0;
+    }
+    answer_type = cell->payload[RELAY_HEADER_SIZE];
+    if (rh->length >= answer_len+6)
+      ttl = (int)ntohl(get_uint32(cell->payload+RELAY_HEADER_SIZE+
+                                  2+answer_len));
+    else
+      ttl = -1;
+    if (answer_type == RESOLVED_TYPE_IPV4 ||
+        answer_type == RESOLVED_TYPE_IPV6) {
+      tor_addr_t addr;
+      if (decode_address_from_payload(&addr, cell->payload+RELAY_HEADER_SIZE,
+                                      rh->length) &&
+          tor_addr_is_internal(&addr, 0) &&
+          get_options()->ClientDNSRejectInternalAddresses) {
+        log_info(LD_APP,"Got a resolve with answer %s. Rejecting.",
+                 fmt_addr(&addr));
+        connection_ap_handshake_socks_resolved(entry_conn,
+                                               RESOLVED_TYPE_ERROR_TRANSIENT,
+                                               0, NULL, 0, TIME_MAX);
+        connection_mark_unattached_ap(entry_conn,
+                                      END_STREAM_REASON_TORPROTOCOL);
+        return 0;
+      }
+    }
+    connection_ap_handshake_socks_resolved(entry_conn,
+                   answer_type,
+                   cell->payload[RELAY_HEADER_SIZE+1], /*answer_len*/
+                   cell->payload+RELAY_HEADER_SIZE+2, /*answer*/
+                   ttl,
+                   -1);
+    if (answer_type == RESOLVED_TYPE_IPV4 && answer_len == 4) {
+      tor_addr_t addr;
+      tor_addr_from_ipv4n(&addr,
+                          get_uint32(cell->payload+RELAY_HEADER_SIZE+2));
+      remap_event_helper(entry_conn, &addr);
+    } else if (answer_type == RESOLVED_TYPE_IPV6 && answer_len == 16) {
+      tor_addr_t addr;
+      tor_addr_from_ipv6_bytes(&addr,
+                               (char*)(cell->payload+RELAY_HEADER_SIZE+2));
+      remap_event_helper(entry_conn, &addr);
+    }
+    connection_mark_unattached_ap(entry_conn,
+                              END_STREAM_REASON_DONE |
+                              END_STREAM_REASON_FLAG_ALREADY_SOCKS_REPLIED);
+    return 0;
+  }
+
+  log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
+         "Got an unexpected relay command %d, in state %d (%s). Dropping.",
+         rh->command, conn->base_.state,
+         conn_state_to_string(conn->base_.type, conn->base_.state));
+  return 0; /* for forward compatibility, don't kill the circuit */
+//  connection_edge_end(conn, END_STREAM_REASON_TORPROTOCOL);
+//  connection_mark_for_close(conn);
+//  return -1;
+}
+
+/** An incoming relay cell has arrived on circuit <b>circ</b>. If
+ * <b>conn</b> is NULL this is a control cell, else <b>cell</b> is
+ * destined for <b>conn</b>.
+ *
+ * If <b>layer_hint</b> is defined, then we're the origin of the
+ * circuit, and it specifies the hop that packaged <b>cell</b>.
+ *
+ * Return -reason if you want to warn and tear down the circuit, else 0.
+ */
+static int
+connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
+                                   edge_connection_t *conn,
+                                   crypt_path_t *layer_hint)
+{
+  static int num_seen=0;
+  relay_header_t rh;
+  unsigned domain = layer_hint?LD_APP:LD_EXIT;
+  int reason;
+  int optimistic_data = 0; /* Set to 1 if we receive data on a stream
+                            * that's in the EXIT_CONN_STATE_RESOLVING
+                            * or EXIT_CONN_STATE_CONNECTING states. */
+
+  tor_assert(cell);
+  tor_assert(circ);
+
+  relay_header_unpack(&rh, cell->payload);
+//  log_fn(LOG_DEBUG,"command %d stream %d", rh.command, rh.stream_id);
+  num_seen++;
+  log_debug(domain, "Now seen %d relay cells here (command %d, stream %d).",
+            num_seen, rh.command, rh.stream_id);
+
+  if (rh.length > RELAY_PAYLOAD_SIZE) {
+    log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
+           "Relay cell length field too long. Closing circuit.");
+    return - END_CIRC_REASON_TORPROTOCOL;
+  }
+
+  if (rh.stream_id == 0) {
+    switch (rh.command) {
+      case RELAY_COMMAND_BEGIN:
+      case RELAY_COMMAND_CONNECTED:
+      case RELAY_COMMAND_DATA:
+      case RELAY_COMMAND_END:
+      case RELAY_COMMAND_RESOLVE:
+      case RELAY_COMMAND_RESOLVED:
+      case RELAY_COMMAND_BEGIN_DIR:
+        log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL, "Relay command %d with zero "
+               "stream_id. Dropping.", (int)rh.command);
+        return 0;
+      default:
+        ;
+    }
+  }
+
+  /* either conn is NULL, in which case we've got a control cell, or else
+   * conn points to the recognized stream. */
+
+  if (conn && !connection_state_is_open(TO_CONN(conn))) {
+    if (conn->base_.type == CONN_TYPE_EXIT &&
+        (conn->base_.state == EXIT_CONN_STATE_CONNECTING ||
+         conn->base_.state == EXIT_CONN_STATE_RESOLVING) &&
+        rh.command == RELAY_COMMAND_DATA) {
+      /* Allow DATA cells to be delivered to an exit node in state
+       * EXIT_CONN_STATE_CONNECTING or EXIT_CONN_STATE_RESOLVING.
+       * This speeds up HTTP, for example. */
+      optimistic_data = 1;
+    } else {
+ 
