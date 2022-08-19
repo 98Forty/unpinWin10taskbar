@@ -1509,4 +1509,269 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
           layer_hint->package_window += CIRCWINDOW_INCREMENT;
           log_debug(LD_APP,"circ-level sendme at origin, packagewindow %d.",
                     layer_hint->package_window);
-          circuit_resume_edge_reading(circ, layer_hin
+          circuit_resume_edge_reading(circ, layer_hint);
+        } else {
+          if (circ->package_window + CIRCWINDOW_INCREMENT >
+                CIRCWINDOW_START_MAX) {
+            static struct ratelim_t client_warn_ratelim = RATELIM_INIT(600);
+            log_fn_ratelim(&client_warn_ratelim, LOG_WARN, LD_PROTOCOL,
+                   "Unexpected sendme cell from client. "
+                   "Closing circ (window %d).",
+                   circ->package_window);
+            return -END_CIRC_REASON_TORPROTOCOL;
+          }
+          circ->package_window += CIRCWINDOW_INCREMENT;
+          log_debug(LD_APP,
+                    "circ-level sendme at non-origin, packagewindow %d.",
+                    circ->package_window);
+          circuit_resume_edge_reading(circ, layer_hint);
+        }
+        return 0;
+      }
+      if (!conn) {
+        log_info(domain,"sendme cell dropped, unknown stream (streamid %d).",
+                 rh.stream_id);
+        return 0;
+      }
+      conn->package_window += STREAMWINDOW_INCREMENT;
+      log_debug(domain,"stream-level sendme, packagewindow now %d.",
+                conn->package_window);
+      if (circuit_queue_streams_are_blocked(circ)) {
+        /* Still waiting for queue to flush; don't touch conn */
+        return 0;
+      }
+      connection_start_reading(TO_CONN(conn));
+      /* handle whatever might still be on the inbuf */
+      if (connection_edge_package_raw_inbuf(conn, 1, NULL) < 0) {
+        /* (We already sent an end cell if possible) */
+        connection_mark_for_close(TO_CONN(conn));
+        return 0;
+      }
+      return 0;
+    case RELAY_COMMAND_RESOLVE:
+      if (layer_hint) {
+        log_fn(LOG_PROTOCOL_WARN, LD_APP,
+               "resolve request unsupported at AP; dropping.");
+        return 0;
+      } else if (conn) {
+        log_fn(LOG_PROTOCOL_WARN, domain,
+               "resolve request for known stream; dropping.");
+        return 0;
+      } else if (circ->purpose != CIRCUIT_PURPOSE_OR) {
+        log_fn(LOG_PROTOCOL_WARN, domain,
+               "resolve request on circ with purpose %d; dropping",
+               circ->purpose);
+        return 0;
+      }
+      connection_exit_begin_resolve(cell, TO_OR_CIRCUIT(circ));
+      return 0;
+    case RELAY_COMMAND_RESOLVED:
+      if (conn) {
+        log_fn(LOG_PROTOCOL_WARN, domain,
+               "'resolved' unsupported while open. Closing circ.");
+        return -END_CIRC_REASON_TORPROTOCOL;
+      }
+      log_info(domain,
+               "'resolved' received, no conn attached anymore. Ignoring.");
+      return 0;
+    case RELAY_COMMAND_ESTABLISH_INTRO:
+    case RELAY_COMMAND_ESTABLISH_RENDEZVOUS:
+    case RELAY_COMMAND_INTRODUCE1:
+    case RELAY_COMMAND_INTRODUCE2:
+    case RELAY_COMMAND_INTRODUCE_ACK:
+    case RELAY_COMMAND_RENDEZVOUS1:
+    case RELAY_COMMAND_RENDEZVOUS2:
+    case RELAY_COMMAND_INTRO_ESTABLISHED:
+    case RELAY_COMMAND_RENDEZVOUS_ESTABLISHED:
+      rend_process_relay_cell(circ, layer_hint,
+                              rh.command, rh.length,
+                              cell->payload+RELAY_HEADER_SIZE);
+      return 0;
+  }
+  log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
+         "Received unknown relay command %d. Perhaps the other side is using "
+         "a newer version of Tor? Dropping.",
+         rh.command);
+  return 0; /* for forward compatibility, don't kill the circuit */
+}
+
+/** How many relay_data cells have we built, ever? */
+uint64_t stats_n_data_cells_packaged = 0;
+/** How many bytes of data have we put in relay_data cells have we built,
+ * ever? This would be RELAY_PAYLOAD_SIZE*stats_n_data_cells_packaged if
+ * every relay cell we ever sent were completely full of data. */
+uint64_t stats_n_data_bytes_packaged = 0;
+/** How many relay_data cells have we received, ever? */
+uint64_t stats_n_data_cells_received = 0;
+/** How many bytes of data have we received relay_data cells, ever? This would
+ * be RELAY_PAYLOAD_SIZE*stats_n_data_cells_packaged if every relay cell we
+ * ever received were completely full of data. */
+uint64_t stats_n_data_bytes_received = 0;
+
+/** If <b>conn</b> has an entire relay payload of bytes on its inbuf (or
+ * <b>package_partial</b> is true), and the appropriate package windows aren't
+ * empty, grab a cell and send it down the circuit.
+ *
+ * If *<b>max_cells</b> is given, package no more than max_cells.  Decrement
+ * *<b>max_cells</b> by the number of cells packaged.
+ *
+ * Return -1 (and send a RELAY_COMMAND_END cell if necessary) if conn should
+ * be marked for close, else return 0.
+ */
+int
+connection_edge_package_raw_inbuf(edge_connection_t *conn, int package_partial,
+                                  int *max_cells)
+{
+  size_t bytes_to_process, length;
+  char payload[CELL_PAYLOAD_SIZE];
+  circuit_t *circ;
+  const unsigned domain = conn->base_.type == CONN_TYPE_AP ? LD_APP : LD_EXIT;
+  int sending_from_optimistic = 0;
+  entry_connection_t *entry_conn =
+    conn->base_.type == CONN_TYPE_AP ? EDGE_TO_ENTRY_CONN(conn) : NULL;
+  const int sending_optimistically =
+    entry_conn &&
+    conn->base_.type == CONN_TYPE_AP &&
+    conn->base_.state != AP_CONN_STATE_OPEN;
+  crypt_path_t *cpath_layer = conn->cpath_layer;
+
+  tor_assert(conn);
+
+  if (conn->base_.marked_for_close) {
+    log_warn(LD_BUG,
+             "called on conn that's already marked for close at %s:%d.",
+             conn->base_.marked_for_close_file, conn->base_.marked_for_close);
+    return 0;
+  }
+
+  if (max_cells && *max_cells <= 0)
+    return 0;
+
+ repeat_connection_edge_package_raw_inbuf:
+
+  circ = circuit_get_by_edge_conn(conn);
+  if (!circ) {
+    log_info(domain,"conn has no circuit! Closing.");
+    conn->end_reason = END_STREAM_REASON_CANT_ATTACH;
+    return -1;
+  }
+
+  if (circuit_consider_stop_edge_reading(circ, cpath_layer))
+    return 0;
+
+  if (conn->package_window <= 0) {
+    log_info(domain,"called with package_window %d. Skipping.",
+             conn->package_window);
+    connection_stop_reading(TO_CONN(conn));
+    return 0;
+  }
+
+  sending_from_optimistic = entry_conn &&
+    entry_conn->sending_optimistic_data != NULL;
+
+  if (PREDICT_UNLIKELY(sending_from_optimistic)) {
+    bytes_to_process = generic_buffer_len(entry_conn->sending_optimistic_data);
+    if (PREDICT_UNLIKELY(!bytes_to_process)) {
+      log_warn(LD_BUG, "sending_optimistic_data was non-NULL but empty");
+      bytes_to_process = connection_get_inbuf_len(TO_CONN(conn));
+      sending_from_optimistic = 0;
+    }
+  } else {
+    bytes_to_process = connection_get_inbuf_len(TO_CONN(conn));
+  }
+
+  if (!bytes_to_process)
+    return 0;
+
+  if (!package_partial && bytes_to_process < RELAY_PAYLOAD_SIZE)
+    return 0;
+
+  if (bytes_to_process > RELAY_PAYLOAD_SIZE) {
+    length = RELAY_PAYLOAD_SIZE;
+  } else {
+    length = bytes_to_process;
+  }
+  stats_n_data_bytes_packaged += length;
+  stats_n_data_cells_packaged += 1;
+
+  if (PREDICT_UNLIKELY(sending_from_optimistic)) {
+    /* XXXX We could be more efficient here by sometimes packing
+     * previously-sent optimistic data in the same cell with data
+     * from the inbuf. */
+    generic_buffer_get(entry_conn->sending_optimistic_data, payload, length);
+    if (!generic_buffer_len(entry_conn->sending_optimistic_data)) {
+        generic_buffer_free(entry_conn->sending_optimistic_data);
+        entry_conn->sending_optimistic_data = NULL;
+    }
+  } else {
+    connection_fetch_from_buf(payload, length, TO_CONN(conn));
+  }
+
+  log_debug(domain,TOR_SOCKET_T_FORMAT": Packaging %d bytes (%d waiting).",
+            conn->base_.s,
+            (int)length, (int)connection_get_inbuf_len(TO_CONN(conn)));
+
+  if (sending_optimistically && !sending_from_optimistic) {
+    /* This is new optimistic data; remember it in case we need to detach and
+       retry */
+    if (!entry_conn->pending_optimistic_data)
+      entry_conn->pending_optimistic_data = generic_buffer_new();
+    generic_buffer_add(entry_conn->pending_optimistic_data, payload, length);
+  }
+
+  if (connection_edge_send_command(conn, RELAY_COMMAND_DATA,
+                                   payload, length) < 0 )
+    /* circuit got marked for close, don't continue, don't need to mark conn */
+    return 0;
+
+  if (!cpath_layer) { /* non-rendezvous exit */
+    tor_assert(circ->package_window > 0);
+    circ->package_window--;
+  } else { /* we're an AP, or an exit on a rendezvous circ */
+    tor_assert(cpath_layer->package_window > 0);
+    cpath_layer->package_window--;
+  }
+
+  if (--conn->package_window <= 0) { /* is it 0 after decrement? */
+    connection_stop_reading(TO_CONN(conn));
+    log_debug(domain,"conn->package_window reached 0.");
+    circuit_consider_stop_edge_reading(circ, cpath_layer);
+    return 0; /* don't process the inbuf any more */
+  }
+  log_debug(domain,"conn->package_window is now %d",conn->package_window);
+
+  if (max_cells) {
+    *max_cells -= 1;
+    if (*max_cells <= 0)
+      return 0;
+  }
+
+  /* handle more if there's more, or return 0 if there isn't */
+  goto repeat_connection_edge_package_raw_inbuf;
+}
+
+/** Called when we've just received a relay data cell, when
+ * we've just finished flushing all bytes to stream <b>conn</b>,
+ * or when we've flushed *some* bytes to the stream <b>conn</b>.
+ *
+ * If conn->outbuf is not too full, and our deliver window is
+ * low, send back a suitable number of stream-level sendme cells.
+ */
+void
+connection_edge_consider_sending_sendme(edge_connection_t *conn)
+{
+  circuit_t *circ;
+
+  if (connection_outbuf_too_full(TO_CONN(conn)))
+    return;
+
+  circ = circuit_get_by_edge_conn(conn);
+  if (!circ) {
+    /* this can legitimately happen if the destroy has already
+     * arrived and torn down the circuit */
+    log_info(LD_APP,"No circuit associated with conn. Skipping.");
+    return;
+  }
+
+  while (conn->deliver_window <= STREAMWINDOW_START - STREAMWINDOW_INCREMENT) {
+    log_debu
