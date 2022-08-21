@@ -2041,4 +2041,349 @@ circuit_consider_sending_sendme(circuit_t *circ, crypt_path_t *layer_hint)
 #define assert_cmux_ok_paranoid(chan)
 #endif
 
-/** The total number o
+/** The total number of cells we have allocated from the memory pool. */
+static size_t total_cells_allocated = 0;
+
+/** A memory pool to allocate packed_cell_t objects. */
+static mp_pool_t *cell_pool = NULL;
+
+/** Memory pool to allocate insertion_time_elem_t objects used for cell
+ * statistics. */
+static mp_pool_t *it_pool = NULL;
+
+/** Memory pool to allocate insertion_command_elem_t objects used for cell
+ * statistics if CELL_STATS events are enabled. */
+static mp_pool_t *ic_pool = NULL;
+
+/** Allocate structures to hold cells. */
+void
+init_cell_pool(void)
+{
+  tor_assert(!cell_pool);
+  cell_pool = mp_pool_new(sizeof(packed_cell_t), 128*1024);
+}
+
+/** Free all storage used to hold cells (and insertion times/commands if we
+ * measure cell statistics and/or if CELL_STATS events are enabled). */
+void
+free_cell_pool(void)
+{
+  /* Maybe we haven't called init_cell_pool yet; need to check for it. */
+  if (cell_pool) {
+    mp_pool_destroy(cell_pool);
+    cell_pool = NULL;
+  }
+  if (it_pool) {
+    mp_pool_destroy(it_pool);
+    it_pool = NULL;
+  }
+  if (ic_pool) {
+    mp_pool_destroy(ic_pool);
+    ic_pool = NULL;
+  }
+}
+
+/** Free excess storage in cell pool. */
+void
+clean_cell_pool(void)
+{
+  tor_assert(cell_pool);
+  mp_pool_clean(cell_pool, 0, 1);
+}
+
+/** Release storage held by <b>cell</b>. */
+static INLINE void
+packed_cell_free_unchecked(packed_cell_t *cell)
+{
+  --total_cells_allocated;
+  mp_pool_release(cell);
+}
+
+/** Allocate and return a new packed_cell_t. */
+STATIC packed_cell_t *
+packed_cell_new(void)
+{
+  ++total_cells_allocated;
+  return mp_pool_get(cell_pool);
+}
+
+/** Return a packed cell used outside by channel_t lower layer */
+void
+packed_cell_free(packed_cell_t *cell)
+{
+  if (!cell)
+    return;
+  packed_cell_free_unchecked(cell);
+}
+
+/** Log current statistics for cell pool allocation at log level
+ * <b>severity</b>. */
+void
+dump_cell_pool_usage(int severity)
+{
+  circuit_t *c;
+  int n_circs = 0;
+  int n_cells = 0;
+  TOR_LIST_FOREACH(c, circuit_get_global_list(), head) {
+    n_cells += c->n_chan_cells.n;
+    if (!CIRCUIT_IS_ORIGIN(c))
+      n_cells += TO_OR_CIRCUIT(c)->p_chan_cells.n;
+    ++n_circs;
+  }
+  tor_log(severity, LD_MM,
+          "%d cells allocated on %d circuits. %d cells leaked.",
+          n_cells, n_circs, (int)total_cells_allocated - n_cells);
+  mp_pool_log_status(cell_pool, severity);
+}
+
+/** Allocate a new copy of packed <b>cell</b>. */
+static INLINE packed_cell_t *
+packed_cell_copy(const cell_t *cell, int wide_circ_ids)
+{
+  packed_cell_t *c = packed_cell_new();
+  cell_pack(c, cell, wide_circ_ids);
+  return c;
+}
+
+/** Append <b>cell</b> to the end of <b>queue</b>. */
+void
+cell_queue_append(cell_queue_t *queue, packed_cell_t *cell)
+{
+  TOR_SIMPLEQ_INSERT_TAIL(&queue->head, cell, next);
+  ++queue->n;
+}
+
+/** Append command of type <b>command</b> in direction to <b>queue</b> for
+ * CELL_STATS event. */
+static void
+cell_command_queue_append(cell_queue_t *queue, uint8_t command)
+{
+  insertion_command_queue_t *ic_queue = queue->insertion_commands;
+  if (!ic_pool)
+    ic_pool = mp_pool_new(sizeof(insertion_command_elem_t), 1024);
+  if (!ic_queue) {
+    ic_queue = tor_malloc_zero(sizeof(insertion_command_queue_t));
+    queue->insertion_commands = ic_queue;
+  }
+  if (ic_queue->last && ic_queue->last->command == command) {
+    ic_queue->last->counter++;
+  } else {
+    insertion_command_elem_t *elem = mp_pool_get(ic_pool);
+    elem->next = NULL;
+    elem->command = command;
+    elem->counter = 1;
+    if (ic_queue->last) {
+      ic_queue->last->next = elem;
+      ic_queue->last = elem;
+    } else {
+      ic_queue->first = ic_queue->last = elem;
+    }
+  }
+}
+
+/** Retrieve oldest command from <b>queue</b> and write it to
+ * <b>command</b> for CELL_STATS event.  Return 0 for success, -1
+ * otherwise. */
+static int
+cell_command_queue_pop(uint8_t *command, cell_queue_t *queue)
+{
+  int res = -1;
+  insertion_command_queue_t *ic_queue = queue->insertion_commands;
+  if (ic_queue && ic_queue->first) {
+    insertion_command_elem_t *ic_elem = ic_queue->first;
+    ic_elem->counter--;
+    if (ic_elem->counter < 1) {
+      ic_queue->first = ic_elem->next;
+      if (ic_elem == ic_queue->last)
+        ic_queue->last = NULL;
+      mp_pool_release(ic_elem);
+    }
+    *command = ic_elem->command;
+    res = 0;
+  }
+  return res;
+}
+
+/** Append a newly allocated copy of <b>cell</b> to the end of the
+ * <b>exitward</b> (or app-ward) <b>queue</b> of <b>circ</b>.  If
+ * <b>use_stats</b> is true, record statistics about the cell.
+ */
+void
+cell_queue_append_packed_copy(circuit_t *circ, cell_queue_t *queue,
+                              int exitward, const cell_t *cell,
+                              int wide_circ_ids, int use_stats)
+{
+  struct timeval now;
+  packed_cell_t *copy = packed_cell_copy(cell, wide_circ_ids);
+  tor_gettimeofday_cached(&now);
+  copy->inserted_time = (uint32_t)tv_to_msec(&now);
+
+  /* Remember the time when this cell was put in the queue. */
+  /*XXXX This may be obsoleted by inserted_time */
+  if ((get_options()->CellStatistics ||
+      get_options()->TestingEnableCellStatsEvent) && use_stats) {
+    uint32_t added;
+    insertion_time_queue_t *it_queue = queue->insertion_times;
+    if (!it_pool)
+      it_pool = mp_pool_new(sizeof(insertion_time_elem_t), 1024);
+
+#define SECONDS_IN_A_DAY 86400L
+    added = (uint32_t)(((now.tv_sec % SECONDS_IN_A_DAY) * 100L)
+            + ((uint32_t)now.tv_usec / (uint32_t)10000L));
+    if (!it_queue) {
+      it_queue = tor_malloc_zero(sizeof(insertion_time_queue_t));
+      queue->insertion_times = it_queue;
+    }
+    if (it_queue->last && it_queue->last->insertion_time == added) {
+      it_queue->last->counter++;
+    } else {
+      insertion_time_elem_t *elem = mp_pool_get(it_pool);
+      elem->next = NULL;
+      elem->insertion_time = added;
+      elem->counter = 1;
+      if (it_queue->last) {
+        it_queue->last->next = elem;
+        it_queue->last = elem;
+      } else {
+        it_queue->first = it_queue->last = elem;
+      }
+    }
+  }
+  /* Remember that we added a cell to the queue, and remember the cell
+   * command. */
+  if (get_options()->TestingEnableCellStatsEvent && circ) {
+    testing_cell_stats_entry_t *ent =
+                      tor_malloc_zero(sizeof(testing_cell_stats_entry_t));
+    ent->command = cell->command;
+    ent->exitward = exitward;
+    if (!circ->testing_cell_stats)
+      circ->testing_cell_stats = smartlist_new();
+    smartlist_add(circ->testing_cell_stats, ent);
+    cell_command_queue_append(queue, cell->command);
+  }
+  cell_queue_append(queue, copy);
+}
+
+/** Initialize <b>queue</b> as an empty cell queue. */
+void
+cell_queue_init(cell_queue_t *queue)
+{
+  memset(queue, 0, sizeof(cell_queue_t));
+  TOR_SIMPLEQ_INIT(&queue->head);
+}
+
+/** Remove and free every cell in <b>queue</b>. */
+void
+cell_queue_clear(cell_queue_t *queue)
+{
+  packed_cell_t *cell;
+  while ((cell = TOR_SIMPLEQ_FIRST(&queue->head))) {
+    TOR_SIMPLEQ_REMOVE_HEAD(&queue->head, next);
+    packed_cell_free_unchecked(cell);
+  }
+  TOR_SIMPLEQ_INIT(&queue->head);
+  queue->n = 0;
+  if (queue->insertion_times) {
+    while (queue->insertion_times->first) {
+      insertion_time_elem_t *elem = queue->insertion_times->first;
+      queue->insertion_times->first = elem->next;
+      mp_pool_release(elem);
+    }
+    tor_free(queue->insertion_times);
+  }
+}
+
+/** Extract and return the cell at the head of <b>queue</b>; return NULL if
+ * <b>queue</b> is empty. */
+STATIC packed_cell_t *
+cell_queue_pop(cell_queue_t *queue)
+{
+  packed_cell_t *cell = TOR_SIMPLEQ_FIRST(&queue->head);
+  if (!cell)
+    return NULL;
+  TOR_SIMPLEQ_REMOVE_HEAD(&queue->head, next);
+  --queue->n;
+  return cell;
+}
+
+/** Return the total number of bytes used for each packed_cell in a queue.
+ * Approximate. */
+size_t
+packed_cell_mem_cost(void)
+{
+  return sizeof(packed_cell_t) + MP_POOL_ITEM_OVERHEAD +
+    get_options()->CellStatistics ?
+    (sizeof(insertion_time_elem_t)+MP_POOL_ITEM_OVERHEAD) : 0;
+}
+
+/** Check whether we've got too much space used for cells.  If so,
+ * call the OOM handler and return 1.  Otherwise, return 0. */
+static int
+cell_queues_check_size(void)
+{
+  size_t alloc = total_cells_allocated * packed_cell_mem_cost();
+  if (alloc >= get_options()->MaxMemInCellQueues) {
+    circuits_handle_oom(alloc);
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * Update the number of cells available on the circuit's n_chan or p_chan's
+ * circuit mux.
+ */
+void
+update_circuit_on_cmux_(circuit_t *circ, cell_direction_t direction,
+                        const char *file, int lineno)
+{
+  channel_t *chan = NULL;
+  or_circuit_t *or_circ = NULL;
+  circuitmux_t *cmux = NULL;
+
+  tor_assert(circ);
+
+  /* Okay, get the channel */
+  if (direction == CELL_DIRECTION_OUT) {
+    chan = circ->n_chan;
+  } else {
+    or_circ = TO_OR_CIRCUIT(circ);
+    chan = or_circ->p_chan;
+  }
+
+  tor_assert(chan);
+  tor_assert(chan->cmux);
+
+  /* Now get the cmux */
+  cmux = chan->cmux;
+
+  /* Cmux sanity check */
+  if (! circuitmux_is_circuit_attached(cmux, circ)) {
+    log_warn(LD_BUG, "called on non-attachd circuit from %s:%d",
+             file, lineno);
+    return;
+  }
+  tor_assert(circuitmux_attached_circuit_direction(cmux, circ) == direction);
+
+  assert_cmux_ok_paranoid(chan);
+
+  /* Update the number of cells we have for the circuit mux */
+  if (direction == CELL_DIRECTION_OUT) {
+    circuitmux_set_num_cells(cmux, circ, circ->n_chan_cells.n);
+  } else {
+    circuitmux_set_num_cells(cmux, circ, or_circ->p_chan_cells.n);
+  }
+
+  assert_cmux_ok_paranoid(chan);
+}
+
+/** Remove all circuits from the cmux on <b>chan</b>. */
+void
+channel_unlink_all_circuits(channel_t *chan)
+{
+  tor_assert(chan);
+  tor_assert(chan->cmux);
+
+  circuitmux_detach_all_circuits(chan->cmux);
+  chan->num_n_circuits = 0;
+  chan->num_p_circuits =
