@@ -2663,4 +2663,208 @@ append_cell_to_circuit_queue(circuit_t *circ, channel_t *chan,
           } else if (tgt_max_middle_cells < orcirc->max_middle_cells) {
             /*
              * If we're shrinking the cap, we can't shrink past either queue;
-             * compare tgt_ma
+             * compare tgt_max_middle_cells rather than tgt_max_middle_cells *
+             * ORCIRC_MAX_MIDDLE_KILL_THRESH so the queues don't shrink enough
+             * to generate spurious warnings, either.
+             */
+            n_len = circ->n_chan_cells.n;
+            p_len = orcirc->p_chan_cells.n;
+            tmp = tgt_max_middle_cells;
+            if (tmp < n_len) tmp = n_len;
+            if (tmp < p_len) tmp = p_len;
+            orcirc->max_middle_cells = tmp;
+          }
+          /* else no change */
+        }
+      } else {
+        /* tgt_max_middle_cells == 0 indicates we should disable the cap */
+        orcirc->max_middle_cells = 0;
+      }
+
+      /* Now we know orcirc->max_middle_cells is set correctly */
+      if (orcirc->max_middle_cells > 0) {
+        hard_max_middle_cells =
+          (uint32_t)(((double)orcirc->max_middle_cells) *
+                     ORCIRC_MAX_MIDDLE_KILL_THRESH);
+
+        if ((unsigned)queue->n + 1 >= hard_max_middle_cells) {
+          /* Queueing this cell would put queue over the kill theshold */
+          log_warn(LD_CIRC,
+                   "Got a cell exceeding the hard cap of %u in the "
+                   "%s direction on middle circ ID %u on chan ID "
+                   U64_FORMAT "; killing the circuit.",
+                   hard_max_middle_cells,
+                   (direction == CELL_DIRECTION_OUT) ? "n" : "p",
+                   (direction == CELL_DIRECTION_OUT) ?
+                     circ->n_circ_id : orcirc->p_circ_id,
+                   U64_PRINTF_ARG(
+                     (direction == CELL_DIRECTION_OUT) ?
+                        circ->n_chan->global_identifier :
+                        orcirc->p_chan->global_identifier));
+          circuit_mark_for_close(circ, END_CIRC_REASON_RESOURCELIMIT);
+          return;
+        } else if ((unsigned)queue->n + 1 == orcirc->max_middle_cells) {
+          /* Only use ==, not >= for this test so we don't spam the log */
+          log_warn(LD_CIRC,
+                   "While trying to queue a cell, reached the soft cap of %u "
+                   "in the %s direction on middle circ ID %u "
+                   "on chan ID " U64_FORMAT ".",
+                   orcirc->max_middle_cells,
+                   (direction == CELL_DIRECTION_OUT) ? "n" : "p",
+                   (direction == CELL_DIRECTION_OUT) ?
+                     circ->n_circ_id : orcirc->p_circ_id,
+                   U64_PRINTF_ARG(
+                     (direction == CELL_DIRECTION_OUT) ?
+                        circ->n_chan->global_identifier :
+                        orcirc->p_chan->global_identifier));
+        }
+      }
+    }
+  }
+#endif
+
+  cell_queue_append_packed_copy(circ, queue, exitward, cell,
+                                chan->wide_circ_ids, 1);
+
+  if (PREDICT_UNLIKELY(cell_queues_check_size())) {
+    /* We ran the OOM handler */
+    if (circ->marked_for_close)
+      return;
+  }
+
+  /* If we have too many cells on the circuit, we should stop reading from
+   * the edge streams for a while. */
+  if (!streams_blocked && queue->n >= CELL_QUEUE_HIGHWATER_SIZE)
+    set_streams_blocked_on_circ(circ, chan, 1, 0); /* block streams */
+
+  if (streams_blocked && fromstream) {
+    /* This edge connection is apparently not blocked; block it. */
+    set_streams_blocked_on_circ(circ, chan, 1, fromstream);
+  }
+
+  update_circuit_on_cmux(circ, direction);
+  if (queue->n == 1) {
+    /* This was the first cell added to the queue.  We just made this
+     * circuit active. */
+    log_debug(LD_GENERAL, "Made a circuit active.");
+  }
+
+  if (!channel_has_queued_writes(chan)) {
+    /* There is no data at all waiting to be sent on the outbuf.  Add a
+     * cell, so that we can notice when it gets flushed, flushed_some can
+     * get called, and we can start putting more data onto the buffer then.
+     */
+    log_debug(LD_GENERAL, "Primed a buffer.");
+    channel_flush_from_first_active_circuit(chan, 1);
+  }
+}
+
+/** Append an encoded value of <b>addr</b> to <b>payload_out</b>, which must
+ * have at least 18 bytes of free space.  The encoding is, as specified in
+ * tor-spec.txt:
+ *   RESOLVED_TYPE_IPV4 or RESOLVED_TYPE_IPV6  [1 byte]
+ *   LENGTH                                    [1 byte]
+ *   ADDRESS                                   [length bytes]
+ * Return the number of bytes added, or -1 on error */
+int
+append_address_to_payload(uint8_t *payload_out, const tor_addr_t *addr)
+{
+  uint32_t a;
+  switch (tor_addr_family(addr)) {
+  case AF_INET:
+    payload_out[0] = RESOLVED_TYPE_IPV4;
+    payload_out[1] = 4;
+    a = tor_addr_to_ipv4n(addr);
+    memcpy(payload_out+2, &a, 4);
+    return 6;
+  case AF_INET6:
+    payload_out[0] = RESOLVED_TYPE_IPV6;
+    payload_out[1] = 16;
+    memcpy(payload_out+2, tor_addr_to_in6_addr8(addr), 16);
+    return 18;
+  case AF_UNSPEC:
+  default:
+    return -1;
+  }
+}
+
+/** Given <b>payload_len</b> bytes at <b>payload</b>, starting with an address
+ * encoded as by append_address_to_payload(), try to decode the address into
+ * *<b>addr_out</b>.  Return the next byte in the payload after the address on
+ * success, or NULL on failure. */
+const uint8_t *
+decode_address_from_payload(tor_addr_t *addr_out, const uint8_t *payload,
+                            int payload_len)
+{
+  if (payload_len < 2)
+    return NULL;
+  if (payload_len < 2+payload[1])
+    return NULL;
+
+  switch (payload[0]) {
+  case RESOLVED_TYPE_IPV4:
+    if (payload[1] != 4)
+      return NULL;
+    tor_addr_from_ipv4n(addr_out, get_uint32(payload+2));
+    break;
+  case RESOLVED_TYPE_IPV6:
+    if (payload[1] != 16)
+      return NULL;
+    tor_addr_from_ipv6_bytes(addr_out, (char*)(payload+2));
+    break;
+  default:
+    tor_addr_make_unspec(addr_out);
+    break;
+  }
+  return payload + 2 + payload[1];
+}
+
+/** Remove all the cells queued on <b>circ</b> for <b>chan</b>. */
+void
+circuit_clear_cell_queue(circuit_t *circ, channel_t *chan)
+{
+  cell_queue_t *queue;
+  cell_direction_t direction;
+
+  if (circ->n_chan == chan) {
+    queue = &circ->n_chan_cells;
+    direction = CELL_DIRECTION_OUT;
+  } else {
+    or_circuit_t *orcirc = TO_OR_CIRCUIT(circ);
+    tor_assert(orcirc->p_chan == chan);
+    queue = &orcirc->p_chan_cells;
+    direction = CELL_DIRECTION_IN;
+  }
+
+  /* Clear the queue */
+  cell_queue_clear(queue);
+
+  /* Update the cell counter in the cmux */
+  if (chan->cmux && circuitmux_is_circuit_attached(chan->cmux, circ))
+    update_circuit_on_cmux(circ, direction);
+}
+
+/** Fail with an assert if the circuit mux on chan is corrupt
+ */
+void
+assert_circuit_mux_okay(channel_t *chan)
+{
+  tor_assert(chan);
+  tor_assert(chan->cmux);
+
+  circuitmux_assert_okay(chan->cmux);
+}
+
+/** Return 1 if we shouldn't restart reading on this circuit, even if
+ * we get a SENDME.  Else return 0.
+*/
+static int
+circuit_queue_streams_are_blocked(circuit_t *circ)
+{
+  if (CIRCUIT_IS_ORIGIN(circ)) {
+    return circ->streams_blocked_on_n_chan;
+  } else {
+    return circ->streams_blocked_on_p_chan;
+  }
+}
+
