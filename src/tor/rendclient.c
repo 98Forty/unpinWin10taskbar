@@ -335,4 +335,260 @@ rend_client_send_introduction(origin_circuit_t *introcirc,
   circuit_change_purpose(TO_CIRCUIT(introcirc),
                          CIRCUIT_PURPOSE_C_INTRODUCE_ACK_WAIT);
   /* Set timestamp_dirty, because circuit_expire_building expects it
-   *
+   * to specify when a circuit entered the _C_INTRODUCE_ACK_WAIT
+   * state. */
+  introcirc->base_.timestamp_dirty = time(NULL);
+
+  pathbias_count_use_attempt(introcirc);
+
+  goto cleanup;
+
+ perm_err:
+  if (!introcirc->base_.marked_for_close)
+    circuit_mark_for_close(TO_CIRCUIT(introcirc), END_CIRC_REASON_INTERNAL);
+  circuit_mark_for_close(TO_CIRCUIT(rendcirc), END_CIRC_REASON_INTERNAL);
+ cleanup:
+  memwipe(payload, 0, sizeof(payload));
+  memwipe(tmp, 0, sizeof(tmp));
+
+  return status;
+}
+
+/** Called when a rendezvous circuit is open; sends a establish
+ * rendezvous circuit as appropriate. */
+void
+rend_client_rendcirc_has_opened(origin_circuit_t *circ)
+{
+  tor_assert(circ->base_.purpose == CIRCUIT_PURPOSE_C_ESTABLISH_REND);
+
+  log_info(LD_REND,"rendcirc is open");
+
+  /* generate a rendezvous cookie, store it in circ */
+  if (rend_client_send_establish_rendezvous(circ) < 0) {
+    return;
+  }
+}
+
+/**
+ * Called to close other intro circuits we launched in parallel
+ * due to timeout.
+ */
+static void
+rend_client_close_other_intros(const char *onion_address)
+{
+  circuit_t *c;
+  /* abort parallel intro circs, if any */
+  TOR_LIST_FOREACH(c, circuit_get_global_list(), head) {
+    if ((c->purpose == CIRCUIT_PURPOSE_C_INTRODUCING ||
+        c->purpose == CIRCUIT_PURPOSE_C_INTRODUCE_ACK_WAIT) &&
+        !c->marked_for_close && CIRCUIT_IS_ORIGIN(c)) {
+      origin_circuit_t *oc = TO_ORIGIN_CIRCUIT(c);
+      if (oc->rend_data &&
+          !rend_cmp_service_ids(onion_address,
+                                oc->rend_data->onion_address)) {
+        log_info(LD_REND|LD_CIRC, "Closing introduction circuit %d that we "
+                 "built in parallel (Purpose %d).", oc->global_identifier,
+                 c->purpose);
+        circuit_mark_for_close(c, END_CIRC_REASON_TIMEOUT);
+      }
+    }
+  }
+}
+
+/** Called when get an ACK or a NAK for a REND_INTRODUCE1 cell.
+ */
+int
+rend_client_introduction_acked(origin_circuit_t *circ,
+                               const uint8_t *request, size_t request_len)
+{
+  origin_circuit_t *rendcirc;
+  (void) request; // XXXX Use this.
+
+  if (circ->base_.purpose != CIRCUIT_PURPOSE_C_INTRODUCE_ACK_WAIT) {
+    log_warn(LD_PROTOCOL,
+             "Received REND_INTRODUCE_ACK on unexpected circuit %u.",
+             (unsigned)circ->base_.n_circ_id);
+    circuit_mark_for_close(TO_CIRCUIT(circ), END_CIRC_REASON_TORPROTOCOL);
+    return -1;
+  }
+
+  tor_assert(circ->build_state->chosen_exit);
+#ifndef NON_ANONYMOUS_MODE_ENABLED
+  tor_assert(!(circ->build_state->onehop_tunnel));
+#endif
+  tor_assert(circ->rend_data);
+
+  /* For path bias: This circuit was used successfully. Valid
+   * nacks and acks count. */
+  pathbias_mark_use_success(circ);
+
+  if (request_len == 0) {
+    /* It's an ACK; the introduction point relayed our introduction request. */
+    /* Locate the rend circ which is waiting to hear about this ack,
+     * and tell it.
+     */
+    log_info(LD_REND,"Received ack. Telling rend circ...");
+    rendcirc = circuit_get_ready_rend_circ_by_rend_data(circ->rend_data);
+    if (rendcirc) { /* remember the ack */
+#ifndef NON_ANONYMOUS_MODE_ENABLED
+      tor_assert(!(rendcirc->build_state->onehop_tunnel));
+#endif
+      circuit_change_purpose(TO_CIRCUIT(rendcirc),
+                             CIRCUIT_PURPOSE_C_REND_READY_INTRO_ACKED);
+      /* Set timestamp_dirty, because circuit_expire_building expects
+       * it to specify when a circuit entered the
+       * _C_REND_READY_INTRO_ACKED state. */
+      rendcirc->base_.timestamp_dirty = time(NULL);
+    } else {
+      log_info(LD_REND,"...Found no rend circ. Dropping on the floor.");
+    }
+    /* close the circuit: we won't need it anymore. */
+    circuit_change_purpose(TO_CIRCUIT(circ),
+                           CIRCUIT_PURPOSE_C_INTRODUCE_ACKED);
+    circuit_mark_for_close(TO_CIRCUIT(circ), END_CIRC_REASON_FINISHED);
+
+    /* close any other intros launched in parallel */
+    rend_client_close_other_intros(circ->rend_data->onion_address);
+  } else {
+    /* It's a NAK; the introduction point didn't relay our request. */
+    circuit_change_purpose(TO_CIRCUIT(circ), CIRCUIT_PURPOSE_C_INTRODUCING);
+    /* Remove this intro point from the set of viable introduction
+     * points. If any remain, extend to a new one and try again.
+     * If none remain, refetch the service descriptor.
+     */
+    log_info(LD_REND, "Got nack for %s from %s...",
+        safe_str_client(circ->rend_data->onion_address),
+        safe_str_client(extend_info_describe(circ->build_state->chosen_exit)));
+    if (rend_client_report_intro_point_failure(circ->build_state->chosen_exit,
+                                             circ->rend_data,
+                                             INTRO_POINT_FAILURE_GENERIC)>0) {
+      /* There are introduction points left. Re-extend the circuit to
+       * another intro point and try again. */
+      int result = rend_client_reextend_intro_circuit(circ);
+      /* XXXX If that call failed, should we close the rend circuit,
+       * too? */
+      return result;
+    }
+  }
+  return 0;
+}
+
+/** The period for which a hidden service directory cannot be queried for
+ * the same descriptor ID again. */
+#define REND_HID_SERV_DIR_REQUERY_PERIOD (15 * 60)
+
+/** Contains the last request times to hidden service directories for
+ * certain queries; each key is a string consisting of the
+ * concatenation of a base32-encoded HS directory identity digest, a
+ * base32-encoded HS descriptor ID, and a hidden service address
+ * (without the ".onion" part); each value is a pointer to a time_t
+ * holding the time of the last request for that descriptor ID to that
+ * HS directory. */
+static strmap_t *last_hid_serv_requests_ = NULL;
+
+/** Returns last_hid_serv_requests_, initializing it to a new strmap if
+ * necessary. */
+static strmap_t *
+get_last_hid_serv_requests(void)
+{
+  if (!last_hid_serv_requests_)
+    last_hid_serv_requests_ = strmap_new();
+  return last_hid_serv_requests_;
+}
+
+#define LAST_HID_SERV_REQUEST_KEY_LEN (REND_DESC_ID_V2_LEN_BASE32 + \
+                                       REND_DESC_ID_V2_LEN_BASE32 + \
+                                       REND_SERVICE_ID_LEN_BASE32)
+
+/** Look up the last request time to hidden service directory <b>hs_dir</b>
+ * for descriptor ID <b>desc_id_base32</b> for the service specified in
+ * <b>rend_query</b>. If <b>set</b> is non-zero,
+ * assign the current time <b>now</b> and return that. Otherwise, return
+ * the most recent request time, or 0 if no such request has been sent
+ * before. */
+static time_t
+lookup_last_hid_serv_request(routerstatus_t *hs_dir,
+                             const char *desc_id_base32,
+                             const rend_data_t *rend_query,
+                             time_t now, int set)
+{
+  char hsdir_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
+  char hsdir_desc_comb_id[LAST_HID_SERV_REQUEST_KEY_LEN + 1];
+  time_t *last_request_ptr;
+  strmap_t *last_hid_serv_requests = get_last_hid_serv_requests();
+  base32_encode(hsdir_id_base32, sizeof(hsdir_id_base32),
+                hs_dir->identity_digest, DIGEST_LEN);
+  tor_snprintf(hsdir_desc_comb_id, sizeof(hsdir_desc_comb_id), "%s%s%s",
+               hsdir_id_base32,
+               desc_id_base32,
+               rend_query->onion_address);
+  /* XXX023 tor_assert(strlen(hsdir_desc_comb_id) ==
+                       LAST_HID_SERV_REQUEST_KEY_LEN); */
+  if (set) {
+    time_t *oldptr;
+    last_request_ptr = tor_malloc_zero(sizeof(time_t));
+    *last_request_ptr = now;
+    oldptr = strmap_set(last_hid_serv_requests, hsdir_desc_comb_id,
+                        last_request_ptr);
+    tor_free(oldptr);
+  } else
+    last_request_ptr = strmap_get_lc(last_hid_serv_requests,
+                                     hsdir_desc_comb_id);
+  return (last_request_ptr) ? *last_request_ptr : 0;
+}
+
+/** Clean the history of request times to hidden service directories, so that
+ * it does not contain requests older than REND_HID_SERV_DIR_REQUERY_PERIOD
+ * seconds any more. */
+static void
+directory_clean_last_hid_serv_requests(time_t now)
+{
+  strmap_iter_t *iter;
+  time_t cutoff = now - REND_HID_SERV_DIR_REQUERY_PERIOD;
+  strmap_t *last_hid_serv_requests = get_last_hid_serv_requests();
+  for (iter = strmap_iter_init(last_hid_serv_requests);
+       !strmap_iter_done(iter); ) {
+    const char *key;
+    void *val;
+    time_t *ent;
+    strmap_iter_get(iter, &key, &val);
+    ent = (time_t *) val;
+    if (*ent < cutoff) {
+      iter = strmap_iter_next_rmv(last_hid_serv_requests, iter);
+      tor_free(ent);
+    } else {
+      iter = strmap_iter_next(last_hid_serv_requests, iter);
+    }
+  }
+}
+
+/** Remove all requests related to the hidden service named
+ * <b>onion_address</b> from the history of times of requests to
+ * hidden service directories. */
+static void
+purge_hid_serv_from_last_hid_serv_requests(const char *onion_address)
+{
+  strmap_iter_t *iter;
+  strmap_t *last_hid_serv_requests = get_last_hid_serv_requests();
+  /* XXX023 tor_assert(strlen(onion_address) == REND_SERVICE_ID_LEN_BASE32); */
+  for (iter = strmap_iter_init(last_hid_serv_requests);
+       !strmap_iter_done(iter); ) {
+    const char *key;
+    void *val;
+    strmap_iter_get(iter, &key, &val);
+    /* XXX023 tor_assert(strlen(key) == LAST_HID_SERV_REQUEST_KEY_LEN); */
+    if (tor_memeq(key + LAST_HID_SERV_REQUEST_KEY_LEN -
+                  REND_SERVICE_ID_LEN_BASE32,
+                  onion_address,
+                  REND_SERVICE_ID_LEN_BASE32)) {
+      iter = strmap_iter_next_rmv(last_hid_serv_requests, iter);
+      tor_free(val);
+    } else {
+      iter = strmap_iter_next(last_hid_serv_requests, iter);
+    }
+  }
+}
+
+/** Purge the history of request times to hidden service directories,
+ * so that future lookups of an HS descriptor will not fail because we
+ * accessed
