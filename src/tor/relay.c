@@ -2386,4 +2386,281 @@ channel_unlink_all_circuits(channel_t *chan)
 
   circuitmux_detach_all_circuits(chan->cmux);
   chan->num_n_circuits = 0;
-  chan->num_p_circuits =
+  chan->num_p_circuits = 0;
+}
+
+/** Block (if <b>block</b> is true) or unblock (if <b>block</b> is false)
+ * every edge connection that is using <b>circ</b> to write to <b>chan</b>,
+ * and start or stop reading as appropriate.
+ *
+ * If <b>stream_id</b> is nonzero, block only the edge connection whose
+ * stream_id matches it.
+ *
+ * Returns the number of streams whose status we changed.
+ */
+static int
+set_streams_blocked_on_circ(circuit_t *circ, channel_t *chan,
+                            int block, streamid_t stream_id)
+{
+  edge_connection_t *edge = NULL;
+  int n = 0;
+  if (circ->n_chan == chan) {
+    circ->streams_blocked_on_n_chan = block;
+    if (CIRCUIT_IS_ORIGIN(circ))
+      edge = TO_ORIGIN_CIRCUIT(circ)->p_streams;
+  } else {
+    circ->streams_blocked_on_p_chan = block;
+    tor_assert(!CIRCUIT_IS_ORIGIN(circ));
+    edge = TO_OR_CIRCUIT(circ)->n_streams;
+  }
+
+  for (; edge; edge = edge->next_stream) {
+    connection_t *conn = TO_CONN(edge);
+    if (stream_id && edge->stream_id != stream_id)
+      continue;
+
+    if (edge->edge_blocked_on_circ != block) {
+      ++n;
+      edge->edge_blocked_on_circ = block;
+    }
+
+    if (!conn->read_event && !HAS_BUFFEREVENT(conn)) {
+      /* This connection is a placeholder for something; probably a DNS
+       * request.  It can't actually stop or start reading.*/
+      continue;
+    }
+
+    if (block) {
+      if (connection_is_reading(conn))
+        connection_stop_reading(conn);
+    } else {
+      /* Is this right? */
+      if (!connection_is_reading(conn))
+        connection_start_reading(conn);
+    }
+  }
+
+  return n;
+}
+
+/** Pull as many cells as possible (but no more than <b>max</b>) from the
+ * queue of the first active circuit on <b>chan</b>, and write them to
+ * <b>chan</b>-&gt;outbuf.  Return the number of cells written.  Advance
+ * the active circuit pointer to the next active circuit in the ring. */
+int
+channel_flush_from_first_active_circuit(channel_t *chan, int max)
+{
+  circuitmux_t *cmux = NULL;
+  int n_flushed = 0;
+  cell_queue_t *queue, *destroy_queue=NULL;
+  circuit_t *circ;
+  or_circuit_t *or_circ;
+  int streams_blocked;
+  packed_cell_t *cell;
+
+  /* Get the cmux */
+  tor_assert(chan);
+  tor_assert(chan->cmux);
+  cmux = chan->cmux;
+
+  /* Main loop: pick a circuit, send a cell, update the cmux */
+  while (n_flushed < max) {
+    circ = circuitmux_get_first_active_circuit(cmux, &destroy_queue);
+    if (destroy_queue) {
+      /* this code is duplicated from some of the logic below. Ugly! XXXX */
+      tor_assert(destroy_queue->n > 0);
+      cell = cell_queue_pop(destroy_queue);
+      channel_write_packed_cell(chan, cell);
+      /* Update the cmux destroy counter */
+      circuitmux_notify_xmit_destroy(cmux);
+      cell = NULL;
+      ++n_flushed;
+      continue;
+    }
+    /* If it returns NULL, no cells left to send */
+    if (!circ) break;
+    assert_cmux_ok_paranoid(chan);
+
+    if (circ->n_chan == chan) {
+      queue = &circ->n_chan_cells;
+      streams_blocked = circ->streams_blocked_on_n_chan;
+    } else {
+      or_circ = TO_OR_CIRCUIT(circ);
+      tor_assert(or_circ->p_chan == chan);
+      queue = &TO_OR_CIRCUIT(circ)->p_chan_cells;
+      streams_blocked = circ->streams_blocked_on_p_chan;
+    }
+
+    /* Circuitmux told us this was active, so it should have cells */
+    tor_assert(queue->n > 0);
+
+    /*
+     * Get just one cell here; once we've sent it, that can change the circuit
+     * selection, so we have to loop around for another even if this circuit
+     * has more than one.
+     */
+    cell = cell_queue_pop(queue);
+
+    /* Calculate the exact time that this cell has spent in the queue. */
+    if (get_options()->CellStatistics ||
+        get_options()->TestingEnableCellStatsEvent) {
+      struct timeval tvnow;
+      uint32_t flushed;
+      uint32_t cell_waiting_time;
+      insertion_time_queue_t *it_queue = queue->insertion_times;
+      tor_gettimeofday_cached(&tvnow);
+      flushed = (uint32_t)((tvnow.tv_sec % SECONDS_IN_A_DAY) * 100L +
+                 (uint32_t)tvnow.tv_usec / (uint32_t)10000L);
+      if (!it_queue || !it_queue->first) {
+        log_info(LD_GENERAL, "Cannot determine insertion time of cell. "
+                             "Looks like the CellStatistics option was "
+                             "recently enabled.");
+      } else {
+        insertion_time_elem_t *elem = it_queue->first;
+        cell_waiting_time =
+            (uint32_t)((flushed * 10L + SECONDS_IN_A_DAY * 1000L -
+                        elem->insertion_time * 10L) %
+                       (SECONDS_IN_A_DAY * 1000L));
+#undef SECONDS_IN_A_DAY
+        elem->counter--;
+        if (elem->counter < 1) {
+          it_queue->first = elem->next;
+          if (elem == it_queue->last)
+            it_queue->last = NULL;
+          mp_pool_release(elem);
+        }
+        if (get_options()->CellStatistics && !CIRCUIT_IS_ORIGIN(circ)) {
+          or_circ = TO_OR_CIRCUIT(circ);
+          or_circ->total_cell_waiting_time += cell_waiting_time;
+          or_circ->processed_cells++;
+        }
+        if (get_options()->TestingEnableCellStatsEvent) {
+          uint8_t command;
+          if (cell_command_queue_pop(&command, queue) < 0) {
+            log_info(LD_GENERAL, "Cannot determine command of cell. "
+                                 "Looks like the CELL_STATS event was "
+                                 "recently enabled.");
+          } else {
+            testing_cell_stats_entry_t *ent =
+                        tor_malloc_zero(sizeof(testing_cell_stats_entry_t));
+            ent->command = command;
+            ent->waiting_time = (unsigned int)cell_waiting_time / 10;
+            ent->removed = 1;
+            if (circ->n_chan == chan)
+              ent->exitward = 1;
+            if (!circ->testing_cell_stats)
+              circ->testing_cell_stats = smartlist_new();
+            smartlist_add(circ->testing_cell_stats, ent);
+          }
+        }
+      }
+    }
+
+    /* If we just flushed our queue and this circuit is used for a
+     * tunneled directory request, possibly advance its state. */
+    if (queue->n == 0 && chan->dirreq_id)
+      geoip_change_dirreq_state(chan->dirreq_id,
+                                DIRREQ_TUNNELED,
+                                DIRREQ_CIRC_QUEUE_FLUSHED);
+
+    /* Now send the cell */
+    channel_write_packed_cell(chan, cell);
+    cell = NULL;
+
+    /*
+     * Don't packed_cell_free_unchecked(cell) here because the channel will
+     * do so when it gets out of the channel queue (probably already did, in
+     * which case that was an immediate double-free bug).
+     */
+
+    /* Update the counter */
+    ++n_flushed;
+
+    /*
+     * Now update the cmux; tell it we've just sent a cell, and how many
+     * we have left.
+     */
+    circuitmux_notify_xmit_cells(cmux, circ, 1);
+    circuitmux_set_num_cells(cmux, circ, queue->n);
+    if (queue->n == 0)
+      log_debug(LD_GENERAL, "Made a circuit inactive.");
+
+    /* Is the cell queue low enough to unblock all the streams that are waiting
+     * to write to this circuit? */
+    if (streams_blocked && queue->n <= CELL_QUEUE_LOWWATER_SIZE)
+      set_streams_blocked_on_circ(circ, chan, 0, 0); /* unblock streams */
+
+    /* If n_flushed < max still, loop around and pick another circuit */
+  }
+
+  /* Okay, we're done sending now */
+  assert_cmux_ok_paranoid(chan);
+
+  return n_flushed;
+}
+
+#if 0
+/** Indicate the current preferred cap for middle circuits; zero disables
+ * the cap.  Right now it's just a constant, ORCIRC_MAX_MIDDLE_CELLS, but
+ * the logic in append_cell_to_circuit_queue() is written to be correct
+ * if we want to base it on a consensus param or something that might change
+ * in the future.
+ */
+static int
+get_max_middle_cells(void)
+{
+  return ORCIRC_MAX_MIDDLE_CELLS;
+}
+#endif
+
+/** Add <b>cell</b> to the queue of <b>circ</b> writing to <b>chan</b>
+ * transmitting in <b>direction</b>. */
+void
+append_cell_to_circuit_queue(circuit_t *circ, channel_t *chan,
+                             cell_t *cell, cell_direction_t direction,
+                             streamid_t fromstream)
+{
+  or_circuit_t *orcirc = NULL;
+  cell_queue_t *queue;
+  int streams_blocked;
+#if 0
+  uint32_t tgt_max_middle_cells, p_len, n_len, tmp, hard_max_middle_cells;
+#endif
+
+  int exitward;
+  if (circ->marked_for_close)
+    return;
+
+  exitward = (direction == CELL_DIRECTION_OUT);
+  if (exitward) {
+    queue = &circ->n_chan_cells;
+    streams_blocked = circ->streams_blocked_on_n_chan;
+  } else {
+    orcirc = TO_OR_CIRCUIT(circ);
+    queue = &orcirc->p_chan_cells;
+    streams_blocked = circ->streams_blocked_on_p_chan;
+  }
+
+  /*
+   * Disabling this for now because of a possible guard discovery attack
+   */
+#if 0
+  /* Are we a middle circuit about to exceed ORCIRC_MAX_MIDDLE_CELLS? */
+  if ((circ->n_chan != NULL) && CIRCUIT_IS_ORCIRC(circ)) {
+    orcirc = TO_OR_CIRCUIT(circ);
+    if (orcirc->p_chan) {
+      /* We are a middle circuit if we have both n_chan and p_chan */
+      /* We'll need to know the current preferred maximum */
+      tgt_max_middle_cells = get_max_middle_cells();
+      if (tgt_max_middle_cells > 0) {
+        /* Do we need to initialize middle_max_cells? */
+        if (orcirc->max_middle_cells == 0) {
+          orcirc->max_middle_cells = tgt_max_middle_cells;
+        } else {
+          if (tgt_max_middle_cells > orcirc->max_middle_cells) {
+            /* If we want to increase the cap, we can do so right away */
+            orcirc->max_middle_cells = tgt_max_middle_cells;
+          } else if (tgt_max_middle_cells < orcirc->max_middle_cells) {
+            /*
+             * If we're shrinking the cap, we can't shrink past either queue;
+             * compare tgt_ma
