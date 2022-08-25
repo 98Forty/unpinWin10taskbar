@@ -591,4 +591,226 @@ purge_hid_serv_from_last_hid_serv_requests(const char *onion_address)
 
 /** Purge the history of request times to hidden service directories,
  * so that future lookups of an HS descriptor will not fail because we
- * accessed
+ * accessed all of the HSDir relays responsible for the descriptor
+ * recently. */
+void
+rend_client_purge_last_hid_serv_requests(void)
+{
+  /* Don't create the table if it doesn't exist yet (and it may very
+   * well not exist if the user hasn't accessed any HSes)... */
+  strmap_t *old_last_hid_serv_requests = last_hid_serv_requests_;
+  /* ... and let get_last_hid_serv_requests re-create it for us if
+   * necessary. */
+  last_hid_serv_requests_ = NULL;
+
+  if (old_last_hid_serv_requests != NULL) {
+    log_info(LD_REND, "Purging client last-HS-desc-request-time table");
+    strmap_free(old_last_hid_serv_requests, tor_free_);
+  }
+}
+
+/** Determine the responsible hidden service directories for <b>desc_id</b>
+ * and fetch the descriptor with that ID from one of them. Only
+ * send a request to a hidden service directory that we have not yet tried
+ * during this attempt to connect to this hidden service; on success, return 1,
+ * in the case that no hidden service directory is left to ask for the
+ * descriptor, return 0, and in case of a failure -1.  */
+static int
+directory_get_from_hs_dir(const char *desc_id, const rend_data_t *rend_query)
+{
+  smartlist_t *responsible_dirs = smartlist_new();
+  routerstatus_t *hs_dir;
+  char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
+  time_t now = time(NULL);
+  char descriptor_cookie_base64[3*REND_DESC_COOKIE_LEN_BASE64];
+  int tor2web_mode = get_options()->Tor2webMode;
+  tor_assert(desc_id);
+  tor_assert(rend_query);
+  /* Determine responsible dirs. Even if we can't get all we want,
+   * work with the ones we have. If it's empty, we'll notice below. */
+  hid_serv_get_responsible_directories(responsible_dirs, desc_id);
+
+  base32_encode(desc_id_base32, sizeof(desc_id_base32),
+                desc_id, DIGEST_LEN);
+
+  /* Only select those hidden service directories to which we did not send
+   * a request recently and for which we have a router descriptor here. */
+
+  /* Clean request history first. */
+  directory_clean_last_hid_serv_requests(now);
+
+  SMARTLIST_FOREACH(responsible_dirs, routerstatus_t *, dir, {
+      time_t last = lookup_last_hid_serv_request(
+                            dir, desc_id_base32, rend_query, 0, 0);
+      const node_t *node = node_get_by_id(dir->identity_digest);
+      if (last + REND_HID_SERV_DIR_REQUERY_PERIOD >= now ||
+          !node || !node_has_descriptor(node))
+      SMARTLIST_DEL_CURRENT(responsible_dirs, dir);
+  });
+
+  hs_dir = smartlist_choose(responsible_dirs);
+  smartlist_free(responsible_dirs);
+  if (!hs_dir) {
+    log_info(LD_REND, "Could not pick one of the responsible hidden "
+                      "service directories, because we requested them all "
+                      "recently without success.");
+    return 0;
+  }
+
+  /* Remember that we are requesting a descriptor from this hidden service
+   * directory now. */
+  lookup_last_hid_serv_request(hs_dir, desc_id_base32, rend_query, now, 1);
+
+  /* Encode descriptor cookie for logging purposes. */
+  if (rend_query->auth_type != REND_NO_AUTH) {
+    if (base64_encode(descriptor_cookie_base64,
+                      sizeof(descriptor_cookie_base64),
+                      rend_query->descriptor_cookie, REND_DESC_COOKIE_LEN)<0) {
+      log_warn(LD_BUG, "Could not base64-encode descriptor cookie.");
+      return 0;
+    }
+    /* Remove == signs and newline. */
+    descriptor_cookie_base64[strlen(descriptor_cookie_base64)-3] = '\0';
+  } else {
+    strlcpy(descriptor_cookie_base64, "(none)",
+            sizeof(descriptor_cookie_base64));
+  }
+
+  /* Send fetch request. (Pass query and possibly descriptor cookie so that
+   * they can be written to the directory connection and be referred to when
+   * the response arrives. */
+  directory_initiate_command_routerstatus_rend(hs_dir,
+                                          DIR_PURPOSE_FETCH_RENDDESC_V2,
+                                          ROUTER_PURPOSE_GENERAL,
+                                   tor2web_mode?DIRIND_ONEHOP:DIRIND_ANONYMOUS,
+                                          desc_id_base32,
+                                          NULL, 0, 0,
+                                          rend_query);
+  log_info(LD_REND, "Sending fetch request for v2 descriptor for "
+                    "service '%s' with descriptor ID '%s', auth type %d, "
+                    "and descriptor cookie '%s' to hidden service "
+                    "directory %s",
+           rend_query->onion_address, desc_id_base32,
+           rend_query->auth_type,
+           (rend_query->auth_type == REND_NO_AUTH ? "[none]" :
+            escaped_safe_str_client(descriptor_cookie_base64)),
+           routerstatus_describe(hs_dir));
+  control_event_hs_descriptor_requested(rend_query,
+                                        hs_dir->identity_digest,
+                                        desc_id_base32);
+  return 1;
+}
+
+/** Unless we already have a descriptor for <b>rend_query</b> with at least
+ * one (possibly) working introduction point in it, start a connection to a
+ * hidden service directory to fetch a v2 rendezvous service descriptor. */
+void
+rend_client_refetch_v2_renddesc(const rend_data_t *rend_query)
+{
+  char descriptor_id[DIGEST_LEN];
+  int replicas_left_to_try[REND_NUMBER_OF_NON_CONSECUTIVE_REPLICAS];
+  int i, tries_left;
+  rend_cache_entry_t *e = NULL;
+  tor_assert(rend_query);
+  /* Are we configured to fetch descriptors? */
+  if (!get_options()->FetchHidServDescriptors) {
+    log_warn(LD_REND, "We received an onion address for a v2 rendezvous "
+        "service descriptor, but are not fetching service descriptors.");
+    return;
+  }
+  /* Before fetching, check if we already have a usable descriptor here. */
+  if (rend_cache_lookup_entry(rend_query->onion_address, -1, &e) > 0 &&
+      rend_client_any_intro_points_usable(e)) {
+    log_info(LD_REND, "We would fetch a v2 rendezvous descriptor, but we "
+                      "already have a usable descriptor here. Not fetching.");
+    return;
+  }
+  log_debug(LD_REND, "Fetching v2 rendezvous descriptor for service %s",
+            safe_str_client(rend_query->onion_address));
+  /* Randomly iterate over the replicas until a descriptor can be fetched
+   * from one of the consecutive nodes, or no options are left. */
+  tries_left = REND_NUMBER_OF_NON_CONSECUTIVE_REPLICAS;
+  for (i = 0; i < REND_NUMBER_OF_NON_CONSECUTIVE_REPLICAS; i++)
+    replicas_left_to_try[i] = i;
+  while (tries_left > 0) {
+    int rand = crypto_rand_int(tries_left);
+    int chosen_replica = replicas_left_to_try[rand];
+    replicas_left_to_try[rand] = replicas_left_to_try[--tries_left];
+
+    if (rend_compute_v2_desc_id(descriptor_id, rend_query->onion_address,
+                                rend_query->auth_type == REND_STEALTH_AUTH ?
+                                    rend_query->descriptor_cookie : NULL,
+                                time(NULL), chosen_replica) < 0) {
+      log_warn(LD_REND, "Internal error: Computing v2 rendezvous "
+                        "descriptor ID did not succeed.");
+      /*
+       * Hmm, can this write anything to descriptor_id and still fail?
+       * Let's clear it just to be safe.
+       *
+       * From here on, any returns should goto done which clears
+       * descriptor_id so we don't leave key-derived material on the stack.
+       */
+      goto done;
+    }
+    if (directory_get_from_hs_dir(descriptor_id, rend_query) != 0)
+      goto done; /* either success or failure, but we're done */
+  }
+  /* If we come here, there are no hidden service directories left. */
+  log_info(LD_REND, "Could not pick one of the responsible hidden "
+                    "service directories to fetch descriptors, because "
+                    "we already tried them all unsuccessfully.");
+  /* Close pending connections. */
+  rend_client_desc_trynow(rend_query->onion_address);
+
+ done:
+  memwipe(descriptor_id, 0, sizeof(descriptor_id));
+
+  return;
+}
+
+/** Cancel all rendezvous descriptor fetches currently in progress.
+ */
+void
+rend_client_cancel_descriptor_fetches(void)
+{
+  smartlist_t *connection_array = get_connection_array();
+
+  SMARTLIST_FOREACH_BEGIN(connection_array, connection_t *, conn) {
+    if (conn->type == CONN_TYPE_DIR &&
+        (conn->purpose == DIR_PURPOSE_FETCH_RENDDESC ||
+         conn->purpose == DIR_PURPOSE_FETCH_RENDDESC_V2)) {
+      /* It's a rendezvous descriptor fetch in progress -- cancel it
+       * by marking the connection for close.
+       *
+       * Even if this connection has already reached EOF, this is
+       * enough to make sure that if the descriptor hasn't been
+       * processed yet, it won't be.  See the end of
+       * connection_handle_read; connection_reached_eof (indirectly)
+       * processes whatever response the connection received. */
+
+      const rend_data_t *rd = (TO_DIR_CONN(conn))->rend_data;
+      if (!rd) {
+        log_warn(LD_BUG | LD_REND,
+                 "Marking for close dir conn fetching rendezvous "
+                 "descriptor for unknown service!");
+      } else {
+        log_debug(LD_REND, "Marking for close dir conn fetching "
+                  "rendezvous descriptor for service %s",
+                  safe_str(rd->onion_address));
+      }
+      connection_mark_for_close(conn);
+    }
+  } SMARTLIST_FOREACH_END(conn);
+}
+
+/** Mark <b>failed_intro</b> as a failed introduction point for the
+ * hidden service specified by <b>rend_query</b>. If the HS now has no
+ * usable intro points, or we do not have an HS descriptor for it,
+ * then launch a new renddesc fetch.
+ *
+ * If <b>failure_type</b> is INTRO_POINT_FAILURE_GENERIC, remove the
+ * intro point from (our parsed copy of) the HS descriptor.
+ *
+ * If <b>failure_type</b> is INTRO_POINT_FAILURE_TIMEOUT, mark the
+ * intro point as 'timed out'; it will not be retried until the
+ * current hidden service connection attempt has ended or it 
