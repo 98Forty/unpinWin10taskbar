@@ -1340,4 +1340,23 @@ rend_parse_service_authorization(const or_options_t *options,
     }
     strmap_set(parsed, auth->onion_address, auth);
     auth = NULL;
- 
+  }
+  res = 0;
+  goto done;
+ err:
+  res = -1;
+ done:
+  rend_service_authorization_free(auth);
+  SMARTLIST_FOREACH(sl, char *, c, tor_free(c););
+  smartlist_free(sl);
+  if (!validate_only && res == 0) {
+    rend_service_authorization_free_all();
+    auth_hid_servs = parsed;
+  } else {
+    strmap_free(parsed, rend_service_authorization_strmap_item_free);
+  }
+  memwipe(descriptor_cookie_tmp, 0, sizeof(descriptor_cookie_tmp));
+  memwipe(descriptor_cookie_base64ext, 0, sizeof(descriptor_cookie_base64ext));
+  return res;
+}
+
