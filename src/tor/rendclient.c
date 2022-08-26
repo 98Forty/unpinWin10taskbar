@@ -1072,4 +1072,272 @@ rend_client_desc_trynow(const char *query)
   } SMARTLIST_FOREACH_END(base_conn);
 }
 
-/** Clea
+/** Clear temporary state used only during an attempt to connect to
+ * the hidden service named <b>onion_address</b>.  Called when a
+ * connection attempt has ended; may be called occasionally at other
+ * times, and should be reasonably harmless. */
+void
+rend_client_note_connection_attempt_ended(const char *onion_address)
+{
+  rend_cache_entry_t *cache_entry = NULL;
+  rend_cache_lookup_entry(onion_address, -1, &cache_entry);
+
+  log_info(LD_REND, "Connection attempt for %s has ended; "
+           "cleaning up temporary state.",
+           safe_str_client(onion_address));
+
+  /* Clear the timed_out flag on all remaining intro points for this HS. */
+  if (cache_entry != NULL) {
+    SMARTLIST_FOREACH(cache_entry->parsed->intro_nodes,
+                      rend_intro_point_t *, ip,
+                      ip->timed_out = 0; );
+  }
+
+  /* Remove the HS's entries in last_hid_serv_requests. */
+  purge_hid_serv_from_last_hid_serv_requests(onion_address);
+}
+
+/** Return a newly allocated extend_info_t* for a randomly chosen introduction
+ * point for the named hidden service.  Return NULL if all introduction points
+ * have been tried and failed.
+ */
+extend_info_t *
+rend_client_get_random_intro(const rend_data_t *rend_query)
+{
+  extend_info_t *result;
+  rend_cache_entry_t *entry;
+
+  if (rend_cache_lookup_entry(rend_query->onion_address, -1, &entry) < 1) {
+      log_warn(LD_REND,
+               "Query '%s' didn't have valid rend desc in cache. Failing.",
+               safe_str_client(rend_query->onion_address));
+    return NULL;
+  }
+
+  /* See if we can get a node that complies with ExcludeNodes */
+  if ((result = rend_client_get_random_intro_impl(entry, 1, 1)))
+    return result;
+  /* If not, and StrictNodes is not set, see if we can return any old node
+   */
+  if (!get_options()->StrictNodes)
+    return rend_client_get_random_intro_impl(entry, 0, 1);
+  return NULL;
+}
+
+/** As rend_client_get_random_intro, except assume that StrictNodes is set
+ * iff <b>strict</b> is true. If <b>warnings</b> is false, don't complain
+ * to the user when we're out of nodes, even if StrictNodes is true.
+ */
+static extend_info_t *
+rend_client_get_random_intro_impl(const rend_cache_entry_t *entry,
+                                  const int strict,
+                                  const int warnings)
+{
+  int i;
+
+  rend_intro_point_t *intro;
+  const or_options_t *options = get_options();
+  smartlist_t *usable_nodes;
+  int n_excluded = 0;
+
+  /* We'll keep a separate list of the usable nodes.  If this becomes empty,
+   * no nodes are usable.  */
+  usable_nodes = smartlist_new();
+  smartlist_add_all(usable_nodes, entry->parsed->intro_nodes);
+
+  /* Remove the intro points that have timed out during this HS
+   * connection attempt from our list of usable nodes. */
+  SMARTLIST_FOREACH(usable_nodes, rend_intro_point_t *, ip,
+                    if (ip->timed_out) {
+                      SMARTLIST_DEL_CURRENT(usable_nodes, ip);
+                    });
+
+ again:
+  if (smartlist_len(usable_nodes) == 0) {
+    if (n_excluded && get_options()->StrictNodes && warnings) {
+      /* We only want to warn if StrictNodes is really set. Otherwise
+       * we're just about to retry anyways.
+       */
+      log_warn(LD_REND, "All introduction points for hidden service are "
+               "at excluded relays, and StrictNodes is set. Skipping.");
+    }
+    smartlist_free(usable_nodes);
+    return NULL;
+  }
+
+  i = crypto_rand_int(smartlist_len(usable_nodes));
+  intro = smartlist_get(usable_nodes, i);
+  /* Do we need to look up the router or is the extend info complete? */
+  if (!intro->extend_info->onion_key) {
+    const node_t *node;
+    extend_info_t *new_extend_info;
+    if (tor_digest_is_zero(intro->extend_info->identity_digest))
+      node = node_get_by_hex_id(intro->extend_info->nickname);
+    else
+      node = node_get_by_id(intro->extend_info->identity_digest);
+    if (!node) {
+      log_info(LD_REND, "Unknown router with nickname '%s'; trying another.",
+               intro->extend_info->nickname);
+      smartlist_del(usable_nodes, i);
+      goto again;
+    }
+    new_extend_info = extend_info_from_node(node, 0);
+    if (!new_extend_info) {
+      log_info(LD_REND, "We don't have a descriptor for the intro-point relay "
+               "'%s'; trying another.",
+               extend_info_describe(intro->extend_info));
+      smartlist_del(usable_nodes, i);
+      goto again;
+    } else {
+      extend_info_free(intro->extend_info);
+      intro->extend_info = new_extend_info;
+    }
+    tor_assert(intro->extend_info != NULL);
+  }
+  /* Check if we should refuse to talk to this router. */
+  if (strict &&
+      routerset_contains_extendinfo(options->ExcludeNodes,
+                                    intro->extend_info)) {
+    n_excluded++;
+    smartlist_del(usable_nodes, i);
+    goto again;
+  }
+
+  smartlist_free(usable_nodes);
+  return extend_info_dup(intro->extend_info);
+}
+
+/** Return true iff any introduction points still listed in <b>entry</b> are
+ * usable. */
+int
+rend_client_any_intro_points_usable(const rend_cache_entry_t *entry)
+{
+  extend_info_t *extend_info =
+    rend_client_get_random_intro_impl(entry, get_options()->StrictNodes, 0);
+
+  int rv = (extend_info != NULL);
+
+  extend_info_free(extend_info);
+  return rv;
+}
+
+/** Client-side authorizations for hidden services; map of onion address to
+ * rend_service_authorization_t*. */
+static strmap_t *auth_hid_servs = NULL;
+
+/** Look up the client-side authorization for the hidden service with
+ * <b>onion_address</b>. Return NULL if no authorization is available for
+ * that address. */
+rend_service_authorization_t*
+rend_client_lookup_service_authorization(const char *onion_address)
+{
+  tor_assert(onion_address);
+  if (!auth_hid_servs) return NULL;
+  return strmap_get(auth_hid_servs, onion_address);
+}
+
+/** Helper: Free storage held by rend_service_authorization_t. */
+static void
+rend_service_authorization_free(rend_service_authorization_t *auth)
+{
+  tor_free(auth);
+}
+
+/** Helper for strmap_free. */
+static void
+rend_service_authorization_strmap_item_free(void *service_auth)
+{
+  rend_service_authorization_free(service_auth);
+}
+
+/** Release all the storage held in auth_hid_servs.
+ */
+void
+rend_service_authorization_free_all(void)
+{
+  if (!auth_hid_servs) {
+    return;
+  }
+  strmap_free(auth_hid_servs, rend_service_authorization_strmap_item_free);
+  auth_hid_servs = NULL;
+}
+
+/** Parse <b>config_line</b> as a client-side authorization for a hidden
+ * service and add it to the local map of hidden service authorizations.
+ * Return 0 for success and -1 for failure. */
+int
+rend_parse_service_authorization(const or_options_t *options,
+                                 int validate_only)
+{
+  config_line_t *line;
+  int res = -1;
+  strmap_t *parsed = strmap_new();
+  smartlist_t *sl = smartlist_new();
+  rend_service_authorization_t *auth = NULL;
+  char descriptor_cookie_tmp[REND_DESC_COOKIE_LEN+2];
+  char descriptor_cookie_base64ext[REND_DESC_COOKIE_LEN_BASE64+2+1];
+
+  for (line = options->HidServAuth; line; line = line->next) {
+    char *onion_address, *descriptor_cookie;
+    int auth_type_val = 0;
+    auth = NULL;
+    SMARTLIST_FOREACH(sl, char *, c, tor_free(c););
+    smartlist_clear(sl);
+    smartlist_split_string(sl, line->value, " ",
+                           SPLIT_SKIP_SPACE|SPLIT_IGNORE_BLANK, 3);
+    if (smartlist_len(sl) < 2) {
+      log_warn(LD_CONFIG, "Configuration line does not consist of "
+               "\"onion-address authorization-cookie [service-name]\": "
+               "'%s'", line->value);
+      goto err;
+    }
+    auth = tor_malloc_zero(sizeof(rend_service_authorization_t));
+    /* Parse onion address. */
+    onion_address = smartlist_get(sl, 0);
+    if (strlen(onion_address) != REND_SERVICE_ADDRESS_LEN ||
+        strcmpend(onion_address, ".onion")) {
+      log_warn(LD_CONFIG, "Onion address has wrong format: '%s'",
+               onion_address);
+      goto err;
+    }
+    strlcpy(auth->onion_address, onion_address, REND_SERVICE_ID_LEN_BASE32+1);
+    if (!rend_valid_service_id(auth->onion_address)) {
+      log_warn(LD_CONFIG, "Onion address has wrong format: '%s'",
+               onion_address);
+      goto err;
+    }
+    /* Parse descriptor cookie. */
+    descriptor_cookie = smartlist_get(sl, 1);
+    if (strlen(descriptor_cookie) != REND_DESC_COOKIE_LEN_BASE64) {
+      log_warn(LD_CONFIG, "Authorization cookie has wrong length: '%s'",
+               descriptor_cookie);
+      goto err;
+    }
+    /* Add trailing zero bytes (AA) to make base64-decoding happy. */
+    tor_snprintf(descriptor_cookie_base64ext,
+                 REND_DESC_COOKIE_LEN_BASE64+2+1,
+                 "%sAA", descriptor_cookie);
+    if (base64_decode(descriptor_cookie_tmp, sizeof(descriptor_cookie_tmp),
+                      descriptor_cookie_base64ext,
+                      strlen(descriptor_cookie_base64ext)) < 0) {
+      log_warn(LD_CONFIG, "Decoding authorization cookie failed: '%s'",
+               descriptor_cookie);
+      goto err;
+    }
+    auth_type_val = (((uint8_t)descriptor_cookie_tmp[16]) >> 4) + 1;
+    if (auth_type_val < 1 || auth_type_val > 2) {
+      log_warn(LD_CONFIG, "Authorization cookie has unknown authorization "
+                          "type encoded.");
+      goto err;
+    }
+    auth->auth_type = auth_type_val == 1 ? REND_BASIC_AUTH : REND_STEALTH_AUTH;
+    memcpy(auth->descriptor_cookie, descriptor_cookie_tmp,
+           REND_DESC_COOKIE_LEN);
+    if (strmap_get(parsed, auth->onion_address)) {
+      log_warn(LD_CONFIG, "Duplicate authorization for the same hidden "
+                          "service.");
+      goto err;
+    }
+    strmap_set(parsed, auth->onion_address, auth);
+    auth = NULL;
+ 
