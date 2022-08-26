@@ -813,4 +813,263 @@ rend_client_cancel_descriptor_fetches(void)
  *
  * If <b>failure_type</b> is INTRO_POINT_FAILURE_TIMEOUT, mark the
  * intro point as 'timed out'; it will not be retried until the
- * current hidden service connection attempt has ended or it 
+ * current hidden service connection attempt has ended or it has
+ * appeared in a newly fetched rendezvous descriptor.
+ *
+ * If <b>failure_type</b> is INTRO_POINT_FAILURE_UNREACHABLE,
+ * increment the intro point's reachability-failure count; if it has
+ * now failed MAX_INTRO_POINT_REACHABILITY_FAILURES or more times,
+ * remove the intro point from (our parsed copy of) the HS descriptor.
+ *
+ * Return -1 if error, 0 if no usable intro points remain or service
+ * unrecognized, 1 if recognized and some intro points remain.
+ */
+int
+rend_client_report_intro_point_failure(extend_info_t *failed_intro,
+                                       const rend_data_t *rend_query,
+                                       unsigned int failure_type)
+{
+  int i, r;
+  rend_cache_entry_t *ent;
+  connection_t *conn;
+
+  r = rend_cache_lookup_entry(rend_query->onion_address, -1, &ent);
+  if (r<0) {
+    log_warn(LD_BUG, "Malformed service ID %s.",
+             escaped_safe_str_client(rend_query->onion_address));
+    return -1;
+  }
+  if (r==0) {
+    log_info(LD_REND, "Unknown service %s. Re-fetching descriptor.",
+             escaped_safe_str_client(rend_query->onion_address));
+    rend_client_refetch_v2_renddesc(rend_query);
+    return 0;
+  }
+
+  for (i = 0; i < smartlist_len(ent->parsed->intro_nodes); i++) {
+    rend_intro_point_t *intro = smartlist_get(ent->parsed->intro_nodes, i);
+    if (tor_memeq(failed_intro->identity_digest,
+                intro->extend_info->identity_digest, DIGEST_LEN)) {
+      switch (failure_type) {
+      default:
+        log_warn(LD_BUG, "Unknown failure type %u. Removing intro point.",
+                 failure_type);
+        tor_fragile_assert();
+        /* fall through */
+      case INTRO_POINT_FAILURE_GENERIC:
+        rend_intro_point_free(intro);
+        smartlist_del(ent->parsed->intro_nodes, i);
+        break;
+      case INTRO_POINT_FAILURE_TIMEOUT:
+        intro->timed_out = 1;
+        break;
+      case INTRO_POINT_FAILURE_UNREACHABLE:
+        ++(intro->unreachable_count);
+        {
+          int zap_intro_point =
+            intro->unreachable_count >= MAX_INTRO_POINT_REACHABILITY_FAILURES;
+          log_info(LD_REND, "Failed to reach this intro point %u times.%s",
+                   intro->unreachable_count,
+                   zap_intro_point ? " Removing from descriptor.": "");
+          if (zap_intro_point) {
+            rend_intro_point_free(intro);
+            smartlist_del(ent->parsed->intro_nodes, i);
+          }
+        }
+        break;
+      }
+      break;
+    }
+  }
+
+  if (! rend_client_any_intro_points_usable(ent)) {
+    log_info(LD_REND,
+             "No more intro points remain for %s. Re-fetching descriptor.",
+             escaped_safe_str_client(rend_query->onion_address));
+    rend_client_refetch_v2_renddesc(rend_query);
+
+    /* move all pending streams back to renddesc_wait */
+    while ((conn = connection_get_by_type_state_rendquery(CONN_TYPE_AP,
+                                   AP_CONN_STATE_CIRCUIT_WAIT,
+                                   rend_query->onion_address))) {
+      conn->state = AP_CONN_STATE_RENDDESC_WAIT;
+    }
+
+    return 0;
+  }
+  log_info(LD_REND,"%d options left for %s.",
+           smartlist_len(ent->parsed->intro_nodes),
+           escaped_safe_str_client(rend_query->onion_address));
+  return 1;
+}
+
+/** Called when we receive a RENDEZVOUS_ESTABLISHED cell; changes the state of
+ * the circuit to C_REND_READY.
+ */
+int
+rend_client_rendezvous_acked(origin_circuit_t *circ, const uint8_t *request,
+                             size_t request_len)
+{
+  (void) request;
+  (void) request_len;
+  /* we just got an ack for our establish-rendezvous. switch purposes. */
+  if (circ->base_.purpose != CIRCUIT_PURPOSE_C_ESTABLISH_REND) {
+    log_warn(LD_PROTOCOL,"Got a rendezvous ack when we weren't expecting one. "
+             "Closing circ.");
+    circuit_mark_for_close(TO_CIRCUIT(circ), END_CIRC_REASON_TORPROTOCOL);
+    return -1;
+  }
+  log_info(LD_REND,"Got rendezvous ack. This circuit is now ready for "
+           "rendezvous.");
+  circuit_change_purpose(TO_CIRCUIT(circ), CIRCUIT_PURPOSE_C_REND_READY);
+  /* Set timestamp_dirty, because circuit_expire_building expects it
+   * to specify when a circuit entered the _C_REND_READY state. */
+  circ->base_.timestamp_dirty = time(NULL);
+
+  /* From a path bias point of view, this circuit is now successfully used.
+   * Waiting any longer opens us up to attacks from Bob. He could induce
+   * Alice to attempt to connect to his hidden service and never reply
+   * to her rend requests */
+  pathbias_mark_use_success(circ);
+
+  /* XXXX This is a pretty brute-force approach. It'd be better to
+   * attach only the connections that are waiting on this circuit, rather
+   * than trying to attach them all. See comments bug 743. */
+  /* If we already have the introduction circuit built, make sure we send
+   * the INTRODUCE cell _now_ */
+  connection_ap_attach_pending();
+  return 0;
+}
+
+/** Bob sent us a rendezvous cell; join the circuits. */
+int
+rend_client_receive_rendezvous(origin_circuit_t *circ, const uint8_t *request,
+                               size_t request_len)
+{
+  crypt_path_t *hop;
+  char keys[DIGEST_LEN+CPATH_KEY_MATERIAL_LEN];
+
+  if ((circ->base_.purpose != CIRCUIT_PURPOSE_C_REND_READY &&
+       circ->base_.purpose != CIRCUIT_PURPOSE_C_REND_READY_INTRO_ACKED)
+      || !circ->build_state->pending_final_cpath) {
+    log_warn(LD_PROTOCOL,"Got rendezvous2 cell from hidden service, but not "
+             "expecting it. Closing.");
+    circuit_mark_for_close(TO_CIRCUIT(circ), END_CIRC_REASON_TORPROTOCOL);
+    return -1;
+  }
+
+  if (request_len != DH_KEY_LEN+DIGEST_LEN) {
+    log_warn(LD_PROTOCOL,"Incorrect length (%d) on RENDEZVOUS2 cell.",
+             (int)request_len);
+    goto err;
+  }
+
+  log_info(LD_REND,"Got RENDEZVOUS2 cell from hidden service.");
+
+  /* first DH_KEY_LEN bytes are g^y from bob. Finish the dh handshake...*/
+  tor_assert(circ->build_state);
+  tor_assert(circ->build_state->pending_final_cpath);
+  hop = circ->build_state->pending_final_cpath;
+  tor_assert(hop->rend_dh_handshake_state);
+  if (crypto_dh_compute_secret(LOG_PROTOCOL_WARN,
+                               hop->rend_dh_handshake_state, (char*)request,
+                               DH_KEY_LEN,
+                               keys, DIGEST_LEN+CPATH_KEY_MATERIAL_LEN)<0) {
+    log_warn(LD_GENERAL, "Couldn't complete DH handshake.");
+    goto err;
+  }
+  /* ... and set up cpath. */
+  if (circuit_init_cpath_crypto(hop, keys+DIGEST_LEN, 0)<0)
+    goto err;
+
+  /* Check whether the digest is right... */
+  if (tor_memneq(keys, request+DH_KEY_LEN, DIGEST_LEN)) {
+    log_warn(LD_PROTOCOL, "Incorrect digest of key material.");
+    goto err;
+  }
+
+  crypto_dh_free(hop->rend_dh_handshake_state);
+  hop->rend_dh_handshake_state = NULL;
+
+  /* All is well. Extend the circuit. */
+  circuit_change_purpose(TO_CIRCUIT(circ), CIRCUIT_PURPOSE_C_REND_JOINED);
+  hop->state = CPATH_STATE_OPEN;
+  /* set the windows to default. these are the windows
+   * that alice thinks bob has.
+   */
+  hop->package_window = circuit_initial_package_window();
+  hop->deliver_window = CIRCWINDOW_START;
+
+  /* Now that this circuit has finished connecting to its destination,
+   * make sure circuit_get_open_circ_or_launch is willing to return it
+   * so we can actually use it. */
+  circ->hs_circ_has_timed_out = 0;
+
+  onion_append_to_cpath(&circ->cpath, hop);
+  circ->build_state->pending_final_cpath = NULL; /* prevent double-free */
+
+  circuit_try_attaching_streams(circ);
+
+  memwipe(keys, 0, sizeof(keys));
+  return 0;
+ err:
+  memwipe(keys, 0, sizeof(keys));
+  circuit_mark_for_close(TO_CIRCUIT(circ), END_CIRC_REASON_TORPROTOCOL);
+  return -1;
+}
+
+/** Find all the apconns in state AP_CONN_STATE_RENDDESC_WAIT that are
+ * waiting on <b>query</b>. If there's a working cache entry here with at
+ * least one intro point, move them to the next state. */
+void
+rend_client_desc_trynow(const char *query)
+{
+  entry_connection_t *conn;
+  rend_cache_entry_t *entry;
+  const rend_data_t *rend_data;
+  time_t now = time(NULL);
+
+  smartlist_t *conns = get_connection_array();
+  SMARTLIST_FOREACH_BEGIN(conns, connection_t *, base_conn) {
+    if (base_conn->type != CONN_TYPE_AP ||
+        base_conn->state != AP_CONN_STATE_RENDDESC_WAIT ||
+        base_conn->marked_for_close)
+      continue;
+    conn = TO_ENTRY_CONN(base_conn);
+    rend_data = ENTRY_TO_EDGE_CONN(conn)->rend_data;
+    if (!rend_data)
+      continue;
+    if (rend_cmp_service_ids(query, rend_data->onion_address))
+      continue;
+    assert_connection_ok(base_conn, now);
+    if (rend_cache_lookup_entry(rend_data->onion_address, -1,
+                                &entry) == 1 &&
+        rend_client_any_intro_points_usable(entry)) {
+      /* either this fetch worked, or it failed but there was a
+       * valid entry from before which we should reuse */
+      log_info(LD_REND,"Rend desc is usable. Launching circuits.");
+      base_conn->state = AP_CONN_STATE_CIRCUIT_WAIT;
+
+      /* restart their timeout values, so they get a fair shake at
+       * connecting to the hidden service. */
+      base_conn->timestamp_created = now;
+      base_conn->timestamp_lastread = now;
+      base_conn->timestamp_lastwritten = now;
+
+      if (connection_ap_handshake_attach_circuit(conn) < 0) {
+        /* it will never work */
+        log_warn(LD_REND,"Rendezvous attempt failed. Closing.");
+        if (!base_conn->marked_for_close)
+          connection_mark_unattached_ap(conn, END_STREAM_REASON_CANT_ATTACH);
+      }
+    } else { /* 404, or fetch didn't get that far */
+      log_notice(LD_REND,"Closing stream for '%s.onion': hidden service is "
+                 "unavailable (try again later).",
+                 safe_str_client(query));
+      connection_mark_unattached_ap(conn, END_STREAM_REASON_RESOLVEFAILED);
+      rend_client_note_connection_attempt_ended(query);
+    }
+  } SMARTLIST_FOREACH_END(base_conn);
+}
+
+/** Clea
