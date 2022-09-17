@@ -845,4 +845,258 @@ rend_service_load_auth_keys(rend_service_t *s, const char *hfname)
                            "client-name %s\ndescriptor-cookie %s\n",
                            client->client_name, desc_cook_out);
     if (written < 0) {
-  
+      log_warn(LD_BUG, "Could not write client entry.");
+      goto err;
+    }
+    if (client->client_key) {
+      char *client_key_out = NULL;
+      if (crypto_pk_write_private_key_to_string(client->client_key,
+                                                &client_key_out, &len) != 0) {
+        log_warn(LD_BUG, "Internal error: "
+                 "crypto_pk_write_private_key_to_string() failed.");
+        goto err;
+      }
+      if (rend_get_service_id(client->client_key, service_id)<0) {
+        log_warn(LD_BUG, "Internal error: couldn't encode service ID.");
+        /*
+         * len is string length, not buffer length, but last byte is NUL
+         * anyway.
+         */
+        memwipe(client_key_out, 0, len);
+        tor_free(client_key_out);
+        goto err;
+      }
+      written = tor_snprintf(buf + written, sizeof(buf) - written,
+                             "client-key\n%s", client_key_out);
+      memwipe(client_key_out, 0, len);
+      tor_free(client_key_out);
+      if (written < 0) {
+        log_warn(LD_BUG, "Could not write client entry.");
+        goto err;
+      }
+    }
+
+    if (fputs(buf, cfile) < 0) {
+      log_warn(LD_FS, "Could not append client entry to file: %s",
+               strerror(errno));
+      goto err;
+    }
+
+    /* Add line to hostname file. */
+    if (s->auth_type == REND_BASIC_AUTH) {
+      /* Remove == signs (newline has been removed above). */
+      desc_cook_out[strlen(desc_cook_out)-2] = '\0';
+      tor_snprintf(buf, sizeof(buf),"%s.onion %s # client: %s\n",
+                   s->service_id, desc_cook_out, client->client_name);
+    } else {
+      memcpy(extended_desc_cookie, client->descriptor_cookie,
+             REND_DESC_COOKIE_LEN);
+      extended_desc_cookie[REND_DESC_COOKIE_LEN] =
+        ((int)s->auth_type - 1) << 4;
+      if (base64_encode(desc_cook_out, 3*REND_DESC_COOKIE_LEN_BASE64+1,
+                        extended_desc_cookie,
+                        REND_DESC_COOKIE_LEN+1) < 0) {
+        log_warn(LD_BUG, "Could not base64-encode descriptor cookie.");
+        goto err;
+      }
+      desc_cook_out[strlen(desc_cook_out)-3] = '\0'; /* Remove A= and
+                                                        newline. */
+      tor_snprintf(buf, sizeof(buf),"%s.onion %s # client: %s\n",
+                   service_id, desc_cook_out, client->client_name);
+    }
+
+    if (fputs(buf, hfile)<0) {
+      log_warn(LD_FS, "Could not append host entry to file: %s",
+               strerror(errno));
+      goto err;
+    }
+  } SMARTLIST_FOREACH_END(client);
+
+  finish_writing_to_file(open_cfile);
+  finish_writing_to_file(open_hfile);
+
+  goto done;
+ err:
+  r = -1;
+  if (open_cfile)
+    abort_writing_to_file(open_cfile);
+  if (open_hfile)
+    abort_writing_to_file(open_hfile);
+ done:
+  if (client_keys_str) {
+    tor_strclear(client_keys_str);
+    tor_free(client_keys_str);
+  }
+  strmap_free(parsed_clients, rend_authorized_client_strmap_item_free);
+
+  memwipe(cfname, 0, sizeof(cfname));
+
+  /* Clear stack buffers that held key-derived material. */
+  memwipe(buf, 0, sizeof(buf));
+  memwipe(desc_cook_out, 0, sizeof(desc_cook_out));
+  memwipe(service_id, 0, sizeof(service_id));
+  memwipe(extended_desc_cookie, 0, sizeof(extended_desc_cookie));
+
+  return r;
+}
+
+/** Return the service whose public key has a digest of <b>digest</b>, or
+ * NULL if no such service exists.
+ */
+static rend_service_t *
+rend_service_get_by_pk_digest(const char* digest)
+{
+  SMARTLIST_FOREACH(rend_service_list, rend_service_t*, s,
+                    if (tor_memeq(s->pk_digest,digest,DIGEST_LEN))
+                        return s);
+  return NULL;
+}
+
+/** Return 1 if any virtual port in <b>service</b> wants a circuit
+ * to have good uptime. Else return 0.
+ */
+static int
+rend_service_requires_uptime(rend_service_t *service)
+{
+  int i;
+  rend_service_port_config_t *p;
+
+  for (i=0; i < smartlist_len(service->ports); ++i) {
+    p = smartlist_get(service->ports, i);
+    if (smartlist_contains_int_as_string(get_options()->LongLivedPorts,
+                                  p->virtual_port))
+      return 1;
+  }
+  return 0;
+}
+
+/** Check client authorization of a given <b>descriptor_cookie</b> for
+ * <b>service</b>. Return 1 for success and 0 for failure. */
+static int
+rend_check_authorization(rend_service_t *service,
+                         const char *descriptor_cookie)
+{
+  rend_authorized_client_t *auth_client = NULL;
+  tor_assert(service);
+  tor_assert(descriptor_cookie);
+  if (!service->clients) {
+    log_warn(LD_BUG, "Can't check authorization for a service that has no "
+                     "authorized clients configured.");
+    return 0;
+  }
+
+  /* Look up client authorization by descriptor cookie. */
+  SMARTLIST_FOREACH(service->clients, rend_authorized_client_t *, client, {
+    if (tor_memeq(client->descriptor_cookie, descriptor_cookie,
+                REND_DESC_COOKIE_LEN)) {
+      auth_client = client;
+      break;
+    }
+  });
+  if (!auth_client) {
+    char descriptor_cookie_base64[3*REND_DESC_COOKIE_LEN_BASE64];
+    base64_encode(descriptor_cookie_base64, sizeof(descriptor_cookie_base64),
+                  descriptor_cookie, REND_DESC_COOKIE_LEN);
+    log_info(LD_REND, "No authorization found for descriptor cookie '%s'! "
+                      "Dropping cell!",
+             descriptor_cookie_base64);
+    return 0;
+  }
+
+  /* Allow the request. */
+  log_debug(LD_REND, "Client %s authorized for service %s.",
+            auth_client->client_name, service->service_id);
+  return 1;
+}
+
+/** Called when <b>intro</b> will soon be removed from
+ * <b>service</b>'s list of intro points. */
+static void
+rend_service_note_removing_intro_point(rend_service_t *service,
+                                       rend_intro_point_t *intro)
+{
+  time_t now = time(NULL);
+
+  /* Don't process an intro point twice here. */
+  if (intro->rend_service_note_removing_intro_point_called) {
+    return;
+  } else {
+    intro->rend_service_note_removing_intro_point_called = 1;
+  }
+
+  /* Update service->n_intro_points_wanted based on how long intro
+   * lasted and how many introductions it handled. */
+  if (intro->time_published == -1) {
+    /* This intro point was never used.  Don't change
+     * n_intro_points_wanted. */
+  } else {
+    /* We want to increase the number of introduction points service
+     * operates if intro was heavily used, or decrease the number of
+     * intro points if intro was lightly used.
+     *
+     * We consider an intro point's target 'usage' to be
+     * INTRO_POINT_LIFETIME_INTRODUCTIONS introductions in
+     * INTRO_POINT_LIFETIME_MIN_SECONDS seconds.  To calculate intro's
+     * fraction of target usage, we divide the fraction of
+     * _LIFETIME_INTRODUCTIONS introductions that it has handled by
+     * the fraction of _LIFETIME_MIN_SECONDS for which it existed.
+     *
+     * Then we multiply that fraction of desired usage by a fudge
+     * factor of 1.5, to decide how many new introduction points
+     * should ideally replace intro (which is now closed or soon to be
+     * closed).  In theory, assuming that introduction load is
+     * distributed equally across all intro points and ignoring the
+     * fact that different intro points are established and closed at
+     * different times, that number of intro points should bring all
+     * of our intro points exactly to our target usage.
+     *
+     * Then we clamp that number to a number of intro points we might
+     * be willing to replace this intro point with and turn it into an
+     * integer. then we clamp it again to the number of new intro
+     * points we could establish now, then we adjust
+     * service->n_intro_points_wanted and let rend_services_introduce
+     * create the new intro points we want (if any).
+     */
+    const double intro_point_usage =
+      intro_point_accepted_intro_count(intro) /
+      (double)(now - intro->time_published);
+    const double intro_point_target_usage =
+      INTRO_POINT_LIFETIME_INTRODUCTIONS /
+      (double)INTRO_POINT_LIFETIME_MIN_SECONDS;
+    const double fractional_n_intro_points_wanted_to_replace_this_one =
+      (1.5 * (intro_point_usage / intro_point_target_usage));
+    unsigned int n_intro_points_wanted_to_replace_this_one;
+    unsigned int n_intro_points_wanted_now;
+    unsigned int n_intro_points_really_wanted_now;
+    int n_intro_points_really_replacing_this_one;
+
+    if (fractional_n_intro_points_wanted_to_replace_this_one >
+        NUM_INTRO_POINTS_MAX) {
+      n_intro_points_wanted_to_replace_this_one = NUM_INTRO_POINTS_MAX;
+    } else if (fractional_n_intro_points_wanted_to_replace_this_one < 0) {
+      n_intro_points_wanted_to_replace_this_one = 0;
+    } else {
+      n_intro_points_wanted_to_replace_this_one = (unsigned)
+        fractional_n_intro_points_wanted_to_replace_this_one;
+    }
+
+    n_intro_points_wanted_now =
+      service->n_intro_points_wanted +
+      n_intro_points_wanted_to_replace_this_one - 1;
+
+    if (n_intro_points_wanted_now < NUM_INTRO_POINTS_DEFAULT) {
+      /* XXXX This should be NUM_INTRO_POINTS_MIN instead.  Perhaps
+       * another use of NUM_INTRO_POINTS_DEFAULT should be, too. */
+      n_intro_points_really_wanted_now = NUM_INTRO_POINTS_DEFAULT;
+    } else if (n_intro_points_wanted_now > NUM_INTRO_POINTS_MAX) {
+      n_intro_points_really_wanted_now = NUM_INTRO_POINTS_MAX;
+    } else {
+      n_intro_points_really_wanted_now = n_intro_points_wanted_now;
+    }
+
+    n_intro_points_really_replacing_this_one =
+      n_intro_points_really_wanted_now - service->n_intro_points_wanted + 1;
+
+    log_info(LD_REND, "Replacing closing intro point for service %s "
+             "with %d new intro points (wanted %g replacements); "
+ 
