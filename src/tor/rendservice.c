@@ -572,4 +572,277 @@ rend_config_services(const or_options_t *options, int validate_only)
     /* Close introduction circuits of services we don't serve anymore. */
     /* XXXX it would be nicer if we had a nicer abstraction to use here,
      * so we could just iterate over the list of services to close, but
-     
+     * once again, this isn't critical-path code. */
+    TOR_LIST_FOREACH(circ, circuit_get_global_list(), head) {
+      if (!circ->marked_for_close &&
+          circ->state == CIRCUIT_STATE_OPEN &&
+          (circ->purpose == CIRCUIT_PURPOSE_S_ESTABLISH_INTRO ||
+           circ->purpose == CIRCUIT_PURPOSE_S_INTRO)) {
+        origin_circuit_t *oc = TO_ORIGIN_CIRCUIT(circ);
+        int keep_it = 0;
+        tor_assert(oc->rend_data);
+        SMARTLIST_FOREACH(surviving_services, rend_service_t *, ptr, {
+          if (tor_memeq(ptr->pk_digest, oc->rend_data->rend_pk_digest,
+                      DIGEST_LEN)) {
+            keep_it = 1;
+            break;
+          }
+        });
+        if (keep_it)
+          continue;
+        log_info(LD_REND, "Closing intro point %s for service %s.",
+                 safe_str_client(extend_info_describe(
+                                            oc->build_state->chosen_exit)),
+                 oc->rend_data->onion_address);
+        circuit_mark_for_close(circ, END_CIRC_REASON_FINISHED);
+        /* XXXX Is there another reason we should use here? */
+      }
+    }
+    smartlist_free(surviving_services);
+    SMARTLIST_FOREACH(old_service_list, rend_service_t *, ptr,
+                      rend_service_free(ptr));
+    smartlist_free(old_service_list);
+  }
+
+  return 0;
+}
+
+/** Replace the old value of <b>service</b>-\>desc with one that reflects
+ * the other fields in service.
+ */
+static void
+rend_service_update_descriptor(rend_service_t *service)
+{
+  rend_service_descriptor_t *d;
+  origin_circuit_t *circ;
+  int i;
+
+  rend_service_descriptor_free(service->desc);
+  service->desc = NULL;
+
+  d = service->desc = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  d->pk = crypto_pk_dup_key(service->private_key);
+  d->timestamp = time(NULL);
+  d->timestamp -= d->timestamp % 3600; /* Round down to nearest hour */
+  d->intro_nodes = smartlist_new();
+  /* Support intro protocols 2 and 3. */
+  d->protocols = (1 << 2) + (1 << 3);
+
+  for (i = 0; i < smartlist_len(service->intro_nodes); ++i) {
+    rend_intro_point_t *intro_svc = smartlist_get(service->intro_nodes, i);
+    rend_intro_point_t *intro_desc;
+
+    /* This intro point won't be listed in the descriptor... */
+    intro_svc->listed_in_last_desc = 0;
+
+    if (intro_svc->time_expiring != -1) {
+      /* This intro point is expiring.  Don't list it. */
+      continue;
+    }
+
+    circ = find_intro_circuit(intro_svc, service->pk_digest);
+    if (!circ || circ->base_.purpose != CIRCUIT_PURPOSE_S_INTRO) {
+      /* This intro point's circuit isn't finished yet.  Don't list it. */
+      continue;
+    }
+
+    /* ...unless this intro point is listed in the descriptor. */
+    intro_svc->listed_in_last_desc = 1;
+
+    /* We have an entirely established intro circuit.  Publish it in
+     * our descriptor. */
+    intro_desc = tor_malloc_zero(sizeof(rend_intro_point_t));
+    intro_desc->extend_info = extend_info_dup(intro_svc->extend_info);
+    if (intro_svc->intro_key)
+      intro_desc->intro_key = crypto_pk_dup_key(intro_svc->intro_key);
+    smartlist_add(d->intro_nodes, intro_desc);
+
+    if (intro_svc->time_published == -1) {
+      /* We are publishing this intro point in a descriptor for the
+       * first time -- note the current time in the service's copy of
+       * the intro point. */
+      intro_svc->time_published = time(NULL);
+    }
+  }
+}
+
+/** Load and/or generate private keys for all hidden services, possibly
+ * including keys for client authorization.  Return 0 on success, -1 on
+ * failure. */
+int
+rend_service_load_all_keys(void)
+{
+  SMARTLIST_FOREACH_BEGIN(rend_service_list, rend_service_t *, s) {
+    if (s->private_key)
+      continue;
+    log_info(LD_REND, "Loading hidden-service keys from \"%s\"",
+             s->directory);
+
+    if (rend_service_load_keys(s) < 0)
+      return -1;
+  } SMARTLIST_FOREACH_END(s);
+
+  return 0;
+}
+
+/** Load and/or generate private keys for the hidden service <b>s</b>,
+ * possibly including keys for client authorization.  Return 0 on success, -1
+ * on failure. */
+static int
+rend_service_load_keys(rend_service_t *s)
+{
+  char fname[512];
+  char buf[128];
+
+  /* Check/create directory */
+  if (check_private_dir(s->directory, CPD_CREATE, get_options()->User) < 0)
+    return -1;
+
+  /* Load key */
+  if (strlcpy(fname,s->directory,sizeof(fname)) >= sizeof(fname) ||
+      strlcat(fname,PATH_SEPARATOR"private_key",sizeof(fname))
+         >= sizeof(fname)) {
+    log_warn(LD_CONFIG, "Directory name too long to store key file: \"%s\".",
+             s->directory);
+    return -1;
+  }
+  s->private_key = init_key_from_file(fname, 1, LOG_ERR);
+  if (!s->private_key)
+    return -1;
+
+  /* Create service file */
+  if (rend_get_service_id(s->private_key, s->service_id)<0) {
+    log_warn(LD_BUG, "Internal error: couldn't encode service ID.");
+    return -1;
+  }
+  if (crypto_pk_get_digest(s->private_key, s->pk_digest)<0) {
+    log_warn(LD_BUG, "Couldn't compute hash of public key.");
+    return -1;
+  }
+  if (strlcpy(fname,s->directory,sizeof(fname)) >= sizeof(fname) ||
+      strlcat(fname,PATH_SEPARATOR"hostname",sizeof(fname))
+      >= sizeof(fname)) {
+    log_warn(LD_CONFIG, "Directory name too long to store hostname file:"
+             " \"%s\".", s->directory);
+    return -1;
+  }
+
+  tor_snprintf(buf, sizeof(buf),"%s.onion\n", s->service_id);
+  if (write_str_to_file(fname,buf,0)<0) {
+    log_warn(LD_CONFIG, "Could not write onion address to hostname file.");
+    memwipe(buf, 0, sizeof(buf));
+    return -1;
+  }
+  set_initialized();
+  memwipe(buf, 0, sizeof(buf));
+
+  /* If client authorization is configured, load or generate keys. */
+  if (s->auth_type != REND_NO_AUTH) {
+    if (rend_service_load_auth_keys(s, fname) < 0)
+      return -1;
+  }
+
+  return 0;
+}
+
+/** Load and/or generate client authorization keys for the hidden service
+ * <b>s</b>, which stores its hostname in <b>hfname</b>.  Return 0 on success,
+ * -1 on failure. */
+static int
+rend_service_load_auth_keys(rend_service_t *s, const char *hfname)
+{
+  int r = 0;
+  char cfname[512];
+  char *client_keys_str = NULL;
+  strmap_t *parsed_clients = strmap_new();
+  FILE *cfile, *hfile;
+  open_file_t *open_cfile = NULL, *open_hfile = NULL;
+  char extended_desc_cookie[REND_DESC_COOKIE_LEN+1];
+  char desc_cook_out[3*REND_DESC_COOKIE_LEN_BASE64+1];
+  char service_id[16+1];
+  char buf[1500];
+
+  /* Load client keys and descriptor cookies, if available. */
+  if (tor_snprintf(cfname, sizeof(cfname), "%s"PATH_SEPARATOR"client_keys",
+                   s->directory)<0) {
+    log_warn(LD_CONFIG, "Directory name too long to store client keys "
+             "file: \"%s\".", s->directory);
+    goto err;
+  }
+  client_keys_str = read_file_to_str(cfname, RFTS_IGNORE_MISSING, NULL);
+  if (client_keys_str) {
+    if (rend_parse_client_keys(parsed_clients, client_keys_str) < 0) {
+      log_warn(LD_CONFIG, "Previously stored client_keys file could not "
+               "be parsed.");
+      goto err;
+    } else {
+      log_info(LD_CONFIG, "Parsed %d previously stored client entries.",
+               strmap_size(parsed_clients));
+    }
+  }
+
+  /* Prepare client_keys and hostname files. */
+  if (!(cfile = start_writing_to_stdio_file(cfname,
+                                            OPEN_FLAGS_REPLACE | O_TEXT,
+                                            0600, &open_cfile))) {
+    log_warn(LD_CONFIG, "Could not open client_keys file %s",
+             escaped(cfname));
+    goto err;
+  }
+
+  if (!(hfile = start_writing_to_stdio_file(hfname,
+                                            OPEN_FLAGS_REPLACE | O_TEXT,
+                                            0600, &open_hfile))) {
+    log_warn(LD_CONFIG, "Could not open hostname file %s", escaped(hfname));
+    goto err;
+  }
+
+  /* Either use loaded keys for configured clients or generate new
+   * ones if a client is new. */
+  SMARTLIST_FOREACH_BEGIN(s->clients, rend_authorized_client_t *, client) {
+    rend_authorized_client_t *parsed =
+      strmap_get(parsed_clients, client->client_name);
+    int written;
+    size_t len;
+    /* Copy descriptor cookie from parsed entry or create new one. */
+    if (parsed) {
+      memcpy(client->descriptor_cookie, parsed->descriptor_cookie,
+             REND_DESC_COOKIE_LEN);
+    } else {
+      crypto_rand(client->descriptor_cookie, REND_DESC_COOKIE_LEN);
+    }
+    if (base64_encode(desc_cook_out, 3*REND_DESC_COOKIE_LEN_BASE64+1,
+                      client->descriptor_cookie,
+                      REND_DESC_COOKIE_LEN) < 0) {
+      log_warn(LD_BUG, "Could not base64-encode descriptor cookie.");
+      goto err;
+    }
+    /* Copy client key from parsed entry or create new one if required. */
+    if (parsed && parsed->client_key) {
+      client->client_key = crypto_pk_dup_key(parsed->client_key);
+    } else if (s->auth_type == REND_STEALTH_AUTH) {
+      /* Create private key for client. */
+      crypto_pk_t *prkey = NULL;
+      if (!(prkey = crypto_pk_new())) {
+        log_warn(LD_BUG,"Error constructing client key");
+        goto err;
+      }
+      if (crypto_pk_generate_key(prkey)) {
+        log_warn(LD_BUG,"Error generating client key");
+        crypto_pk_free(prkey);
+        goto err;
+      }
+      if (crypto_pk_check_key(prkey) <= 0) {
+        log_warn(LD_BUG,"Generated client key seems invalid");
+        crypto_pk_free(prkey);
+        goto err;
+      }
+      client->client_key = prkey;
+    }
+    /* Add entry to client_keys file. */
+    desc_cook_out[strlen(desc_cook_out)-1] = '\0'; /* Remove newline. */
+    written = tor_snprintf(buf, sizeof(buf),
+                           "client-name %s\ndescriptor-cookie %s\n",
+                           client->client_name, desc_cook_out);
+    if (written < 0) {
+  
