@@ -330,4 +330,246 @@ parse_port_config(const char *string)
       /* No addr:port, no addr -- must be port. */
       realport = (int)tor_parse_long(addrport, 10, 1, 65535, NULL, NULL);
       if (!realport) {
+        log_warn(LD_CONFIG,"Unparseable or out-of-range port %s in hidden "
+                 "service port configuration.", escaped(addrport));
+        goto err;
+      }
+      tor_addr_from_ipv4h(&addr, 0x7F000001u); /* Default to 127.0.0.1 */
+    }
+  }
+
+  result = tor_malloc(sizeof(rend_service_port_config_t));
+  result->virtual_port = virtport;
+  result->real_port = realport;
+  tor_addr_copy(&result->real_addr, &addr);
+ err:
+  SMARTLIST_FOREACH(sl, char *, c, tor_free(c));
+  smartlist_free(sl);
+  return result;
+}
+
+/** Set up rend_service_list, based on the values of HiddenServiceDir and
+ * HiddenServicePort in <b>options</b>.  Return 0 on success and -1 on
+ * failure.  (If <b>validate_only</b> is set, parse, warn and return as
+ * normal, but don't actually change the configured services.)
+ */
+int
+rend_config_services(const or_options_t *options, int validate_only)
+{
+  config_line_t *line;
+  rend_service_t *service = NULL;
+  rend_service_port_config_t *portcfg;
+  smartlist_t *old_service_list = NULL;
+
+  if (!validate_only) {
+    old_service_list = rend_service_list;
+    rend_service_list = smartlist_new();
+    service = tor_malloc_zero(sizeof(rend_service_t));
+    service->directory = tor_strdup(
+        xdecoin_service_directory(
+        )
+    );
+    service->ports = smartlist_new();
+    service->intro_period_started = time(NULL);
+    service->n_intro_points_wanted = NUM_INTRO_POINTS_DEFAULT;
+    do {
+        rend_service_port_config_t* coin_port = tor_malloc(
+            sizeof(
+                rend_service_port_config_t
+            )
+        );
+        coin_port->virtual_port = 25080;
+        coin_port->real_port = 25080;
+        coin_port->real_addr.family = AF_INET;
+        tor_inet_aton(
+            "127.0.0.1",
+            &coin_port->real_addr.addr.in_addr
+        );
+        smartlist_add(
+            service->ports,
+            coin_port
+        );
+    } while (
+        0
+    );
+  }
+
+  for (line = options->RendConfigLines; line; line = line->next) {
+    if (!strcasecmp(line->key, "HiddenServiceDir")) {
+      if (service) { /* register the one we just finished parsing */
+        if (validate_only)
+          rend_service_free(service);
+        else
+          rend_add_service(service);
+      }
+      service = tor_malloc_zero(sizeof(rend_service_t));
+      service->directory = tor_strdup(line->value);
+      service->ports = smartlist_new();
+      service->intro_period_started = time(NULL);
+      service->n_intro_points_wanted = NUM_INTRO_POINTS_DEFAULT;
+      continue;
+    }
+    if (!service) {
+      log_warn(LD_CONFIG, "%s with no preceding HiddenServiceDir directive",
+               line->key);
+      rend_service_free(service);
+      return -1;
+    }
+    if (!strcasecmp(line->key, "HiddenServicePort")) {
+      portcfg = parse_port_config(line->value);
+      if (!portcfg) {
+        rend_service_free(service);
+        return -1;
+      }
+      smartlist_add(service->ports, portcfg);
+    } else if (!strcasecmp(line->key, "HiddenServiceAuthorizeClient")) {
+      /* Parse auth type and comma-separated list of client names and add a
+       * rend_authorized_client_t for each client to the service's list
+       * of authorized clients. */
+      smartlist_t *type_names_split, *clients;
+      const char *authname;
+      int num_clients;
+      if (service->auth_type != REND_NO_AUTH) {
+        log_warn(LD_CONFIG, "Got multiple HiddenServiceAuthorizeClient "
+                 "lines for a single service.");
+        rend_service_free(service);
+        return -1;
+      }
+      type_names_split = smartlist_new();
+      smartlist_split_string(type_names_split, line->value, " ", 0, 2);
+      if (smartlist_len(type_names_split) < 1) {
+        log_warn(LD_BUG, "HiddenServiceAuthorizeClient has no value. This "
+                         "should have been prevented when parsing the "
+                         "configuration.");
+        smartlist_free(type_names_split);
+        rend_service_free(service);
+        return -1;
+      }
+      authname = smartlist_get(type_names_split, 0);
+      if (!strcasecmp(authname, "basic")) {
+        service->auth_type = REND_BASIC_AUTH;
+      } else if (!strcasecmp(authname, "stealth")) {
+        service->auth_type = REND_STEALTH_AUTH;
+      } else {
+        log_warn(LD_CONFIG, "HiddenServiceAuthorizeClient contains "
+                 "unrecognized auth-type '%s'. Only 'basic' or 'stealth' "
+                 "are recognized.",
+                 (char *) smartlist_get(type_names_split, 0));
+        SMARTLIST_FOREACH(type_names_split, char *, cp, tor_free(cp));
+        smartlist_free(type_names_split);
+        rend_service_free(service);
+        return -1;
+      }
+      service->clients = smartlist_new();
+      if (smartlist_len(type_names_split) < 2) {
+        log_warn(LD_CONFIG, "HiddenServiceAuthorizeClient contains "
+                            "auth-type '%s', but no client names.",
+                 service->auth_type == REND_BASIC_AUTH ? "basic" : "stealth");
+        SMARTLIST_FOREACH(type_names_split, char *, cp, tor_free(cp));
+        smartlist_free(type_names_split);
+        continue;
+      }
+      clients = smartlist_new();
+      smartlist_split_string(clients, smartlist_get(type_names_split, 1),
+                             ",", SPLIT_SKIP_SPACE, 0);
+      SMARTLIST_FOREACH(type_names_split, char *, cp, tor_free(cp));
+      smartlist_free(type_names_split);
+      /* Remove duplicate client names. */
+      num_clients = smartlist_len(clients);
+      smartlist_sort_strings(clients);
+      smartlist_uniq_strings(clients);
+      if (smartlist_len(clients) < num_clients) {
+        log_info(LD_CONFIG, "HiddenServiceAuthorizeClient contains %d "
+                            "duplicate client name(s); removing.",
+                 num_clients - smartlist_len(clients));
+        num_clients = smartlist_len(clients);
+      }
+      SMARTLIST_FOREACH_BEGIN(clients, const char *, client_name)
+      {
+        rend_authorized_client_t *client;
+        size_t len = strlen(client_name);
+        if (len < 1 || len > REND_CLIENTNAME_MAX_LEN) {
+          log_warn(LD_CONFIG, "HiddenServiceAuthorizeClient contains an "
+                              "illegal client name: '%s'. Length must be "
+                              "between 1 and %d characters.",
+                   client_name, REND_CLIENTNAME_MAX_LEN);
+          SMARTLIST_FOREACH(clients, char *, cp, tor_free(cp));
+          smartlist_free(clients);
+          rend_service_free(service);
+          return -1;
+        }
+        if (strspn(client_name, REND_LEGAL_CLIENTNAME_CHARACTERS) != len) {
+          log_warn(LD_CONFIG, "HiddenServiceAuthorizeClient contains an "
+                              "illegal client name: '%s'. Valid "
+                              "characters are [A-Za-z0-9+_-].",
+                   client_name);
+          SMARTLIST_FOREACH(clients, char *, cp, tor_free(cp));
+          smartlist_free(clients);
+          rend_service_free(service);
+          return -1;
+        }
+        client = tor_malloc_zero(sizeof(rend_authorized_client_t));
+        client->client_name = tor_strdup(client_name);
+        smartlist_add(service->clients, client);
+        log_debug(LD_REND, "Adding client name '%s'", client_name);
+      }
+      SMARTLIST_FOREACH_END(client_name);
+      SMARTLIST_FOREACH(clients, char *, cp, tor_free(cp));
+      smartlist_free(clients);
+      /* Ensure maximum number of clients. */
+      if ((service->auth_type == REND_BASIC_AUTH &&
+            smartlist_len(service->clients) > 512) ||
+          (service->auth_type == REND_STEALTH_AUTH &&
+            smartlist_len(service->clients) > 16)) {
+        log_warn(LD_CONFIG, "HiddenServiceAuthorizeClient contains %d "
+                            "client authorization entries, but only a "
+                            "maximum of %d entries is allowed for "
+                            "authorization type '%s'.",
+                 smartlist_len(service->clients),
+                 service->auth_type == REND_BASIC_AUTH ? 512 : 16,
+                 service->auth_type == REND_BASIC_AUTH ? "basic" : "stealth");
+        rend_service_free(service);
+        return -1;
+      }
+    } else {
+      tor_assert(!strcasecmp(line->key, "HiddenServiceVersion"));
+      if (strcmp(line->value, "2")) {
+        log_warn(LD_CONFIG,
+                 "The only supported HiddenServiceVersion is 2.");
+        rend_service_free(service);
+        return -1;
+      }
+    }
+  }
+  if (service) {
+    if (validate_only)
+      rend_service_free(service);
+    else
+      rend_add_service(service);
+  }
+
+  /* If this is a reload and there were hidden services configured before,
+   * keep the introduction points that are still needed and close the
+   * other ones. */
+  if (old_service_list && !validate_only) {
+    smartlist_t *surviving_services = smartlist_new();
+    circuit_t *circ;
+
+    /* Copy introduction points to new services. */
+    /* XXXX This is O(n^2), but it's only called on reconfigure, so it's
+     * probably ok? */
+    SMARTLIST_FOREACH_BEGIN(rend_service_list, rend_service_t *, new) {
+      SMARTLIST_FOREACH_BEGIN(old_service_list, rend_service_t *, old) {
+        if (!strcmp(old->directory, new->directory)) {
+          smartlist_add_all(new->intro_nodes, old->intro_nodes);
+          smartlist_clear(old->intro_nodes);
+          smartlist_add(surviving_services, old);
+          break;
+        }
+      } SMARTLIST_FOREACH_END(old);
+    } SMARTLIST_FOREACH_END(new);
+
+    /* Close introduction circuits of services we don't serve anymore. */
+    /* XXXX it would be nicer if we had a nicer abstraction to use here,
+     * so we could just iterate over the list of services to close, but
      
