@@ -1723,4 +1723,337 @@ rend_service_parse_intro_for_v0_or_v1(
                    "short plaintext of encrypted part in v1 INTRODUCE%d "
                    "cell (%lu bytes, needed %lu)",
                    (int)(intro->type),
-                   (unsigned long)plaintext_le
+                   (unsigned long)plaintext_len,
+                   (unsigned long)ver_specific_len);
+    goto err;
+  }
+
+  endptr = memchr(rp_nickname, 0, nickname_field_len);
+  if (!endptr || endptr == rp_nickname) {
+    if (err_msg_out) {
+      tor_asprintf(err_msg_out,
+                   "couldn't find a nul-padded nickname in "
+                   "INTRODUCE%d cell",
+                   (int)(intro->type));
+    }
+    goto err;
+  }
+
+  if ((intro->version == 0 &&
+       !is_legal_nickname(rp_nickname)) ||
+      (intro->version == 1 &&
+       !is_legal_nickname_or_hexdigest(rp_nickname))) {
+    if (err_msg_out) {
+      tor_asprintf(err_msg_out,
+                   "bad nickname in INTRODUCE%d cell",
+                   (int)(intro->type));
+    }
+    goto err;
+  }
+
+  if (intro->version == 1) {
+    memcpy(intro->u.v1.rp, rp_nickname, endptr - rp_nickname + 1);
+  } else {
+    memcpy(intro->u.v0.rp, rp_nickname, endptr - rp_nickname + 1);
+  }
+
+  return ver_specific_len;
+
+ err:
+  return -1;
+}
+
+/** Parse the version-specific parts of a v2 INTRODUCE1 or INTRODUCE2 cell
+ */
+
+static ssize_t
+rend_service_parse_intro_for_v2(
+    rend_intro_cell_t *intro,
+    const uint8_t *buf,
+    size_t plaintext_len,
+    char **err_msg_out)
+{
+  unsigned int klen;
+  extend_info_t *extend_info = NULL;
+  ssize_t ver_specific_len;
+
+  /*
+   * We accept version 3 too so that the v3 parser can call this with
+   * and adjusted buffer for the latter part of a v3 cell, which is
+   * identical to a v2 cell.
+   */
+  if (!(intro->version == 2 ||
+        intro->version == 3)) {
+    if (err_msg_out)
+      tor_asprintf(err_msg_out,
+                   "rend_service_parse_intro_for_v2() called with "
+                   "bad version %d on INTRODUCE%d cell (this is a bug)",
+                   intro->version,
+                   (int)(intro->type));
+    goto err;
+  }
+
+  /* 7 == version, IP and port, DIGEST_LEN == id, 2 == key length */
+  if (plaintext_len < 7 + DIGEST_LEN + 2) {
+    if (err_msg_out) {
+      tor_asprintf(err_msg_out,
+                   "truncated plaintext of encrypted parted of "
+                   "version %d INTRODUCE%d cell",
+                   intro->version,
+                   (int)(intro->type));
+    }
+
+    goto err;
+  }
+
+  extend_info = tor_malloc_zero(sizeof(extend_info_t));
+  tor_addr_from_ipv4n(&extend_info->addr, get_uint32(buf + 1));
+  extend_info->port = ntohs(get_uint16(buf + 5));
+  memcpy(extend_info->identity_digest, buf + 7, DIGEST_LEN);
+  extend_info->nickname[0] = '$';
+  base16_encode(extend_info->nickname + 1, sizeof(extend_info->nickname) - 1,
+                extend_info->identity_digest, DIGEST_LEN);
+  klen = ntohs(get_uint16(buf + 7 + DIGEST_LEN));
+
+  /* 7 == version, IP and port, DIGEST_LEN == id, 2 == key length */
+  if (plaintext_len < 7 + DIGEST_LEN + 2 + klen) {
+    if (err_msg_out) {
+      tor_asprintf(err_msg_out,
+                   "truncated plaintext of encrypted parted of "
+                   "version %d INTRODUCE%d cell",
+                   intro->version,
+                   (int)(intro->type));
+    }
+
+    goto err;
+  }
+
+  extend_info->onion_key =
+    crypto_pk_asn1_decode((const char *)(buf + 7 + DIGEST_LEN + 2), klen);
+  if (!extend_info->onion_key) {
+    if (err_msg_out) {
+      tor_asprintf(err_msg_out,
+                   "error decoding onion key in version %d "
+                   "INTRODUCE%d cell",
+                   intro->version,
+                   (intro->type));
+    }
+
+    goto err;
+  }
+
+  ver_specific_len = 7+DIGEST_LEN+2+klen;
+
+  if (intro->version == 2) intro->u.v2.extend_info = extend_info;
+  else intro->u.v3.extend_info = extend_info;
+
+  return ver_specific_len;
+
+ err:
+  extend_info_free(extend_info);
+
+  return -1;
+}
+
+/** Parse the version-specific parts of a v3 INTRODUCE1 or INTRODUCE2 cell
+ */
+
+static ssize_t
+rend_service_parse_intro_for_v3(
+    rend_intro_cell_t *intro,
+    const uint8_t *buf,
+    size_t plaintext_len,
+    char **err_msg_out)
+{
+  ssize_t adjust, v2_ver_specific_len, ts_offset;
+
+  /* This should only be called on v3 cells */
+  if (intro->version != 3) {
+    if (err_msg_out)
+      tor_asprintf(err_msg_out,
+                   "rend_service_parse_intro_for_v3() called with "
+                   "bad version %d on INTRODUCE%d cell (this is a bug)",
+                   intro->version,
+                   (int)(intro->type));
+    goto err;
+  }
+
+  /*
+   * Check that we have at least enough to get auth_len:
+   *
+   * 1 octet for version, 1 for auth_type, 2 for auth_len
+   */
+  if (plaintext_len < 4) {
+    if (err_msg_out) {
+      tor_asprintf(err_msg_out,
+                   "truncated plaintext of encrypted parted of "
+                   "version %d INTRODUCE%d cell",
+                   intro->version,
+                   (int)(intro->type));
+    }
+
+    goto err;
+  }
+
+  /*
+   * The rend_client_send_introduction() function over in rendclient.c is
+   * broken (i.e., fails to match the spec) in such a way that we can't
+   * change it without breaking the protocol.  Specifically, it doesn't
+   * emit auth_len when auth-type is REND_NO_AUTH, so everything is off
+   * by two bytes after that.  Calculate ts_offset and do everything from
+   * the timestamp on relative to that to handle this dain bramage.
+   */
+
+  intro->u.v3.auth_type = buf[1];
+  if (intro->u.v3.auth_type != REND_NO_AUTH) {
+    intro->u.v3.auth_len = ntohs(get_uint16(buf + 2));
+    ts_offset = 4 + intro->u.v3.auth_len;
+  } else {
+    intro->u.v3.auth_len = 0;
+    ts_offset = 2;
+  }
+
+  /* Check that auth len makes sense for this auth type */
+  if (intro->u.v3.auth_type == REND_BASIC_AUTH ||
+      intro->u.v3.auth_type == REND_STEALTH_AUTH) {
+      if (intro->u.v3.auth_len != REND_DESC_COOKIE_LEN) {
+        if (err_msg_out) {
+          tor_asprintf(err_msg_out,
+                       "wrong auth data size %d for INTRODUCE%d cell, "
+                       "should be %d",
+                       (int)(intro->u.v3.auth_len),
+                       (int)(intro->type),
+                       REND_DESC_COOKIE_LEN);
+        }
+
+        goto err;
+      }
+  }
+
+  /* Check that we actually have everything up through the timestamp */
+  if (plaintext_len < (size_t)(ts_offset)+4) {
+    if (err_msg_out) {
+      tor_asprintf(err_msg_out,
+                   "truncated plaintext of encrypted parted of "
+                   "version %d INTRODUCE%d cell",
+                   intro->version,
+                   (int)(intro->type));
+    }
+
+    goto err;
+  }
+
+  if (intro->u.v3.auth_type != REND_NO_AUTH &&
+      intro->u.v3.auth_len > 0) {
+    /* Okay, we can go ahead and copy auth_data */
+    intro->u.v3.auth_data = tor_malloc(intro->u.v3.auth_len);
+    /*
+     * We know we had an auth_len field in this case, so 4 is
+     * always right.
+     */
+    memcpy(intro->u.v3.auth_data, buf + 4, intro->u.v3.auth_len);
+  }
+
+  /*
+   * From here on, the format is as in v2, so we call the v2 parser with
+   * adjusted buffer and length.  We are 4 + ts_offset octets in, but the
+   * v2 parser expects to skip over a version byte at the start, so we
+   * adjust by 3 + ts_offset.
+   */
+  adjust = 3 + ts_offset;
+
+  v2_ver_specific_len =
+    rend_service_parse_intro_for_v2(intro,
+                                    buf + adjust, plaintext_len - adjust,
+                                    err_msg_out);
+
+  /* Success in v2 parser */
+  if (v2_ver_specific_len >= 0) return v2_ver_specific_len + adjust;
+  /* Failure in v2 parser; it will have provided an err_msg */
+  else return v2_ver_specific_len;
+
+ err:
+  return -1;
+}
+
+/** Table of parser functions for version-specific parts of an INTRODUCE2
+ * cell.
+ */
+
+static ssize_t
+  (*intro_version_handlers[])(
+    rend_intro_cell_t *,
+    const uint8_t *,
+    size_t,
+    char **) =
+{ rend_service_parse_intro_for_v0_or_v1,
+  rend_service_parse_intro_for_v0_or_v1,
+  rend_service_parse_intro_for_v2,
+  rend_service_parse_intro_for_v3 };
+
+/** Decrypt the encrypted part of an INTRODUCE1 or INTRODUCE2 cell,
+ * return 0 if successful, or < 0 and write an error message to
+ * *err_msg_out if provided.
+ */
+
+int
+rend_service_decrypt_intro(
+    rend_intro_cell_t *intro,
+    crypto_pk_t *key,
+    char **err_msg_out)
+{
+  char *err_msg = NULL;
+  uint8_t key_digest[DIGEST_LEN];
+  char service_id[REND_SERVICE_ID_LEN_BASE32+1];
+  ssize_t key_len;
+  uint8_t buf[RELAY_PAYLOAD_SIZE];
+  int result, status = 0;
+
+  if (!intro || !key) {
+    if (err_msg_out) {
+      err_msg =
+        tor_strdup("rend_service_decrypt_intro() called with bad "
+                   "parameters");
+    }
+
+    status = -2;
+    goto err;
+  }
+
+  /* Make sure we have ciphertext */
+  if (!(intro->ciphertext) || intro->ciphertext_len <= 0) {
+    if (err_msg_out) {
+      tor_asprintf(&err_msg,
+                   "rend_intro_cell_t was missing ciphertext for "
+                   "INTRODUCE%d cell",
+                   (int)(intro->type));
+    }
+    status = -3;
+    goto err;
+  }
+
+  /* Check that this cell actually matches this service key */
+
+  /* first DIGEST_LEN bytes of request is intro or service pk digest */
+  crypto_pk_get_digest(key, (char *)key_digest);
+  if (tor_memneq(key_digest, intro->pk, DIGEST_LEN)) {
+    if (err_msg_out) {
+      base32_encode(service_id, REND_SERVICE_ID_LEN_BASE32 + 1,
+                    (char*)(intro->pk), REND_SERVICE_ID_LEN);
+      tor_asprintf(&err_msg,
+                   "got an INTRODUCE%d cell for the wrong service (%s)",
+                   (int)(intro->type),
+                   escaped(service_id));
+    }
+
+    status = -4;
+    goto err;
+  }
+
+  /* Make sure the encrypted part is long enough to decrypt */
+
+  key_len = crypto_pk_keysize(key);
+  if (intro->ciphertext_len < key_len) {
+    if (err_msg_out) {
+      tor_asprintf(&err_msg,
+                   "got an INT
