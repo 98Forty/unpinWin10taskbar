@@ -1382,4 +1382,345 @@ rend_service_introduce(origin_circuit_t *circuit, const uint8_t *request,
   }
   if (!launched) { /* give up */
     log_warn(LD_REND, "Giving up launching first hop of circuit to rendezvous "
-             "p
+             "point %s for service %s.",
+             safe_str_client(extend_info_describe(rp)),
+             serviceid);
+    reason = END_CIRC_REASON_CONNECTFAILED;
+    goto err;
+  }
+  log_info(LD_REND,
+           "Accepted intro; launching circuit to %s "
+           "(cookie %s) for service %s.",
+           safe_str_client(extend_info_describe(rp)),
+           hexcookie, serviceid);
+  tor_assert(launched->build_state);
+  /* Fill in the circuit's state. */
+  launched->rend_data = tor_malloc_zero(sizeof(rend_data_t));
+  memcpy(launched->rend_data->rend_pk_digest,
+         circuit->rend_data->rend_pk_digest,
+         DIGEST_LEN);
+  memcpy(launched->rend_data->rend_cookie, parsed_req->rc, REND_COOKIE_LEN);
+  strlcpy(launched->rend_data->onion_address, service->service_id,
+          sizeof(launched->rend_data->onion_address));
+
+  launched->build_state->service_pending_final_cpath_ref =
+    tor_malloc_zero(sizeof(crypt_path_reference_t));
+  launched->build_state->service_pending_final_cpath_ref->refcount = 1;
+
+  launched->build_state->service_pending_final_cpath_ref->cpath = cpath =
+    tor_malloc_zero(sizeof(crypt_path_t));
+  cpath->magic = CRYPT_PATH_MAGIC;
+  launched->build_state->expiry_time = now + MAX_REND_TIMEOUT;
+
+  cpath->rend_dh_handshake_state = dh;
+  dh = NULL;
+  if (circuit_init_cpath_crypto(cpath,keys+DIGEST_LEN,1)<0)
+    goto err;
+  memcpy(cpath->rend_circ_nonce, keys, DIGEST_LEN);
+
+  goto done;
+
+ log_error:
+  if (!err_msg) {
+    if (stage_descr) {
+      tor_asprintf(&err_msg,
+                   "unknown %s error for INTRODUCE2", stage_descr);
+    } else {
+      err_msg = tor_strdup("unknown error for INTRODUCE2");
+    }
+  }
+
+  log_warn(LD_REND, "%s on circ %u", err_msg,
+           (unsigned)circuit->base_.n_circ_id);
+ err:
+  status = -1;
+  if (dh) crypto_dh_free(dh);
+  if (launched) {
+    circuit_mark_for_close(TO_CIRCUIT(launched), reason);
+  }
+  tor_free(err_msg);
+
+ done:
+  memwipe(keys, 0, sizeof(keys));
+  memwipe(buf, 0, sizeof(buf));
+  memwipe(serviceid, 0, sizeof(serviceid));
+  memwipe(hexcookie, 0, sizeof(hexcookie));
+
+  /* Free the parsed cell */
+  if (parsed_req) {
+    rend_service_free_intro(parsed_req);
+    parsed_req = NULL;
+  }
+
+  /* Free rp if we must */
+  if (need_rp_free) extend_info_free(rp);
+
+  return status;
+}
+
+/** Given a parsed and decrypted INTRODUCE2, find the rendezvous point or
+ * return NULL and an error string if we can't.
+ */
+
+static extend_info_t *
+find_rp_for_intro(const rend_intro_cell_t *intro,
+                  uint8_t *need_free_out, char **err_msg_out)
+{
+  extend_info_t *rp = NULL;
+  char *err_msg = NULL;
+  const char *rp_nickname = NULL;
+  const node_t *node = NULL;
+  uint8_t need_free = 0;
+
+  if (!intro || !need_free_out) {
+    if (err_msg_out)
+      err_msg = tor_strdup("Bad parameters to find_rp_for_intro()");
+
+    goto err;
+  }
+
+  if (intro->version == 0 || intro->version == 1) {
+    if (intro->version == 1) rp_nickname = (const char *)(intro->u.v1.rp);
+    else rp_nickname = (const char *)(intro->u.v0.rp);
+
+    node = node_get_by_nickname(rp_nickname, 0);
+    if (!node) {
+      if (err_msg_out) {
+        tor_asprintf(&err_msg,
+                     "Couldn't find router %s named in INTRODUCE2 cell",
+                     escaped_safe_str_client(rp_nickname));
+      }
+
+      goto err;
+    }
+
+    rp = extend_info_from_node(node, 0);
+    if (!rp) {
+      if (err_msg_out) {
+        tor_asprintf(&err_msg,
+                     "Could build extend_info_t for router %s named "
+                     "in INTRODUCE2 cell",
+                     escaped_safe_str_client(rp_nickname));
+      }
+
+      goto err;
+    } else {
+      need_free = 1;
+    }
+  } else if (intro->version == 2) {
+    rp = intro->u.v2.extend_info;
+  } else if (intro->version == 3) {
+    rp = intro->u.v3.extend_info;
+  } else {
+    if (err_msg_out) {
+      tor_asprintf(&err_msg,
+                   "Unknown version %d in INTRODUCE2 cell",
+                   (int)(intro->version));
+    }
+
+    goto err;
+  }
+
+  goto done;
+
+ err:
+  if (err_msg_out) *err_msg_out = err_msg;
+  else tor_free(err_msg);
+
+ done:
+  if (rp && need_free_out) *need_free_out = need_free;
+
+  return rp;
+}
+
+/** Remove unnecessary parts from a rend_intro_cell_t - the ciphertext if
+ * already decrypted, the plaintext too if already parsed
+ */
+
+void
+rend_service_compact_intro(rend_intro_cell_t *request)
+{
+  if (!request) return;
+
+  if ((request->plaintext && request->plaintext_len > 0) ||
+       request->parsed) {
+    tor_free(request->ciphertext);
+    request->ciphertext_len = 0;
+  }
+
+  if (request->parsed) {
+    tor_free(request->plaintext);
+    request->plaintext_len = 0;
+  }
+}
+
+/** Free a parsed INTRODUCE1 or INTRODUCE2 cell that was allocated by
+ * rend_service_parse_intro().
+ */
+void
+rend_service_free_intro(rend_intro_cell_t *request)
+{
+  if (!request) {
+    log_info(LD_BUG, "rend_service_free_intro() called with NULL request!");
+    return;
+  }
+
+  /* Free ciphertext */
+  tor_free(request->ciphertext);
+  request->ciphertext_len = 0;
+
+  /* Have plaintext? */
+  if (request->plaintext) {
+    /* Zero it out just to be safe */
+    memwipe(request->plaintext, 0, request->plaintext_len);
+    tor_free(request->plaintext);
+    request->plaintext_len = 0;
+  }
+
+  /* Have parsed plaintext? */
+  if (request->parsed) {
+    switch (request->version) {
+      case 0:
+      case 1:
+        /*
+         * Nothing more to do; these formats have no further pointers
+         * in them.
+         */
+        break;
+      case 2:
+        extend_info_free(request->u.v2.extend_info);
+        request->u.v2.extend_info = NULL;
+        break;
+      case 3:
+        if (request->u.v3.auth_data) {
+          memwipe(request->u.v3.auth_data, 0, request->u.v3.auth_len);
+          tor_free(request->u.v3.auth_data);
+        }
+
+        extend_info_free(request->u.v3.extend_info);
+        request->u.v3.extend_info = NULL;
+        break;
+      default:
+        log_info(LD_BUG,
+                 "rend_service_free_intro() saw unknown protocol "
+                 "version %d.",
+                 request->version);
+    }
+  }
+
+  /* Zero it out to make sure sensitive stuff doesn't hang around in memory */
+  memwipe(request, 0, sizeof(*request));
+
+  tor_free(request);
+}
+
+/** Parse an INTRODUCE1 or INTRODUCE2 cell into a newly allocated
+ * rend_intro_cell_t structure.  Free it with rend_service_free_intro()
+ * when finished.  The type parameter should be 1 or 2 to indicate whether
+ * this is INTRODUCE1 or INTRODUCE2.  This parses only the non-encrypted
+ * parts; after this, call rend_service_decrypt_intro() with a key, then
+ * rend_service_parse_intro_plaintext() to finish parsing.  The optional
+ * err_msg_out parameter is set to a string suitable for log output
+ * if parsing fails.  This function does some validation, but only
+ * that which depends solely on the contents of the cell and the
+ * key; it can be unit-tested.  Further validation is done in
+ * rend_service_validate_intro().
+ */
+
+rend_intro_cell_t *
+rend_service_begin_parse_intro(const uint8_t *request,
+                               size_t request_len,
+                               uint8_t type,
+                               char **err_msg_out)
+{
+  rend_intro_cell_t *rv = NULL;
+  char *err_msg = NULL;
+
+  if (!request || request_len <= 0) goto err;
+  if (!(type == 1 || type == 2)) goto err;
+
+  /* First, check that the cell is long enough to be a sensible INTRODUCE */
+
+  /* min key length plus digest length plus nickname length */
+  if (request_len <
+        (DIGEST_LEN + REND_COOKIE_LEN + (MAX_NICKNAME_LEN + 1) +
+         DH_KEY_LEN + 42)) {
+    if (err_msg_out) {
+      tor_asprintf(&err_msg,
+                   "got a truncated INTRODUCE%d cell",
+                   (int)type);
+    }
+    goto err;
+  }
+
+  /* Allocate a new parsed cell structure */
+  rv = tor_malloc_zero(sizeof(*rv));
+
+  /* Set the type */
+  rv->type = type;
+
+  /* Copy in the ID */
+  memcpy(rv->pk, request, DIGEST_LEN);
+
+  /* Copy in the ciphertext */
+  rv->ciphertext = tor_malloc(request_len - DIGEST_LEN);
+  memcpy(rv->ciphertext, request + DIGEST_LEN, request_len - DIGEST_LEN);
+  rv->ciphertext_len = request_len - DIGEST_LEN;
+
+  goto done;
+
+ err:
+  if (rv) rend_service_free_intro(rv);
+  rv = NULL;
+  if (err_msg_out && !err_msg) {
+    tor_asprintf(&err_msg,
+                 "unknown INTRODUCE%d error",
+                 (int)type);
+  }
+
+ done:
+  if (err_msg_out) *err_msg_out = err_msg;
+  else tor_free(err_msg);
+
+  return rv;
+}
+
+/** Parse the version-specific parts of a v0 or v1 INTRODUCE1 or INTRODUCE2
+ * cell
+ */
+
+static ssize_t
+rend_service_parse_intro_for_v0_or_v1(
+    rend_intro_cell_t *intro,
+    const uint8_t *buf,
+    size_t plaintext_len,
+    char **err_msg_out)
+{
+  const char *rp_nickname, *endptr;
+  size_t nickname_field_len, ver_specific_len;
+
+  if (intro->version == 1) {
+    ver_specific_len = MAX_HEX_NICKNAME_LEN + 2;
+    rp_nickname = ((const char *)buf) + 1;
+    nickname_field_len = MAX_HEX_NICKNAME_LEN + 1;
+  } else if (intro->version == 0) {
+    ver_specific_len = MAX_NICKNAME_LEN + 1;
+    rp_nickname = (const char *)buf;
+    nickname_field_len = MAX_NICKNAME_LEN + 1;
+  } else {
+    if (err_msg_out)
+      tor_asprintf(err_msg_out,
+                   "rend_service_parse_intro_for_v0_or_v1() called with "
+                   "bad version %d on INTRODUCE%d cell (this is a bug)",
+                   intro->version,
+                   (int)(intro->type));
+    goto err;
+  }
+
+  if (plaintext_len < ver_specific_len) {
+    if (err_msg_out)
+      tor_asprintf(err_msg_out,
+                   "short plaintext of encrypted part in v1 INTRODUCE%d "
+                   "cell (%lu bytes, needed %lu)",
+                   (int)(intro->type),
+                   (unsigned long)plaintext_le
