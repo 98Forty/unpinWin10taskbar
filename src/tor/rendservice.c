@@ -2056,4 +2056,323 @@ rend_service_decrypt_intro(
   if (intro->ciphertext_len < key_len) {
     if (err_msg_out) {
       tor_asprintf(&err_msg,
-                   "got an INT
+                   "got an INTRODUCE%d cell with a truncated PK-encrypted "
+                   "part",
+                   (int)(intro->type));
+    }
+
+    status = -5;
+    goto err;
+  }
+
+  /* Decrypt the encrypted part */
+
+  note_crypto_pk_op(REND_SERVER);
+  result =
+    crypto_pk_private_hybrid_decrypt(
+       key, (char *)buf, sizeof(buf),
+       (const char *)(intro->ciphertext), intro->ciphertext_len,
+       PK_PKCS1_OAEP_PADDING, 1);
+  if (result < 0) {
+    if (err_msg_out) {
+      tor_asprintf(&err_msg,
+                   "couldn't decrypt INTRODUCE%d cell",
+                   (int)(intro->type));
+    }
+    status = -6;
+    goto err;
+  }
+  intro->plaintext_len = result;
+  intro->plaintext = tor_malloc(intro->plaintext_len);
+  memcpy(intro->plaintext, buf, intro->plaintext_len);
+
+  goto done;
+
+ err:
+  if (err_msg_out && !err_msg) {
+    tor_asprintf(&err_msg,
+                 "unknown INTRODUCE%d error decrypting encrypted part",
+                 (int)(intro->type));
+  }
+  if (status >= 0) status = -1;
+
+ done:
+  if (err_msg_out) *err_msg_out = err_msg;
+  else tor_free(err_msg);
+
+  /* clean up potentially sensitive material */
+  memwipe(buf, 0, sizeof(buf));
+  memwipe(key_digest, 0, sizeof(key_digest));
+  memwipe(service_id, 0, sizeof(service_id));
+
+  return status;
+}
+
+/** Parse the plaintext of the encrypted part of an INTRODUCE1 or
+ * INTRODUCE2 cell, return 0 if successful, or < 0 and write an error
+ * message to *err_msg_out if provided.
+ */
+
+int
+rend_service_parse_intro_plaintext(
+    rend_intro_cell_t *intro,
+    char **err_msg_out)
+{
+  char *err_msg = NULL;
+  ssize_t ver_specific_len, ver_invariant_len;
+  uint8_t version;
+  int status = 0;
+
+  if (!intro) {
+    if (err_msg_out) {
+      err_msg =
+        tor_strdup("rend_service_parse_intro_plaintext() called with NULL "
+                   "rend_intro_cell_t");
+    }
+
+    status = -2;
+    goto err;
+  }
+
+  /* Check that we have plaintext */
+  if (!(intro->plaintext) || intro->plaintext_len <= 0) {
+    if (err_msg_out) {
+      err_msg = tor_strdup("rend_intro_cell_t was missing plaintext");
+    }
+    status = -3;
+    goto err;
+  }
+
+  /* In all formats except v0, the first byte is a version number */
+  version = intro->plaintext[0];
+
+  /* v0 has no version byte (stupid...), so handle it as a fallback */
+  if (version > 3) version = 0;
+
+  /* Copy the version into the parsed cell structure */
+  intro->version = version;
+
+  /* Call the version-specific parser from the table */
+  ver_specific_len =
+    intro_version_handlers[version](intro,
+                                    intro->plaintext, intro->plaintext_len,
+                                    &err_msg);
+  if (ver_specific_len < 0) {
+    status = -4;
+    goto err;
+  }
+
+  /** The rendezvous cookie and Diffie-Hellman stuff are version-invariant
+   * and at the end of the plaintext of the encrypted part of the cell.
+   */
+
+  ver_invariant_len = intro->plaintext_len - ver_specific_len;
+  if (ver_invariant_len < REND_COOKIE_LEN + DH_KEY_LEN) {
+    tor_asprintf(&err_msg,
+        "decrypted plaintext of INTRODUCE%d cell was truncated (%ld bytes)",
+        (int)(intro->type),
+        (long)(intro->plaintext_len));
+    status = -5;
+    goto err;
+  } else if (ver_invariant_len > REND_COOKIE_LEN + DH_KEY_LEN) {
+    tor_asprintf(&err_msg,
+        "decrypted plaintext of INTRODUCE%d cell was too long (%ld bytes)",
+        (int)(intro->type),
+        (long)(intro->plaintext_len));
+    status = -6;
+  } else {
+    memcpy(intro->rc,
+           intro->plaintext + ver_specific_len,
+           REND_COOKIE_LEN);
+    memcpy(intro->dh,
+           intro->plaintext + ver_specific_len + REND_COOKIE_LEN,
+           DH_KEY_LEN);
+  }
+
+  /* Flag it as being fully parsed */
+  intro->parsed = 1;
+
+  goto done;
+
+ err:
+  if (err_msg_out && !err_msg) {
+    tor_asprintf(&err_msg,
+                 "unknown INTRODUCE%d error parsing encrypted part",
+                 (int)(intro->type));
+  }
+  if (status >= 0) status = -1;
+
+ done:
+  if (err_msg_out) *err_msg_out = err_msg;
+  else tor_free(err_msg);
+
+  return status;
+}
+
+/** Do validity checks on a parsed intro cell before decryption; some of
+ * these are not done in rend_service_begin_parse_intro() itself because
+ * they depend on a lot of other state and would make it hard to unit test.
+ * Returns >= 0 if successful or < 0 if the intro cell is invalid, and
+ * optionally writes out an error message for logging.  If an err_msg
+ * pointer is provided, it is the caller's responsibility to free any
+ * provided message.
+ */
+
+int
+rend_service_validate_intro_early(const rend_intro_cell_t *intro,
+                                  char **err_msg_out)
+{
+  int status = 0;
+
+  if (!intro) {
+    if (err_msg_out)
+      *err_msg_out =
+        tor_strdup("NULL intro cell passed to "
+                   "rend_service_validate_intro_early()");
+
+    status = -1;
+    goto err;
+  }
+
+  /* TODO */
+
+ err:
+  return status;
+}
+
+/** Do validity checks on a parsed intro cell after decryption; some of
+ * these are not done in rend_service_parse_intro_plaintext() itself because
+ * they depend on a lot of other state and would make it hard to unit test.
+ * Returns >= 0 if successful or < 0 if the intro cell is invalid, and
+ * optionally writes out an error message for logging.  If an err_msg
+ * pointer is provided, it is the caller's responsibility to free any
+ * provided message.
+ */
+
+int
+rend_service_validate_intro_late(const rend_intro_cell_t *intro,
+                                 char **err_msg_out)
+{
+  int status = 0;
+
+  if (!intro) {
+    if (err_msg_out)
+      *err_msg_out =
+        tor_strdup("NULL intro cell passed to "
+                   "rend_service_validate_intro_late()");
+
+    status = -1;
+    goto err;
+  }
+
+  if (intro->version == 3 && intro->parsed) {
+    if (!(intro->u.v3.auth_type == REND_NO_AUTH ||
+          intro->u.v3.auth_type == REND_BASIC_AUTH ||
+          intro->u.v3.auth_type == REND_STEALTH_AUTH)) {
+      /* This is an informative message, not an error, as in the old code */
+      if (err_msg_out)
+        tor_asprintf(err_msg_out,
+                     "unknown authorization type %d",
+                     intro->u.v3.auth_type);
+    }
+  }
+
+ err:
+  return status;
+}
+
+/** Called when we fail building a rendezvous circuit at some point other
+ * than the last hop: launches a new circuit to the same rendezvous point.
+ */
+void
+rend_service_relaunch_rendezvous(origin_circuit_t *oldcirc)
+{
+  origin_circuit_t *newcirc;
+  cpath_build_state_t *newstate, *oldstate;
+
+  tor_assert(oldcirc->base_.purpose == CIRCUIT_PURPOSE_S_CONNECT_REND);
+
+  /* Don't relaunch the same rend circ twice. */
+  if (oldcirc->hs_service_side_rend_circ_has_been_relaunched) {
+    log_info(LD_REND, "Rendezvous circuit to %s has already been relaunched; "
+             "not relaunching it again.",
+             oldcirc->build_state ?
+             safe_str(extend_info_describe(oldcirc->build_state->chosen_exit))
+             : "*unknown*");
+    return;
+  }
+  oldcirc->hs_service_side_rend_circ_has_been_relaunched = 1;
+
+  if (!oldcirc->build_state ||
+      oldcirc->build_state->failure_count > MAX_REND_FAILURES ||
+      oldcirc->build_state->expiry_time < time(NULL)) {
+    log_info(LD_REND,
+             "Attempt to build circuit to %s for rendezvous has failed "
+             "too many times or expired; giving up.",
+             oldcirc->build_state ?
+             safe_str(extend_info_describe(oldcirc->build_state->chosen_exit))
+             : "*unknown*");
+    return;
+  }
+
+  oldstate = oldcirc->build_state;
+  tor_assert(oldstate);
+
+  if (oldstate->service_pending_final_cpath_ref == NULL) {
+    log_info(LD_REND,"Skipping relaunch of circ that failed on its first hop. "
+             "Initiator will retry.");
+    return;
+  }
+
+  log_info(LD_REND,"Reattempting rendezvous circuit to '%s'",
+           safe_str(extend_info_describe(oldstate->chosen_exit)));
+
+  newcirc = circuit_launch_by_extend_info(CIRCUIT_PURPOSE_S_CONNECT_REND,
+                            oldstate->chosen_exit,
+                            CIRCLAUNCH_NEED_CAPACITY|CIRCLAUNCH_IS_INTERNAL);
+
+  if (!newcirc) {
+    log_warn(LD_REND,"Couldn't relaunch rendezvous circuit to '%s'.",
+             safe_str(extend_info_describe(oldstate->chosen_exit)));
+    return;
+  }
+  newstate = newcirc->build_state;
+  tor_assert(newstate);
+  newstate->failure_count = oldstate->failure_count+1;
+  newstate->expiry_time = oldstate->expiry_time;
+  newstate->service_pending_final_cpath_ref =
+    oldstate->service_pending_final_cpath_ref;
+  ++(newstate->service_pending_final_cpath_ref->refcount);
+
+  newcirc->rend_data = rend_data_dup(oldcirc->rend_data);
+}
+
+/** Launch a circuit to serve as an introduction point for the service
+ * <b>service</b> at the introduction point <b>nickname</b>
+ */
+static int
+rend_service_launch_establish_intro(rend_service_t *service,
+                                    rend_intro_point_t *intro)
+{
+  origin_circuit_t *launched;
+
+  log_info(LD_REND,
+           "Launching circuit to introduction point %s for service %s",
+           safe_str_client(extend_info_describe(intro->extend_info)),
+           service->service_id);
+
+  rep_hist_note_used_internal(time(NULL), 1, 0);
+
+  ++service->n_intro_circuits_launched;
+  launched = circuit_launch_by_extend_info(CIRCUIT_PURPOSE_S_ESTABLISH_INTRO,
+                             intro->extend_info,
+                             CIRCLAUNCH_NEED_UPTIME|CIRCLAUNCH_IS_INTERNAL);
+
+  if (!launched) {
+    log_info(LD_REND,
+             "Can't launch circuit to establish introduction at %s.",
+             safe_str_client(extend_info_describe(intro->extend_info)));
+    return -1;
+  }
+
+  
