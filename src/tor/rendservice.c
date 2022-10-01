@@ -2375,4 +2375,276 @@ rend_service_launch_establish_intro(rend_service_t *service,
     return -1;
   }
 
-  
+  if (tor_memneq(intro->extend_info->identity_digest,
+      launched->build_state->chosen_exit->identity_digest, DIGEST_LEN)) {
+    char cann[HEX_DIGEST_LEN+1], orig[HEX_DIGEST_LEN+1];
+    base16_encode(cann, sizeof(cann),
+                  launched->build_state->chosen_exit->identity_digest,
+                  DIGEST_LEN);
+    base16_encode(orig, sizeof(orig),
+                  intro->extend_info->identity_digest, DIGEST_LEN);
+    log_info(LD_REND, "The intro circuit we just cannibalized ends at $%s, "
+                      "but we requested an intro circuit to $%s. Updating "
+                      "our service.", cann, orig);
+    extend_info_free(intro->extend_info);
+    intro->extend_info = extend_info_dup(launched->build_state->chosen_exit);
+  }
+
+  launched->rend_data = tor_malloc_zero(sizeof(rend_data_t));
+  strlcpy(launched->rend_data->onion_address, service->service_id,
+          sizeof(launched->rend_data->onion_address));
+  memcpy(launched->rend_data->rend_pk_digest, service->pk_digest, DIGEST_LEN);
+  launched->intro_key = crypto_pk_dup_key(intro->intro_key);
+  if (launched->base_.state == CIRCUIT_STATE_OPEN)
+    rend_service_intro_has_opened(launched);
+  return 0;
+}
+
+/** Return the number of introduction points that are or have been
+ * established for the given service address in <b>query</b>. */
+static int
+count_established_intro_points(const char *query)
+{
+  int num_ipos = 0;
+  circuit_t *circ;
+  TOR_LIST_FOREACH(circ, circuit_get_global_list(), head) {
+    if (!circ->marked_for_close &&
+        circ->state == CIRCUIT_STATE_OPEN &&
+        (circ->purpose == CIRCUIT_PURPOSE_S_ESTABLISH_INTRO ||
+         circ->purpose == CIRCUIT_PURPOSE_S_INTRO)) {
+      origin_circuit_t *oc = TO_ORIGIN_CIRCUIT(circ);
+      if (oc->rend_data &&
+          !rend_cmp_service_ids(query, oc->rend_data->onion_address))
+        num_ipos++;
+    }
+  }
+  return num_ipos;
+}
+
+/** Called when we're done building a circuit to an introduction point:
+ *  sends a RELAY_ESTABLISH_INTRO cell.
+ */
+void
+rend_service_intro_has_opened(origin_circuit_t *circuit)
+{
+  rend_service_t *service;
+  size_t len;
+  int r;
+  char buf[RELAY_PAYLOAD_SIZE];
+  char auth[DIGEST_LEN + 9];
+  char serviceid[REND_SERVICE_ID_LEN_BASE32+1];
+  int reason = END_CIRC_REASON_TORPROTOCOL;
+  crypto_pk_t *intro_key;
+
+  tor_assert(circuit->base_.purpose == CIRCUIT_PURPOSE_S_ESTABLISH_INTRO);
+#ifndef NON_ANONYMOUS_MODE_ENABLED
+  tor_assert(!(circuit->build_state->onehop_tunnel));
+#endif
+  tor_assert(circuit->cpath);
+  tor_assert(circuit->rend_data);
+
+  base32_encode(serviceid, REND_SERVICE_ID_LEN_BASE32+1,
+                circuit->rend_data->rend_pk_digest, REND_SERVICE_ID_LEN);
+
+  service = rend_service_get_by_pk_digest(
+                circuit->rend_data->rend_pk_digest);
+  if (!service) {
+    log_warn(LD_REND, "Unrecognized service ID %s on introduction circuit %u.",
+             serviceid, (unsigned)circuit->base_.n_circ_id);
+    reason = END_CIRC_REASON_NOSUCHSERVICE;
+    goto err;
+  }
+
+  /* If we already have enough introduction circuits for this service,
+   * redefine this one as a general circuit or close it, depending. */
+  if (count_established_intro_points(serviceid) >
+      (int)service->n_intro_points_wanted) { /* XXX023 remove cast */
+    const or_options_t *options = get_options();
+    if (options->ExcludeNodes) {
+      /* XXXX in some future version, we can test whether the transition is
+         allowed or not given the actual nodes in the circuit.  But for now,
+         this case, we might as well close the thing. */
+      log_info(LD_CIRC|LD_REND, "We have just finished an introduction "
+               "circuit, but we already have enough.  Closing it.");
+      reason = END_CIRC_REASON_NONE;
+      goto err;
+    } else {
+      tor_assert(circuit->build_state->is_internal);
+      log_info(LD_CIRC|LD_REND, "We have just finished an introduction "
+               "circuit, but we already have enough. Redefining purpose to "
+               "general; leaving as internal.");
+
+      circuit_change_purpose(TO_CIRCUIT(circuit), CIRCUIT_PURPOSE_C_GENERAL);
+
+      {
+        rend_data_t *rend_data = circuit->rend_data;
+        circuit->rend_data = NULL;
+        rend_data_free(rend_data);
+      }
+      {
+        crypto_pk_t *intro_key = circuit->intro_key;
+        circuit->intro_key = NULL;
+        crypto_pk_free(intro_key);
+      }
+
+      circuit_has_opened(circuit);
+      goto done;
+    }
+  }
+
+  log_info(LD_REND,
+           "Established circuit %u as introduction point for service %s",
+           (unsigned)circuit->base_.n_circ_id, serviceid);
+
+  /* Use the intro key instead of the service key in ESTABLISH_INTRO. */
+  intro_key = circuit->intro_key;
+  /* Build the payload for a RELAY_ESTABLISH_INTRO cell. */
+  r = crypto_pk_asn1_encode(intro_key, buf+2,
+                            RELAY_PAYLOAD_SIZE-2);
+  if (r < 0) {
+    log_warn(LD_BUG, "Internal error; failed to establish intro point.");
+    reason = END_CIRC_REASON_INTERNAL;
+    goto err;
+  }
+  len = r;
+  set_uint16(buf, htons((uint16_t)len));
+  len += 2;
+  memcpy(auth, circuit->cpath->prev->rend_circ_nonce, DIGEST_LEN);
+  memcpy(auth+DIGEST_LEN, "INTRODUCE", 9);
+  if (crypto_digest(buf+len, auth, DIGEST_LEN+9))
+    goto err;
+  len += 20;
+  note_crypto_pk_op(REND_SERVER);
+  r = crypto_pk_private_sign_digest(intro_key, buf+len, sizeof(buf)-len,
+                                    buf, len);
+  if (r<0) {
+    log_warn(LD_BUG, "Internal error: couldn't sign introduction request.");
+    reason = END_CIRC_REASON_INTERNAL;
+    goto err;
+  }
+  len += r;
+
+  if (relay_send_command_from_edge(0, TO_CIRCUIT(circuit),
+                                   RELAY_COMMAND_ESTABLISH_INTRO,
+                                   buf, len, circuit->cpath->prev)<0) {
+    log_info(LD_GENERAL,
+             "Couldn't send introduction request for service %s on circuit %u",
+             serviceid, (unsigned)circuit->base_.n_circ_id);
+    reason = END_CIRC_REASON_INTERNAL;
+    goto err;
+  }
+
+  /* We've attempted to use this circuit */
+  pathbias_count_use_attempt(circuit);
+
+  goto done;
+
+ err:
+  circuit_mark_for_close(TO_CIRCUIT(circuit), reason);
+ done:
+  memwipe(buf, 0, sizeof(buf));
+  memwipe(auth, 0, sizeof(auth));
+  memwipe(serviceid, 0, sizeof(serviceid));
+
+  return;
+}
+
+/** Called when we get an INTRO_ESTABLISHED cell; mark the circuit as a
+ * live introduction point, and note that the service descriptor is
+ * now out-of-date. */
+int
+rend_service_intro_established(origin_circuit_t *circuit,
+                               const uint8_t *request,
+                               size_t request_len)
+{
+  rend_service_t *service;
+  char serviceid[REND_SERVICE_ID_LEN_BASE32+1];
+  (void) request;
+  (void) request_len;
+
+  if (circuit->base_.purpose != CIRCUIT_PURPOSE_S_ESTABLISH_INTRO) {
+    log_warn(LD_PROTOCOL,
+             "received INTRO_ESTABLISHED cell on non-intro circuit.");
+    goto err;
+  }
+  tor_assert(circuit->rend_data);
+  service = rend_service_get_by_pk_digest(
+                circuit->rend_data->rend_pk_digest);
+  if (!service) {
+    log_warn(LD_REND, "Unknown service on introduction circuit %u.",
+             (unsigned)circuit->base_.n_circ_id);
+    goto err;
+  }
+  service->desc_is_dirty = time(NULL);
+  circuit_change_purpose(TO_CIRCUIT(circuit), CIRCUIT_PURPOSE_S_INTRO);
+
+  base32_encode(serviceid, REND_SERVICE_ID_LEN_BASE32 + 1,
+                circuit->rend_data->rend_pk_digest, REND_SERVICE_ID_LEN);
+  log_info(LD_REND,
+           "Received INTRO_ESTABLISHED cell on circuit %u for service %s",
+           (unsigned)circuit->base_.n_circ_id, serviceid);
+
+  /* Getting a valid INTRODUCE_ESTABLISHED means we've successfully
+   * used the circ */
+  pathbias_mark_use_success(circuit);
+
+  return 0;
+ err:
+  circuit_mark_for_close(TO_CIRCUIT(circuit), END_CIRC_REASON_TORPROTOCOL);
+  return -1;
+}
+
+/** Called once a circuit to a rendezvous point is established: sends a
+ *  RELAY_COMMAND_RENDEZVOUS1 cell.
+ */
+void
+rend_service_rendezvous_has_opened(origin_circuit_t *circuit)
+{
+  rend_service_t *service;
+  char buf[RELAY_PAYLOAD_SIZE];
+  crypt_path_t *hop;
+  char serviceid[REND_SERVICE_ID_LEN_BASE32+1];
+  char hexcookie[9];
+  int reason;
+
+  tor_assert(circuit->base_.purpose == CIRCUIT_PURPOSE_S_CONNECT_REND);
+  tor_assert(circuit->cpath);
+  tor_assert(circuit->build_state);
+#ifndef NON_ANONYMOUS_MODE_ENABLED
+  tor_assert(!(circuit->build_state->onehop_tunnel));
+#endif
+  tor_assert(circuit->rend_data);
+
+  /* Declare the circuit dirty to avoid reuse, and for path-bias */
+  if (!circuit->base_.timestamp_dirty)
+    circuit->base_.timestamp_dirty = time(NULL);
+
+  /* This may be redundant */
+  pathbias_count_use_attempt(circuit);
+
+  hop = circuit->build_state->service_pending_final_cpath_ref->cpath;
+
+  base16_encode(hexcookie,9,circuit->rend_data->rend_cookie,4);
+  base32_encode(serviceid, REND_SERVICE_ID_LEN_BASE32+1,
+                circuit->rend_data->rend_pk_digest, REND_SERVICE_ID_LEN);
+
+  log_info(LD_REND,
+           "Done building circuit %u to rendezvous with "
+           "cookie %s for service %s",
+           (unsigned)circuit->base_.n_circ_id, hexcookie, serviceid);
+
+  /* Clear the 'in-progress HS circ has timed out' flag for
+   * consistency with what happens on the client side; this line has
+   * no effect on Tor's behaviour. */
+  circuit->hs_circ_has_timed_out = 0;
+
+  /* If hop is NULL, another rend circ has already connected to this
+   * rend point.  Close this circ. */
+  if (hop == NULL) {
+    log_info(LD_REND, "Another rend circ has already reached this rend point; "
+             "closing this rend circ.");
+    reason = END_CIRC_REASON_NONE;
+    goto err;
+  }
+
+  /* Remove our final cpath element from the refer
