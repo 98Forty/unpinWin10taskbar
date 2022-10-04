@@ -2647,4 +2647,255 @@ rend_service_rendezvous_has_opened(origin_circuit_t *circuit)
     goto err;
   }
 
-  /* Remove our final cpath element from the refer
+  /* Remove our final cpath element from the reference, so that no
+   * other circuit will try to use it.  Store it in
+   * pending_final_cpath for now to ensure that it will be freed if
+   * our rendezvous attempt fails. */
+  circuit->build_state->pending_final_cpath = hop;
+  circuit->build_state->service_pending_final_cpath_ref->cpath = NULL;
+
+  service = rend_service_get_by_pk_digest(
+                circuit->rend_data->rend_pk_digest);
+  if (!service) {
+    log_warn(LD_GENERAL, "Internal error: unrecognized service ID on "
+             "rendezvous circuit.");
+    reason = END_CIRC_REASON_INTERNAL;
+    goto err;
+  }
+
+  /* All we need to do is send a RELAY_RENDEZVOUS1 cell... */
+  memcpy(buf, circuit->rend_data->rend_cookie, REND_COOKIE_LEN);
+  if (crypto_dh_get_public(hop->rend_dh_handshake_state,
+                           buf+REND_COOKIE_LEN, DH_KEY_LEN)<0) {
+    log_warn(LD_GENERAL,"Couldn't get DH public key.");
+    reason = END_CIRC_REASON_INTERNAL;
+    goto err;
+  }
+  memcpy(buf+REND_COOKIE_LEN+DH_KEY_LEN, hop->rend_circ_nonce,
+         DIGEST_LEN);
+
+  /* Send the cell */
+  if (relay_send_command_from_edge(0, TO_CIRCUIT(circuit),
+                                   RELAY_COMMAND_RENDEZVOUS1,
+                                   buf, REND_COOKIE_LEN+DH_KEY_LEN+DIGEST_LEN,
+                                   circuit->cpath->prev)<0) {
+    log_warn(LD_GENERAL, "Couldn't send RENDEZVOUS1 cell.");
+    reason = END_CIRC_REASON_INTERNAL;
+    goto err;
+  }
+
+  crypto_dh_free(hop->rend_dh_handshake_state);
+  hop->rend_dh_handshake_state = NULL;
+
+  /* Append the cpath entry. */
+  hop->state = CPATH_STATE_OPEN;
+  /* set the windows to default. these are the windows
+   * that bob thinks alice has.
+   */
+  hop->package_window = circuit_initial_package_window();
+  hop->deliver_window = CIRCWINDOW_START;
+
+  onion_append_to_cpath(&circuit->cpath, hop);
+  circuit->build_state->pending_final_cpath = NULL; /* prevent double-free */
+
+  /* Change the circuit purpose. */
+  circuit_change_purpose(TO_CIRCUIT(circuit), CIRCUIT_PURPOSE_S_REND_JOINED);
+
+  goto done;
+
+ err:
+  circuit_mark_for_close(TO_CIRCUIT(circuit), reason);
+ done:
+  memwipe(buf, 0, sizeof(buf));
+  memwipe(serviceid, 0, sizeof(serviceid));
+  memwipe(hexcookie, 0, sizeof(hexcookie));
+
+  return;
+}
+
+/*
+ * Manage introduction points
+ */
+
+/** Return the (possibly non-open) introduction circuit ending at
+ * <b>intro</b> for the service whose public key is <b>pk_digest</b>.
+ * (<b>desc_version</b> is ignored). Return NULL if no such service is
+ * found.
+ */
+static origin_circuit_t *
+find_intro_circuit(rend_intro_point_t *intro, const char *pk_digest)
+{
+  origin_circuit_t *circ = NULL;
+
+  tor_assert(intro);
+  while ((circ = circuit_get_next_by_pk_and_purpose(circ,pk_digest,
+                                                  CIRCUIT_PURPOSE_S_INTRO))) {
+    if (tor_memeq(circ->build_state->chosen_exit->identity_digest,
+                intro->extend_info->identity_digest, DIGEST_LEN) &&
+        circ->rend_data) {
+      return circ;
+    }
+  }
+
+  circ = NULL;
+  while ((circ = circuit_get_next_by_pk_and_purpose(circ,pk_digest,
+                                        CIRCUIT_PURPOSE_S_ESTABLISH_INTRO))) {
+    if (tor_memeq(circ->build_state->chosen_exit->identity_digest,
+                intro->extend_info->identity_digest, DIGEST_LEN) &&
+        circ->rend_data) {
+      return circ;
+    }
+  }
+  return NULL;
+}
+
+/** Return a pointer to the rend_intro_point_t corresponding to the
+ * service-side introduction circuit <b>circ</b>. */
+static rend_intro_point_t *
+find_intro_point(origin_circuit_t *circ)
+{
+  const char *serviceid;
+  rend_service_t *service = NULL;
+
+  tor_assert(TO_CIRCUIT(circ)->purpose == CIRCUIT_PURPOSE_S_ESTABLISH_INTRO ||
+             TO_CIRCUIT(circ)->purpose == CIRCUIT_PURPOSE_S_INTRO);
+  tor_assert(circ->rend_data);
+  serviceid = circ->rend_data->onion_address;
+
+  SMARTLIST_FOREACH(rend_service_list, rend_service_t *, s,
+    if (tor_memeq(s->service_id, serviceid, REND_SERVICE_ID_LEN_BASE32)) {
+      service = s;
+      break;
+    });
+
+  if (service == NULL) return NULL;
+
+  SMARTLIST_FOREACH(service->intro_nodes, rend_intro_point_t *, intro_point,
+    if (crypto_pk_eq_keys(intro_point->intro_key, circ->intro_key)) {
+      return intro_point;
+    });
+
+  return NULL;
+}
+
+/** Determine the responsible hidden service directories for the
+ * rend_encoded_v2_service_descriptor_t's in <b>descs</b> and upload them;
+ * <b>service_id</b> and <b>seconds_valid</b> are only passed for logging
+ * purposes. */
+static void
+directory_post_to_hs_dir(rend_service_descriptor_t *renddesc,
+                         smartlist_t *descs, const char *service_id,
+                         int seconds_valid)
+{
+  int i, j, failed_upload = 0;
+  smartlist_t *responsible_dirs = smartlist_new();
+  smartlist_t *successful_uploads = smartlist_new();
+  routerstatus_t *hs_dir;
+  for (i = 0; i < smartlist_len(descs); i++) {
+    rend_encoded_v2_service_descriptor_t *desc = smartlist_get(descs, i);
+    /* Determine responsible dirs. */
+    if (hid_serv_get_responsible_directories(responsible_dirs,
+                                             desc->desc_id) < 0) {
+      log_warn(LD_REND, "Could not determine the responsible hidden service "
+                        "directories to post descriptors to.");
+      smartlist_free(responsible_dirs);
+      smartlist_free(successful_uploads);
+      return;
+    }
+    for (j = 0; j < smartlist_len(responsible_dirs); j++) {
+      char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
+      char *hs_dir_ip;
+      const node_t *node;
+      hs_dir = smartlist_get(responsible_dirs, j);
+      if (smartlist_contains_digest(renddesc->successful_uploads,
+                                hs_dir->identity_digest))
+        /* Don't upload descriptor if we succeeded in doing so last time. */
+        continue;
+      node = node_get_by_id(hs_dir->identity_digest);
+      if (!node || !node_has_descriptor(node)) {
+        log_info(LD_REND, "Not launching upload for for v2 descriptor to "
+                          "hidden service directory %s; we don't have its "
+                          "router descriptor. Queuing for later upload.",
+                 safe_str_client(routerstatus_describe(hs_dir)));
+        failed_upload = -1;
+        continue;
+      }
+      /* Send publish request. */
+      directory_initiate_command_routerstatus(hs_dir,
+                                              DIR_PURPOSE_UPLOAD_RENDDESC_V2,
+                                              ROUTER_PURPOSE_GENERAL,
+                                              DIRIND_ANONYMOUS, NULL,
+                                              desc->desc_str,
+                                              strlen(desc->desc_str), 0);
+      base32_encode(desc_id_base32, sizeof(desc_id_base32),
+                    desc->desc_id, DIGEST_LEN);
+      hs_dir_ip = tor_dup_ip(hs_dir->addr);
+      log_info(LD_REND, "Launching upload for v2 descriptor for "
+                        "service '%s' with descriptor ID '%s' with validity "
+                        "of %d seconds to hidden service directory '%s' on "
+                        "%s:%d.",
+               safe_str_client(service_id),
+               safe_str_client(desc_id_base32),
+               seconds_valid,
+               hs_dir->nickname,
+               hs_dir_ip,
+               hs_dir->or_port);
+      tor_free(hs_dir_ip);
+      /* Remember successful upload to this router for next time. */
+      if (!smartlist_contains_digest(successful_uploads,
+                                     hs_dir->identity_digest))
+        smartlist_add(successful_uploads, hs_dir->identity_digest);
+    }
+    smartlist_clear(responsible_dirs);
+  }
+  if (!failed_upload) {
+    if (renddesc->successful_uploads) {
+      SMARTLIST_FOREACH(renddesc->successful_uploads, char *, c, tor_free(c););
+      smartlist_free(renddesc->successful_uploads);
+      renddesc->successful_uploads = NULL;
+    }
+    renddesc->all_uploads_performed = 1;
+  } else {
+    /* Remember which routers worked this time, so that we don't upload the
+     * descriptor to them again. */
+    if (!renddesc->successful_uploads)
+      renddesc->successful_uploads = smartlist_new();
+    SMARTLIST_FOREACH(successful_uploads, const char *, c, {
+      if (!smartlist_contains_digest(renddesc->successful_uploads, c)) {
+        char *hsdir_id = tor_memdup(c, DIGEST_LEN);
+        smartlist_add(renddesc->successful_uploads, hsdir_id);
+      }
+    });
+  }
+  smartlist_free(responsible_dirs);
+  smartlist_free(successful_uploads);
+}
+
+/** Encode and sign an up-to-date service descriptor for <b>service</b>,
+ * and upload it/them to the responsible hidden service directories.
+ */
+static void
+upload_service_descriptor(rend_service_t *service)
+{
+  time_t now = time(NULL);
+  int rendpostperiod;
+  char serviceid[REND_SERVICE_ID_LEN_BASE32+1];
+  int uploaded = 0;
+
+  rendpostperiod = get_options()->RendPostPeriod;
+
+  /* Upload descriptor? */
+  if (get_options()->PublishHidServDescriptors) {
+    networkstatus_t *c = networkstatus_get_latest_consensus();
+    if (c && smartlist_len(c->routerstatus_list) > 0) {
+      int seconds_valid, i, j, num_descs;
+      smartlist_t *descs = smartlist_new();
+      smartlist_t *client_cookies = smartlist_new();
+      /* Either upload a single descriptor (including replicas) or one
+       * descriptor for each authorized client in case of authorization
+       * type 'stealth'. */
+      num_descs = service->auth_type == REND_STEALTH_AUTH ?
+                      smartlist_len(service->clients) : 1;
+      for (j = 0; j < num_descs; j++) {
+        crypto_pk_t *client_key = NULL;
+        rend_authorized_client_t *client = N
