@@ -2898,4 +2898,246 @@ upload_service_descriptor(rend_service_t *service)
                       smartlist_len(service->clients) : 1;
       for (j = 0; j < num_descs; j++) {
         crypto_pk_t *client_key = NULL;
-        rend_authorized_client_t *client = N
+        rend_authorized_client_t *client = NULL;
+        smartlist_clear(client_cookies);
+        switch (service->auth_type) {
+          case REND_NO_AUTH:
+            /* Do nothing here. */
+            break;
+          case REND_BASIC_AUTH:
+            SMARTLIST_FOREACH(service->clients, rend_authorized_client_t *,
+                cl, smartlist_add(client_cookies, cl->descriptor_cookie));
+            break;
+          case REND_STEALTH_AUTH:
+            client = smartlist_get(service->clients, j);
+            client_key = client->client_key;
+            smartlist_add(client_cookies, client->descriptor_cookie);
+            break;
+        }
+        /* Encode the current descriptor. */
+        seconds_valid = rend_encode_v2_descriptors(descs, service->desc,
+                                                   now, 0,
+                                                   service->auth_type,
+                                                   client_key,
+                                                   client_cookies);
+        if (seconds_valid < 0) {
+          log_warn(LD_BUG, "Internal error: couldn't encode service "
+                   "descriptor; not uploading.");
+          smartlist_free(descs);
+          smartlist_free(client_cookies);
+          return;
+        }
+        /* Post the current descriptors to the hidden service directories. */
+        rend_get_service_id(service->desc->pk, serviceid);
+        log_info(LD_REND, "Launching upload for hidden service %s",
+                     serviceid);
+        directory_post_to_hs_dir(service->desc, descs, serviceid,
+                                 seconds_valid);
+        /* Free memory for descriptors. */
+        for (i = 0; i < smartlist_len(descs); i++)
+          rend_encoded_v2_service_descriptor_free(smartlist_get(descs, i));
+        smartlist_clear(descs);
+        /* Update next upload time. */
+        if (seconds_valid - REND_TIME_PERIOD_OVERLAPPING_V2_DESCS
+            > rendpostperiod)
+          service->next_upload_time = now + rendpostperiod;
+        else if (seconds_valid < REND_TIME_PERIOD_OVERLAPPING_V2_DESCS)
+          service->next_upload_time = now + seconds_valid + 1;
+        else
+          service->next_upload_time = now + seconds_valid -
+              REND_TIME_PERIOD_OVERLAPPING_V2_DESCS + 1;
+        /* Post also the next descriptors, if necessary. */
+        if (seconds_valid < REND_TIME_PERIOD_OVERLAPPING_V2_DESCS) {
+          seconds_valid = rend_encode_v2_descriptors(descs, service->desc,
+                                                     now, 1,
+                                                     service->auth_type,
+                                                     client_key,
+                                                     client_cookies);
+          if (seconds_valid < 0) {
+            log_warn(LD_BUG, "Internal error: couldn't encode service "
+                     "descriptor; not uploading.");
+            smartlist_free(descs);
+            smartlist_free(client_cookies);
+            return;
+          }
+          directory_post_to_hs_dir(service->desc, descs, serviceid,
+                                   seconds_valid);
+          /* Free memory for descriptors. */
+          for (i = 0; i < smartlist_len(descs); i++)
+            rend_encoded_v2_service_descriptor_free(smartlist_get(descs, i));
+          smartlist_clear(descs);
+        }
+      }
+      smartlist_free(descs);
+      smartlist_free(client_cookies);
+      uploaded = 1;
+      log_info(LD_REND, "Successfully uploaded v2 rend descriptors!");
+    }
+  }
+
+  /* If not uploaded, try again in one minute. */
+  if (!uploaded)
+    service->next_upload_time = now + 60;
+
+  /* Unmark dirty flag of this service. */
+  service->desc_is_dirty = 0;
+}
+
+/** Return the number of INTRODUCE2 cells this hidden service has received
+ * from this intro point. */
+static int
+intro_point_accepted_intro_count(rend_intro_point_t *intro)
+{
+  return intro->accepted_introduce2_count;
+}
+
+/** Return non-zero iff <b>intro</b> should 'expire' now (i.e. we
+ * should stop publishing it in new descriptors and eventually close
+ * it). */
+static int
+intro_point_should_expire_now(rend_intro_point_t *intro,
+                              time_t now)
+{
+  tor_assert(intro != NULL);
+
+  if (intro->time_published == -1) {
+    /* Don't expire an intro point if we haven't even published it yet. */
+    return 0;
+  }
+
+  if (intro->time_expiring != -1) {
+    /* We've already started expiring this intro point.  *Don't* let
+     * this function's result 'flap'. */
+    return 1;
+  }
+
+  if (intro_point_accepted_intro_count(intro) >=
+      INTRO_POINT_LIFETIME_INTRODUCTIONS) {
+    /* This intro point has been used too many times.  Expire it now. */
+    return 1;
+  }
+
+  if (intro->time_to_expire == -1) {
+    /* This intro point has been published, but we haven't picked an
+     * expiration time for it.  Pick one now. */
+    int intro_point_lifetime_seconds =
+      INTRO_POINT_LIFETIME_MIN_SECONDS +
+      crypto_rand_int(INTRO_POINT_LIFETIME_MAX_SECONDS -
+                      INTRO_POINT_LIFETIME_MIN_SECONDS);
+
+    /* Start the expiration timer now, rather than when the intro
+     * point was first published.  There shouldn't be much of a time
+     * difference. */
+    intro->time_to_expire = now + intro_point_lifetime_seconds;
+
+    return 0;
+  }
+
+  /* This intro point has a time to expire set already.  Use it. */
+  return (now >= intro->time_to_expire);
+}
+
+/** For every service, check how many intro points it currently has, and:
+ *  - Pick new intro points as necessary.
+ *  - Launch circuits to any new intro points.
+ */
+void
+rend_services_introduce(void)
+{
+  int i,j,r;
+  const node_t *node;
+  rend_service_t *service;
+  rend_intro_point_t *intro;
+  int intro_point_set_changed, prev_intro_nodes;
+  unsigned int n_intro_points_unexpired;
+  unsigned int n_intro_points_to_open;
+  smartlist_t *intro_nodes;
+  time_t now;
+  const or_options_t *options = get_options();
+
+  intro_nodes = smartlist_new();
+  now = time(NULL);
+
+  for (i=0; i < smartlist_len(rend_service_list); ++i) {
+    smartlist_clear(intro_nodes);
+    service = smartlist_get(rend_service_list, i);
+
+    tor_assert(service);
+
+    /* intro_point_set_changed becomes non-zero iff the set of intro
+     * points to be published in service's descriptor has changed. */
+    intro_point_set_changed = 0;
+
+    /* n_intro_points_unexpired collects the number of non-expiring
+     * intro points we have, so that we know how many new intro
+     * circuits we need to launch for this service. */
+    n_intro_points_unexpired = 0;
+
+    if (now > service->intro_period_started+INTRO_CIRC_RETRY_PERIOD) {
+      /* One period has elapsed; we can try building circuits again. */
+      service->intro_period_started = now;
+      service->n_intro_circuits_launched = 0;
+    } else if (service->n_intro_circuits_launched >=
+               MAX_INTRO_CIRCS_PER_PERIOD) {
+      /* We have failed too many times in this period; wait for the next
+       * one before we try again. */
+      continue;
+    }
+
+    /* Find out which introduction points we have in progress for this
+       service. */
+    SMARTLIST_FOREACH_BEGIN(service->intro_nodes, rend_intro_point_t *,
+                            intro) {
+      origin_circuit_t *intro_circ =
+        find_intro_circuit(intro, service->pk_digest);
+
+      if (intro->time_expiring + INTRO_POINT_EXPIRATION_GRACE_PERIOD > now) {
+        /* This intro point has completely expired.  Remove it, and
+         * mark the circuit for close if it's still alive. */
+        if (intro_circ != NULL &&
+            intro_circ->base_.purpose != CIRCUIT_PURPOSE_PATH_BIAS_TESTING) {
+          circuit_mark_for_close(TO_CIRCUIT(intro_circ),
+                                 END_CIRC_REASON_FINISHED);
+        }
+        rend_intro_point_free(intro);
+        intro = NULL; /* SMARTLIST_DEL_CURRENT takes a name, not a value. */
+        SMARTLIST_DEL_CURRENT(service->intro_nodes, intro);
+        /* We don't need to set intro_point_set_changed here, because
+         * this intro point wouldn't have been published in a current
+         * descriptor anyway. */
+        continue;
+      }
+
+      node = node_get_by_id(intro->extend_info->identity_digest);
+      if (!node || !intro_circ) {
+        int removing_this_intro_point_changes_the_intro_point_set = 1;
+        log_info(LD_REND, "Giving up on %s as intro point for %s"
+                 " (circuit disappeared).",
+                 safe_str_client(extend_info_describe(intro->extend_info)),
+                 safe_str_client(service->service_id));
+        rend_service_note_removing_intro_point(service, intro);
+        if (intro->time_expiring != -1) {
+          log_info(LD_REND, "We were already expiring the intro point; "
+                   "no need to mark the HS descriptor as dirty over this.");
+          removing_this_intro_point_changes_the_intro_point_set = 0;
+        } else if (intro->listed_in_last_desc) {
+          log_info(LD_REND, "The intro point we are giving up on was "
+                   "included in the last published descriptor. "
+                   "Marking current descriptor as dirty.");
+          service->desc_is_dirty = now;
+        }
+        rend_intro_point_free(intro);
+        intro = NULL; /* SMARTLIST_DEL_CURRENT takes a name, not a value. */
+        SMARTLIST_DEL_CURRENT(service->intro_nodes, intro);
+        if (removing_this_intro_point_changes_the_intro_point_set)
+          intro_point_set_changed = 1;
+      }
+
+      if (intro != NULL && intro_point_should_expire_now(intro, now)) {
+        log_info(LD_REND, "Expiring %s as intro point for %s.",
+                 safe_str_client(extend_info_describe(intro->extend_info)),
+                 safe_str_client(service->service_id));
+
+        rend_service_note_removing_intro_point(service, intro);
+
+        /* The polite (and generally Right)
