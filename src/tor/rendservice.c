@@ -3140,4 +3140,257 @@ rend_services_introduce(void)
 
         rend_service_note_removing_intro_point(service, intro);
 
-        /* The polite (and generally Right)
+        /* The polite (and generally Right) way to expire an intro
+         * point is to establish a new one to replace it, publish a
+         * new descriptor that doesn't list any expiring intro points,
+         * and *then*, once our upload attempts for the new descriptor
+         * have ended (whether in success or failure), close the
+         * expiring intro points.
+         *
+         * Unfortunately, we can't find out when the new descriptor
+         * has actually been uploaded, so we'll have to settle for a
+         * five-minute timer.  Start it.  XXXX024 This sucks. */
+        intro->time_expiring = now;
+
+        intro_point_set_changed = 1;
+      }
+
+      if (intro != NULL && intro->time_expiring == -1)
+        ++n_intro_points_unexpired;
+
+      if (node)
+        smartlist_add(intro_nodes, (void*)node);
+    } SMARTLIST_FOREACH_END(intro);
+
+    if (!intro_point_set_changed &&
+        (n_intro_points_unexpired >= service->n_intro_points_wanted)) {
+      continue;
+    }
+
+    /* Remember how many introduction circuits we started with.
+     *
+     * prev_intro_nodes serves a different purpose than
+     * n_intro_points_unexpired -- this variable tells us where our
+     * previously-created intro points end and our new ones begin in
+     * the intro-point list, so we don't have to launch the circuits
+     * at the same time as we create the intro points they correspond
+     * to.  XXXX This is daft. */
+    prev_intro_nodes = smartlist_len(service->intro_nodes);
+
+    /* We have enough directory information to start establishing our
+     * intro points. We want to end up with n_intro_points_wanted
+     * intro points, but if we're just starting, we launch two extra
+     * circuits and use the first n_intro_points_wanted that complete.
+     *
+     * The ones after the first three will be converted to 'general'
+     * internal circuits in rend_service_intro_has_opened(), and then
+     * we'll drop them from the list of intro points next time we
+     * go through the above "find out which introduction points we have
+     * in progress" loop. */
+    n_intro_points_to_open = (service->n_intro_points_wanted +
+                              (prev_intro_nodes == 0 ? 2 : 0));
+    for (j = (int)n_intro_points_unexpired;
+         j < (int)n_intro_points_to_open;
+         ++j) { /* XXXX remove casts */
+      router_crn_flags_t flags = CRN_NEED_UPTIME|CRN_NEED_DESC;
+      if (get_options()->AllowInvalid_ & ALLOW_INVALID_INTRODUCTION)
+        flags |= CRN_ALLOW_INVALID;
+      node = router_choose_random_node(intro_nodes,
+                                       options->ExcludeNodes, flags);
+      if (!node) {
+        log_warn(LD_REND,
+                 "Could only establish %d introduction points for %s; "
+                 "wanted %u.",
+                 smartlist_len(service->intro_nodes), service->service_id,
+                 n_intro_points_to_open);
+        break;
+      }
+      intro_point_set_changed = 1;
+      smartlist_add(intro_nodes, (void*)node);
+      intro = tor_malloc_zero(sizeof(rend_intro_point_t));
+      intro->extend_info = extend_info_from_node(node, 0);
+      intro->intro_key = crypto_pk_new();
+      tor_assert(!crypto_pk_generate_key(intro->intro_key));
+      intro->time_published = -1;
+      intro->time_to_expire = -1;
+      intro->time_expiring = -1;
+      smartlist_add(service->intro_nodes, intro);
+      log_info(LD_REND, "Picked router %s as an intro point for %s.",
+               safe_str_client(node_describe(node)),
+               safe_str_client(service->service_id));
+    }
+
+    /* If there's no need to launch new circuits, stop here. */
+    if (!intro_point_set_changed)
+      continue;
+
+    /* Establish new introduction points. */
+    for (j=prev_intro_nodes; j < smartlist_len(service->intro_nodes); ++j) {
+      intro = smartlist_get(service->intro_nodes, j);
+      r = rend_service_launch_establish_intro(service, intro);
+      if (r<0) {
+        log_warn(LD_REND, "Error launching circuit to node %s for service %s.",
+                 safe_str_client(extend_info_describe(intro->extend_info)),
+                 safe_str_client(service->service_id));
+      }
+    }
+  }
+  smartlist_free(intro_nodes);
+}
+
+/** Regenerate and upload rendezvous service descriptors for all
+ * services, if necessary. If the descriptor has been dirty enough
+ * for long enough, definitely upload; else only upload when the
+ * periodic timeout has expired.
+ *
+ * For the first upload, pick a random time between now and two periods
+ * from now, and pick it independently for each service.
+ */
+void
+rend_consider_services_upload(time_t now)
+{
+  int i;
+  rend_service_t *service;
+  int rendpostperiod = get_options()->RendPostPeriod;
+
+  if (!get_options()->PublishHidServDescriptors)
+    return;
+
+  for (i=0; i < smartlist_len(rend_service_list); ++i) {
+    service = smartlist_get(rend_service_list, i);
+    if (!service->next_upload_time) { /* never been uploaded yet */
+      /* The fixed lower bound of 30 seconds ensures that the descriptor
+       * is stable before being published. See comment below. */
+      service->next_upload_time =
+        now + 30 + crypto_rand_int(2*rendpostperiod);
+    }
+    if (service->next_upload_time < now ||
+        (service->desc_is_dirty &&
+         service->desc_is_dirty < now-30)) {
+      /* if it's time, or if the directory servers have a wrong service
+       * descriptor and ours has been stable for 30 seconds, upload a
+       * new one of each format. */
+      rend_service_update_descriptor(service);
+      upload_service_descriptor(service);
+    }
+  }
+}
+
+/** True if the list of available router descriptors might have changed so
+ * that we should have a look whether we can republish previously failed
+ * rendezvous service descriptors. */
+static int consider_republishing_rend_descriptors = 1;
+
+/** Called when our internal view of the directory has changed, so that we
+ * might have router descriptors of hidden service directories available that
+ * we did not have before. */
+void
+rend_hsdir_routers_changed(void)
+{
+  consider_republishing_rend_descriptors = 1;
+}
+
+/** Consider republication of v2 rendezvous service descriptors that failed
+ * previously, but without regenerating descriptor contents.
+ */
+void
+rend_consider_descriptor_republication(void)
+{
+  int i;
+  rend_service_t *service;
+
+  if (!consider_republishing_rend_descriptors)
+    return;
+  consider_republishing_rend_descriptors = 0;
+
+  if (!get_options()->PublishHidServDescriptors)
+    return;
+
+  for (i=0; i < smartlist_len(rend_service_list); ++i) {
+    service = smartlist_get(rend_service_list, i);
+    if (service->desc && !service->desc->all_uploads_performed) {
+      /* If we failed in uploading a descriptor last time, try again *without*
+       * updating the descriptor's contents. */
+      upload_service_descriptor(service);
+    }
+  }
+}
+
+/** Log the status of introduction points for all rendezvous services
+ * at log severity <b>severity</b>.
+ */
+void
+rend_service_dump_stats(int severity)
+{
+  int i,j;
+  rend_service_t *service;
+  rend_intro_point_t *intro;
+  const char *safe_name;
+  origin_circuit_t *circ;
+
+  for (i=0; i < smartlist_len(rend_service_list); ++i) {
+    service = smartlist_get(rend_service_list, i);
+    tor_log(severity, LD_GENERAL, "Service configured in \"%s\":",
+        service->directory);
+    for (j=0; j < smartlist_len(service->intro_nodes); ++j) {
+      intro = smartlist_get(service->intro_nodes, j);
+      safe_name = safe_str_client(intro->extend_info->nickname);
+
+      circ = find_intro_circuit(intro, service->pk_digest);
+      if (!circ) {
+        tor_log(severity, LD_GENERAL, "  Intro point %d at %s: no circuit",
+            j, safe_name);
+        continue;
+      }
+      tor_log(severity, LD_GENERAL, "  Intro point %d at %s: circuit is %s",
+          j, safe_name, circuit_state_to_string(circ->base_.state));
+    }
+  }
+}
+
+/** Given <b>conn</b>, a rendezvous exit stream, look up the hidden service for
+ * 'circ', and look up the port and address based on conn-\>port.
+ * Assign the actual conn-\>addr and conn-\>port. Return -1 if failure,
+ * or 0 for success.
+ */
+int
+rend_service_set_connection_addr_port(edge_connection_t *conn,
+                                      origin_circuit_t *circ)
+{
+  rend_service_t *service;
+  char serviceid[REND_SERVICE_ID_LEN_BASE32+1];
+  smartlist_t *matching_ports;
+  rend_service_port_config_t *chosen_port;
+
+  tor_assert(circ->base_.purpose == CIRCUIT_PURPOSE_S_REND_JOINED);
+  tor_assert(circ->rend_data);
+  log_debug(LD_REND,"beginning to hunt for addr/port");
+  base32_encode(serviceid, REND_SERVICE_ID_LEN_BASE32+1,
+                circ->rend_data->rend_pk_digest, REND_SERVICE_ID_LEN);
+  service = rend_service_get_by_pk_digest(
+                circ->rend_data->rend_pk_digest);
+  if (!service) {
+    log_warn(LD_REND, "Couldn't find any service associated with pk %s on "
+             "rendezvous circuit %u; closing.",
+             serviceid, (unsigned)circ->base_.n_circ_id);
+    return -1;
+  }
+  matching_ports = smartlist_new();
+  SMARTLIST_FOREACH(service->ports, rend_service_port_config_t *, p,
+  {
+    if (conn->base_.port == p->virtual_port) {
+      smartlist_add(matching_ports, p);
+    }
+  });
+  chosen_port = smartlist_choose(matching_ports);
+  smartlist_free(matching_ports);
+  if (chosen_port) {
+    tor_addr_copy(&conn->base_.addr, &chosen_port->real_addr);
+    conn->base_.port = chosen_port->real_port;
+    return 0;
+  }
+  log_info(LD_REND, "No virtual port mapping exists for port %d on service %s",
+           conn->base_.port,serviceid);
+  return -1;
+}
+
