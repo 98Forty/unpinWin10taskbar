@@ -742,4 +742,290 @@ authority_certs_fetch_missing(networkstatus_t *status, time_t now)
   if (status) {
     SMARTLIST_FOREACH_BEGIN(status->voters, networkstatus_voter_info_t *,
                             voter) {
-      if (!smartlist_len(voter->sigs)
+      if (!smartlist_len(voter->sigs))
+        continue; /* This authority never signed this consensus, so don't
+                   * go looking for a cert with key digest 0000000000. */
+      if (!cache &&
+          !trusteddirserver_get_by_v3_auth_digest(voter->identity_digest))
+        continue; /* We are not a cache, and we don't know this authority.*/
+
+      /*
+       * If we don't know *any* cert for this authority, and a download by ID
+       * is pending or we added it to missing_id_digests above, skip this
+       * one for now to avoid duplicate downloads.
+       */
+      cl = get_cert_list(voter->identity_digest);
+      if (smartlist_len(cl->certs) == 0) {
+        /* We have no certs at all for this one */
+
+        /* Do we have a download of one pending? */
+        if (digestmap_get(pending_id, voter->identity_digest))
+          continue;
+
+        /*
+         * Are we about to launch a download of one due to the trusted
+         * dir server check above?
+         */
+        if (smartlist_contains_digest(missing_id_digests,
+                                      voter->identity_digest))
+          continue;
+      }
+
+      SMARTLIST_FOREACH_BEGIN(voter->sigs, document_signature_t *, sig) {
+        cert = authority_cert_get_by_digests(voter->identity_digest,
+                                             sig->signing_key_digest);
+        if (cert) {
+          if (now < cert->expires)
+            download_status_reset_by_sk_in_cl(cl, sig->signing_key_digest);
+          continue;
+        }
+        if (download_status_is_ready_by_sk_in_cl(
+              cl, sig->signing_key_digest,
+              now, get_options()->TestingCertMaxDownloadTries) &&
+            !fp_pair_map_get_by_digests(pending_cert,
+                                        voter->identity_digest,
+                                        sig->signing_key_digest)) {
+          /*
+           * Do this rather than hex_str(), since hex_str clobbers
+           * old results and we call twice in the param list.
+           */
+          base16_encode(id_digest_str, sizeof(id_digest_str),
+                        voter->identity_digest, DIGEST_LEN);
+          base16_encode(sk_digest_str, sizeof(sk_digest_str),
+                        sig->signing_key_digest, DIGEST_LEN);
+
+          if (voter->nickname) {
+            log_info(LD_DIR,
+                     "We're missing a certificate from authority %s "
+                     "(ID digest %s) with signing key %s: "
+                     "launching request.",
+                     voter->nickname, id_digest_str, sk_digest_str);
+          } else {
+            log_info(LD_DIR,
+                     "We're missing a certificate from authority ID digest "
+                     "%s with signing key %s: launching request.",
+                     id_digest_str, sk_digest_str);
+          }
+
+          /* Allocate a new fp_pair_t to append */
+          fp_tmp = tor_malloc(sizeof(*fp_tmp));
+          memcpy(fp_tmp->first, voter->identity_digest, sizeof(fp_tmp->first));
+          memcpy(fp_tmp->second, sig->signing_key_digest,
+                 sizeof(fp_tmp->second));
+          smartlist_add(missing_cert_digests, fp_tmp);
+        }
+      } SMARTLIST_FOREACH_END(sig);
+    } SMARTLIST_FOREACH_END(voter);
+  }
+
+  /* Do downloads by identity digest */
+  if (smartlist_len(missing_id_digests) > 0) {
+    int need_plus = 0;
+    smartlist_t *fps = smartlist_new();
+
+    smartlist_add(fps, tor_strdup("fp/"));
+
+    SMARTLIST_FOREACH_BEGIN(missing_id_digests, const char *, d) {
+      char *fp = NULL;
+
+      if (digestmap_get(pending_id, d))
+        continue;
+
+      base16_encode(id_digest_str, sizeof(id_digest_str),
+                    d, DIGEST_LEN);
+
+      if (need_plus) {
+        tor_asprintf(&fp, "+%s", id_digest_str);
+      } else {
+        /* No need for tor_asprintf() in this case; first one gets no '+' */
+        fp = tor_strdup(id_digest_str);
+        need_plus = 1;
+      }
+
+      smartlist_add(fps, fp);
+    } SMARTLIST_FOREACH_END(d);
+
+    if (smartlist_len(fps) > 1) {
+      resource = smartlist_join_strings(fps, "", 0, NULL);
+      directory_get_from_dirserver(DIR_PURPOSE_FETCH_CERTIFICATE, 0,
+                                   resource, PDS_RETRY_IF_NO_SERVERS);
+      tor_free(resource);
+    }
+    /* else we didn't add any: they were all pending */
+
+    SMARTLIST_FOREACH(fps, char *, cp, tor_free(cp));
+    smartlist_free(fps);
+  }
+
+  /* Do downloads by identity digest/signing key pair */
+  if (smartlist_len(missing_cert_digests) > 0) {
+    int need_plus = 0;
+    smartlist_t *fp_pairs = smartlist_new();
+
+    smartlist_add(fp_pairs, tor_strdup("fp-sk/"));
+
+    SMARTLIST_FOREACH_BEGIN(missing_cert_digests, const fp_pair_t *, d) {
+      char *fp_pair = NULL;
+
+      if (fp_pair_map_get(pending_cert, d))
+        continue;
+
+      /* Construct string encodings of the digests */
+      base16_encode(id_digest_str, sizeof(id_digest_str),
+                    d->first, DIGEST_LEN);
+      base16_encode(sk_digest_str, sizeof(sk_digest_str),
+                    d->second, DIGEST_LEN);
+
+      /* Now tor_asprintf() */
+      if (need_plus) {
+        tor_asprintf(&fp_pair, "+%s-%s", id_digest_str, sk_digest_str);
+      } else {
+        /* First one in the list doesn't get a '+' */
+        tor_asprintf(&fp_pair, "%s-%s", id_digest_str, sk_digest_str);
+        need_plus = 1;
+      }
+
+      /* Add it to the list of pairs to request */
+      smartlist_add(fp_pairs, fp_pair);
+    } SMARTLIST_FOREACH_END(d);
+
+    if (smartlist_len(fp_pairs) > 1) {
+      resource = smartlist_join_strings(fp_pairs, "", 0, NULL);
+      directory_get_from_dirserver(DIR_PURPOSE_FETCH_CERTIFICATE, 0,
+                                   resource, PDS_RETRY_IF_NO_SERVERS);
+      tor_free(resource);
+    }
+    /* else they were all pending */
+
+    SMARTLIST_FOREACH(fp_pairs, char *, p, tor_free(p));
+    smartlist_free(fp_pairs);
+  }
+
+  smartlist_free(missing_id_digests);
+  SMARTLIST_FOREACH(missing_cert_digests, fp_pair_t *, p, tor_free(p));
+  smartlist_free(missing_cert_digests);
+  digestmap_free(pending_id, NULL);
+  fp_pair_map_free(pending_cert, NULL);
+}
+
+/* Router descriptor storage.
+ *
+ * Routerdescs are stored in a big file, named "cached-descriptors".  As new
+ * routerdescs arrive, we append them to a journal file named
+ * "cached-descriptors.new".
+ *
+ * From time to time, we replace "cached-descriptors" with a new file
+ * containing only the live, non-superseded descriptors, and clear
+ * cached-routers.new.
+ *
+ * On startup, we read both files.
+ */
+
+/** Helper: return 1 iff the router log is so big we want to rebuild the
+ * store. */
+static int
+router_should_rebuild_store(desc_store_t *store)
+{
+  if (store->store_len > (1<<16))
+    return (store->journal_len > store->store_len / 2 ||
+            store->bytes_dropped > store->store_len / 2);
+  else
+    return store->journal_len > (1<<15);
+}
+
+/** Return the desc_store_t in <b>rl</b> that should be used to store
+ * <b>sd</b>. */
+static INLINE desc_store_t *
+desc_get_store(routerlist_t *rl, const signed_descriptor_t *sd)
+{
+  if (sd->is_extrainfo)
+    return &rl->extrainfo_store;
+  else
+    return &rl->desc_store;
+}
+
+/** Add the signed_descriptor_t in <b>desc</b> to the router
+ * journal; change its saved_location to SAVED_IN_JOURNAL and set its
+ * offset appropriately. */
+static int
+signed_desc_append_to_journal(signed_descriptor_t *desc,
+                              desc_store_t *store)
+{
+  char *fname = get_datadir_fname_suffix(store->fname_base, ".new");
+  const char *body = signed_descriptor_get_body_impl(desc,1);
+  size_t len = desc->signed_descriptor_len + desc->annotations_len;
+
+  if (append_bytes_to_file(fname, body, len, 1)) {
+    log_warn(LD_FS, "Unable to store router descriptor");
+    tor_free(fname);
+    return -1;
+  }
+  desc->saved_location = SAVED_IN_JOURNAL;
+  tor_free(fname);
+
+  desc->saved_offset = store->journal_len;
+  store->journal_len += len;
+
+  return 0;
+}
+
+/** Sorting helper: return &lt;0, 0, or &gt;0 depending on whether the
+ * signed_descriptor_t* in *<b>a</b> is older, the same age as, or newer than
+ * the signed_descriptor_t* in *<b>b</b>. */
+static int
+compare_signed_descriptors_by_age_(const void **_a, const void **_b)
+{
+  const signed_descriptor_t *r1 = *_a, *r2 = *_b;
+  return (int)(r1->published_on - r2->published_on);
+}
+
+#define RRS_FORCE 1
+#define RRS_DONT_REMOVE_OLD 2
+
+/** If the journal of <b>store</b> is too long, or if RRS_FORCE is set in
+ * <b>flags</b>, then atomically replace the saved router store with the
+ * routers currently in our routerlist, and clear the journal.  Unless
+ * RRS_DONT_REMOVE_OLD is set in <b>flags</b>, delete expired routers before
+ * rebuilding the store.  Return 0 on success, -1 on failure.
+ */
+static int
+router_rebuild_store(int flags, desc_store_t *store)
+{
+  smartlist_t *chunk_list = NULL;
+  char *fname = NULL, *fname_tmp = NULL;
+  int r = -1;
+  off_t offset = 0;
+  smartlist_t *signed_descriptors = NULL;
+  int nocache=0;
+  size_t total_expected_len = 0;
+  int had_any;
+  int force = flags & RRS_FORCE;
+
+  if (!force && !router_should_rebuild_store(store)) {
+    r = 0;
+    goto done;
+  }
+  if (!routerlist) {
+    r = 0;
+    goto done;
+  }
+
+  if (store->type == EXTRAINFO_STORE)
+    had_any = !eimap_isempty(routerlist->extra_info_map);
+  else
+    had_any = (smartlist_len(routerlist->routers)+
+               smartlist_len(routerlist->old_routers))>0;
+
+  /* Don't save deadweight. */
+  if (!(flags & RRS_DONT_REMOVE_OLD))
+    routerlist_remove_old_routers();
+
+  log_info(LD_DIR, "Rebuilding %s cache", store->description);
+
+  fname = get_datadir_fname(store->fname_base);
+  fname_tmp = get_datadir_fname_suffix(store->fname_base, ".tmp");
+
+  chunk_list = smartlist_new();
+
+  /* We sort the routers by age to enhance locality on disk. */
+  signed
