@@ -467,4 +467,279 @@ trusted_dirs_remove_old_certs(void)
   time_t now = time(NULL);
 #define DEAD_CERT_LIFETIME (2*24*60*60)
 #define OLD_CERT_LIFETIME (7*24*60*60)
-  
+  if (!trusted_dir_certs)
+    return;
+
+  DIGESTMAP_FOREACH(trusted_dir_certs, key, cert_list_t *, cl) {
+    authority_cert_t *newest = NULL;
+    SMARTLIST_FOREACH(cl->certs, authority_cert_t *, cert,
+          if (!newest || (cert->cache_info.published_on >
+                          newest->cache_info.published_on))
+            newest = cert);
+    if (newest) {
+      const time_t newest_published = newest->cache_info.published_on;
+      SMARTLIST_FOREACH_BEGIN(cl->certs, authority_cert_t *, cert) {
+        int expired;
+        time_t cert_published;
+        if (newest == cert)
+          continue;
+        expired = now > cert->expires;
+        cert_published = cert->cache_info.published_on;
+        /* Store expired certs for 48 hours after a newer arrives;
+         */
+        if (expired ?
+            (newest_published + DEAD_CERT_LIFETIME < now) :
+            (cert_published + OLD_CERT_LIFETIME < newest_published)) {
+          SMARTLIST_DEL_CURRENT(cl->certs, cert);
+          authority_cert_free(cert);
+          trusted_dir_servers_certs_changed = 1;
+        }
+      } SMARTLIST_FOREACH_END(cert);
+    }
+  } DIGESTMAP_FOREACH_END;
+#undef OLD_CERT_LIFETIME
+
+  trusted_dirs_flush_certs_to_disk();
+}
+
+/** Return the newest v3 authority certificate whose v3 authority identity key
+ * has digest <b>id_digest</b>.  Return NULL if no such authority is known,
+ * or it has no certificate. */
+authority_cert_t *
+authority_cert_get_newest_by_id(const char *id_digest)
+{
+  cert_list_t *cl;
+  authority_cert_t *best = NULL;
+  if (!trusted_dir_certs ||
+      !(cl = digestmap_get(trusted_dir_certs, id_digest)))
+    return NULL;
+
+  SMARTLIST_FOREACH(cl->certs, authority_cert_t *, cert,
+  {
+    if (!best || cert->cache_info.published_on > best->cache_info.published_on)
+      best = cert;
+  });
+  return best;
+}
+
+/** Return the newest v3 authority certificate whose directory signing key has
+ * digest <b>sk_digest</b>. Return NULL if no such certificate is known.
+ */
+authority_cert_t *
+authority_cert_get_by_sk_digest(const char *sk_digest)
+{
+  authority_cert_t *c;
+  if (!trusted_dir_certs)
+    return NULL;
+
+  if ((c = get_my_v3_authority_cert()) &&
+      tor_memeq(c->signing_key_digest, sk_digest, DIGEST_LEN))
+    return c;
+  if ((c = get_my_v3_legacy_cert()) &&
+      tor_memeq(c->signing_key_digest, sk_digest, DIGEST_LEN))
+    return c;
+
+  DIGESTMAP_FOREACH(trusted_dir_certs, key, cert_list_t *, cl) {
+    SMARTLIST_FOREACH(cl->certs, authority_cert_t *, cert,
+    {
+      if (tor_memeq(cert->signing_key_digest, sk_digest, DIGEST_LEN))
+        return cert;
+    });
+  } DIGESTMAP_FOREACH_END;
+  return NULL;
+}
+
+/** Return the v3 authority certificate with signing key matching
+ * <b>sk_digest</b>, for the authority with identity digest <b>id_digest</b>.
+ * Return NULL if no such authority is known. */
+authority_cert_t *
+authority_cert_get_by_digests(const char *id_digest,
+                              const char *sk_digest)
+{
+  cert_list_t *cl;
+  if (!trusted_dir_certs ||
+      !(cl = digestmap_get(trusted_dir_certs, id_digest)))
+    return NULL;
+  SMARTLIST_FOREACH(cl->certs, authority_cert_t *, cert,
+    if (tor_memeq(cert->signing_key_digest, sk_digest, DIGEST_LEN))
+      return cert; );
+
+  return NULL;
+}
+
+/** Add every known authority_cert_t to <b>certs_out</b>. */
+void
+authority_cert_get_all(smartlist_t *certs_out)
+{
+  tor_assert(certs_out);
+  if (!trusted_dir_certs)
+    return;
+
+  DIGESTMAP_FOREACH(trusted_dir_certs, key, cert_list_t *, cl) {
+    SMARTLIST_FOREACH(cl->certs, authority_cert_t *, c,
+                      smartlist_add(certs_out, c));
+  } DIGESTMAP_FOREACH_END;
+}
+
+/** Called when an attempt to download a certificate with the authority with
+ * ID <b>id_digest</b> and, if not NULL, signed with key signing_key_digest
+ * fails with HTTP response code <b>status</b>: remember the failure, so we
+ * don't try again immediately. */
+void
+authority_cert_dl_failed(const char *id_digest,
+                         const char *signing_key_digest, int status)
+{
+  cert_list_t *cl;
+  download_status_t *dlstatus = NULL;
+  char id_digest_str[2*DIGEST_LEN+1];
+  char sk_digest_str[2*DIGEST_LEN+1];
+
+  if (!trusted_dir_certs ||
+      !(cl = digestmap_get(trusted_dir_certs, id_digest)))
+    return;
+
+  /*
+   * Are we noting a failed download of the latest cert for the id digest,
+   * or of a download by (id, signing key) digest pair?
+   */
+  if (!signing_key_digest) {
+    /* Just by id digest */
+    download_status_failed(&cl->dl_status_by_id, status);
+  } else {
+    /* Reset by (id, signing key) digest pair
+     *
+     * Look for a download_status_t in the map with this digest
+     */
+    dlstatus = dsmap_get(cl->dl_status_map, signing_key_digest);
+    /* Got one? */
+    if (dlstatus) {
+      download_status_failed(dlstatus, status);
+    } else {
+      /*
+       * Do this rather than hex_str(), since hex_str clobbers
+       * old results and we call twice in the param list.
+       */
+      base16_encode(id_digest_str, sizeof(id_digest_str),
+                    id_digest, DIGEST_LEN);
+      base16_encode(sk_digest_str, sizeof(sk_digest_str),
+                    signing_key_digest, DIGEST_LEN);
+      log_warn(LD_BUG,
+               "Got failure for cert fetch with (fp,sk) = (%s,%s), with "
+               "status %d, but knew nothing about the download.",
+               id_digest_str, sk_digest_str, status);
+    }
+  }
+}
+
+/** Return true iff when we've been getting enough failures when trying to
+ * download the certificate with ID digest <b>id_digest</b> that we're willing
+ * to start bugging the user about it. */
+int
+authority_cert_dl_looks_uncertain(const char *id_digest)
+{
+#define N_AUTH_CERT_DL_FAILURES_TO_BUG_USER 2
+  cert_list_t *cl;
+  int n_failures;
+  if (!trusted_dir_certs ||
+      !(cl = digestmap_get(trusted_dir_certs, id_digest)))
+    return 0;
+
+  n_failures = download_status_get_n_failures(&cl->dl_status_by_id);
+  return n_failures >= N_AUTH_CERT_DL_FAILURES_TO_BUG_USER;
+}
+
+/** Try to download any v3 authority certificates that we may be missing.  If
+ * <b>status</b> is provided, try to get all the ones that were used to sign
+ * <b>status</b>.  Additionally, try to have a non-expired certificate for
+ * every V3 authority in trusted_dir_servers.  Don't fetch certificates we
+ * already have.
+ **/
+void
+authority_certs_fetch_missing(networkstatus_t *status, time_t now)
+{
+  /*
+   * The pending_id digestmap tracks pending certificate downloads by
+   * identity digest; the pending_cert digestmap tracks pending downloads
+   * by (identity digest, signing key digest) pairs.
+   */
+  digestmap_t *pending_id;
+  fp_pair_map_t *pending_cert;
+  authority_cert_t *cert;
+  /*
+   * The missing_id_digests smartlist will hold a list of id digests
+   * we want to fetch the newest cert for; the missing_cert_digests
+   * smartlist will hold a list of fp_pair_t with an identity and
+   * signing key digest.
+   */
+  smartlist_t *missing_cert_digests, *missing_id_digests;
+  char *resource = NULL;
+  cert_list_t *cl;
+  const int cache = directory_caches_unknown_auth_certs(get_options());
+  fp_pair_t *fp_tmp = NULL;
+  char id_digest_str[2*DIGEST_LEN+1];
+  char sk_digest_str[2*DIGEST_LEN+1];
+
+  if (should_delay_dir_fetches(get_options()))
+    return;
+
+  pending_cert = fp_pair_map_new();
+  pending_id = digestmap_new();
+  missing_cert_digests = smartlist_new();
+  missing_id_digests = smartlist_new();
+
+  /*
+   * First, we get the lists of already pending downloads so we don't
+   * duplicate effort.
+   */
+  list_pending_downloads(pending_id, DIR_PURPOSE_FETCH_CERTIFICATE, "fp/");
+  list_pending_fpsk_downloads(pending_cert);
+
+  /*
+   * Now, we download any trusted authority certs we don't have by
+   * identity digest only.  This gets the latest cert for that authority.
+   */
+  SMARTLIST_FOREACH_BEGIN(trusted_dir_servers, dir_server_t *, ds) {
+    int found = 0;
+    if (!(ds->type & V3_DIRINFO))
+      continue;
+    if (smartlist_contains_digest(missing_id_digests,
+                                  ds->v3_identity_digest))
+      continue;
+    cl = get_cert_list(ds->v3_identity_digest);
+    SMARTLIST_FOREACH_BEGIN(cl->certs, authority_cert_t *, cert) {
+      if (now < cert->expires) {
+        /* It's not expired, and we weren't looking for something to
+         * verify a consensus with.  Call it done. */
+        download_status_reset(&(cl->dl_status_by_id));
+        /* No sense trying to download it specifically by signing key hash */
+        download_status_reset_by_sk_in_cl(cl, cert->signing_key_digest);
+        found = 1;
+        break;
+      }
+    } SMARTLIST_FOREACH_END(cert);
+    if (!found &&
+        download_status_is_ready(&(cl->dl_status_by_id), now,
+                                 get_options()->TestingCertMaxDownloadTries) &&
+        !digestmap_get(pending_id, ds->v3_identity_digest)) {
+      log_info(LD_DIR,
+               "No current certificate known for authority %s "
+               "(ID digest %s); launching request.",
+               ds->nickname, hex_str(ds->v3_identity_digest, DIGEST_LEN));
+      smartlist_add(missing_id_digests, ds->v3_identity_digest);
+    }
+  } SMARTLIST_FOREACH_END(ds);
+
+  /*
+   * Next, if we have a consensus, scan through it and look for anything
+   * signed with a key from a cert we don't have.  Those get downloaded
+   * by (fp,sk) pair, but if we don't know any certs at all for the fp
+   * (identity digest), and it's one of the trusted dir server certs
+   * we started off above or a pending download in pending_id, don't
+   * try to get it yet.  Most likely, the one we'll get for that will
+   * have the right signing key too, and we'd just be downloading
+   * redundantly.
+   */
+  if (status) {
+    SMARTLIST_FOREACH_BEGIN(status->voters, networkstatus_voter_info_t *,
+                            voter) {
+      if (!smartlist_len(voter->sigs)
