@@ -1346,4 +1346,278 @@ dir_server_t *
 trusteddirserver_get_by_v3_auth_digest(const char *digest)
 {
   if (!trusted_dir_servers)
-    return NUL
+    return NULL;
+
+  SMARTLIST_FOREACH(trusted_dir_servers, dir_server_t *, ds,
+     {
+       if (tor_memeq(ds->v3_identity_digest, digest, DIGEST_LEN) &&
+           (ds->type & V3_DIRINFO))
+         return ds;
+     });
+
+  return NULL;
+}
+
+/** Try to find a running directory authority. Flags are as for
+ * router_pick_directory_server.
+ */
+const routerstatus_t *
+router_pick_trusteddirserver(dirinfo_type_t type, int flags)
+{
+  return router_pick_dirserver_generic(trusted_dir_servers, type, flags);
+}
+
+/** Try to find a running fallback directory Flags are as for
+ * router_pick_directory_server.
+ */
+const routerstatus_t *
+router_pick_fallback_dirserver(dirinfo_type_t type, int flags)
+{
+  return router_pick_dirserver_generic(fallback_dir_servers, type, flags);
+}
+
+/** Try to find a running fallback directory Flags are as for
+ * router_pick_directory_server.
+ */
+static const routerstatus_t *
+router_pick_dirserver_generic(smartlist_t *sourcelist,
+                              dirinfo_type_t type, int flags)
+{
+  const routerstatus_t *choice;
+  int busy = 0;
+  if (get_options()->PreferTunneledDirConns)
+    flags |= PDS_PREFER_TUNNELED_DIR_CONNS_;
+
+  choice = router_pick_trusteddirserver_impl(sourcelist, type, flags, &busy);
+  if (choice || !(flags & PDS_RETRY_IF_NO_SERVERS))
+    return choice;
+  if (busy) {
+    /* If the reason that we got no server is that servers are "busy",
+     * we must be excluding good servers because we already have serverdesc
+     * fetches with them.  Do not mark down servers up because of this. */
+    tor_assert((flags & (PDS_NO_EXISTING_SERVERDESC_FETCH|
+                         PDS_NO_EXISTING_MICRODESC_FETCH)));
+    return NULL;
+  }
+
+  log_info(LD_DIR,
+           "No dirservers are reachable. Trying them all again.");
+  mark_all_dirservers_up(sourcelist);
+  return router_pick_trusteddirserver_impl(sourcelist, type, flags, NULL);
+}
+
+/** How long do we avoid using a directory server after it's given us a 503? */
+#define DIR_503_TIMEOUT (60*60)
+
+/** Pick a random running valid directory server/mirror from our
+ * routerlist.  Arguments are as for router_pick_directory_server(), except
+ * that RETRY_IF_NO_SERVERS is ignored, and:
+ *
+ * If the PDS_PREFER_TUNNELED_DIR_CONNS_ flag is set, prefer directory servers
+ * that we can use with BEGINDIR.
+ */
+static const routerstatus_t *
+router_pick_directory_server_impl(dirinfo_type_t type, int flags)
+{
+  const or_options_t *options = get_options();
+  const node_t *result;
+  smartlist_t *direct, *tunnel;
+  smartlist_t *trusted_direct, *trusted_tunnel;
+  smartlist_t *overloaded_direct, *overloaded_tunnel;
+  time_t now = time(NULL);
+  const networkstatus_t *consensus = networkstatus_get_latest_consensus();
+  int requireother = ! (flags & PDS_ALLOW_SELF);
+  int fascistfirewall = ! (flags & PDS_IGNORE_FASCISTFIREWALL);
+  int prefer_tunnel = (flags & PDS_PREFER_TUNNELED_DIR_CONNS_);
+  int for_guard = (flags & PDS_FOR_GUARD);
+  int try_excluding = 1, n_excluded = 0;
+
+  if (!consensus)
+    return NULL;
+
+ retry_without_exclude:
+
+  direct = smartlist_new();
+  tunnel = smartlist_new();
+  trusted_direct = smartlist_new();
+  trusted_tunnel = smartlist_new();
+  overloaded_direct = smartlist_new();
+  overloaded_tunnel = smartlist_new();
+
+  /* Find all the running dirservers we know about. */
+  SMARTLIST_FOREACH_BEGIN(nodelist_get_list(), const node_t *, node) {
+    int is_trusted;
+    int is_overloaded;
+    tor_addr_t addr;
+    const routerstatus_t *status = node->rs;
+    const country_t country = node->country;
+    if (!status)
+      continue;
+
+    if (!node->is_running || !status->dir_port || !node->is_valid)
+      continue;
+    if (node->is_bad_directory)
+      continue;
+    if (requireother && router_digest_is_me(node->identity))
+      continue;
+    is_trusted = router_digest_is_trusted_dir(node->identity);
+    if ((type & EXTRAINFO_DIRINFO) &&
+        !router_supports_extrainfo(node->identity, 0))
+      continue;
+    if ((type & MICRODESC_DIRINFO) && !is_trusted &&
+        !node->rs->version_supports_microdesc_cache)
+      continue;
+    if (for_guard && node->using_as_guard)
+      continue; /* Don't make the same node a guard twice. */
+    if (try_excluding &&
+        routerset_contains_routerstatus(options->ExcludeNodes, status,
+                                        country)) {
+      ++n_excluded;
+      continue;
+    }
+
+    /* XXXX IP6 proposal 118 */
+    tor_addr_from_ipv4h(&addr, node->rs->addr);
+
+    is_overloaded = status->last_dir_503_at + DIR_503_TIMEOUT > now;
+
+    if (prefer_tunnel &&
+        (!fascistfirewall ||
+         fascist_firewall_allows_address_or(&addr, status->or_port)))
+      smartlist_add(is_trusted ? trusted_tunnel :
+                    is_overloaded ? overloaded_tunnel : tunnel, (void*)node);
+    else if (!fascistfirewall ||
+             fascist_firewall_allows_address_dir(&addr, status->dir_port))
+      smartlist_add(is_trusted ? trusted_direct :
+                    is_overloaded ? overloaded_direct : direct, (void*)node);
+  } SMARTLIST_FOREACH_END(node);
+
+  if (smartlist_len(tunnel)) {
+    result = node_sl_choose_by_bandwidth(tunnel, WEIGHT_FOR_DIR);
+  } else if (smartlist_len(overloaded_tunnel)) {
+    result = node_sl_choose_by_bandwidth(overloaded_tunnel,
+                                                 WEIGHT_FOR_DIR);
+  } else if (smartlist_len(trusted_tunnel)) {
+    /* FFFF We don't distinguish between trusteds and overloaded trusteds
+     * yet. Maybe one day we should. */
+    /* FFFF We also don't load balance over authorities yet. I think this
+     * is a feature, but it could easily be a bug. -RD */
+    result = smartlist_choose(trusted_tunnel);
+  } else if (smartlist_len(direct)) {
+    result = node_sl_choose_by_bandwidth(direct, WEIGHT_FOR_DIR);
+  } else if (smartlist_len(overloaded_direct)) {
+    result = node_sl_choose_by_bandwidth(overloaded_direct,
+                                         WEIGHT_FOR_DIR);
+  } else {
+    result = smartlist_choose(trusted_direct);
+  }
+  smartlist_free(direct);
+  smartlist_free(tunnel);
+  smartlist_free(trusted_direct);
+  smartlist_free(trusted_tunnel);
+  smartlist_free(overloaded_direct);
+  smartlist_free(overloaded_tunnel);
+
+  if (result == NULL && try_excluding && !options->StrictNodes && n_excluded) {
+    /* If we got no result, and we are excluding nodes, and StrictNodes is
+     * not set, try again without excluding nodes. */
+    try_excluding = 0;
+    n_excluded = 0;
+    goto retry_without_exclude;
+  }
+
+  return result ? result->rs : NULL;
+}
+
+/** Pick a random element from a list of dir_server_t, weighting by their
+ * <b>weight</b> field. */
+static const dir_server_t *
+dirserver_choose_by_weight(const smartlist_t *servers, double authority_weight)
+{
+  int n = smartlist_len(servers);
+  int i;
+  u64_dbl_t *weights;
+  const dir_server_t *ds;
+
+  weights = tor_malloc(sizeof(u64_dbl_t) * n);
+  for (i = 0; i < n; ++i) {
+    ds = smartlist_get(servers, i);
+    weights[i].dbl = ds->weight;
+    if (ds->is_authority)
+      weights[i].dbl *= authority_weight;
+  }
+
+  scale_array_elements_to_u64(weights, n, NULL);
+  i = choose_array_element_by_weight(weights, n);
+  tor_free(weights);
+  return (i < 0) ? NULL : smartlist_get(servers, i);
+}
+
+/** Choose randomly from among the dir_server_ts in sourcelist that
+ * are up. Flags are as for router_pick_directory_server_impl().
+ */
+static const routerstatus_t *
+router_pick_trusteddirserver_impl(const smartlist_t *sourcelist,
+                                  dirinfo_type_t type, int flags,
+                                  int *n_busy_out)
+{
+  const or_options_t *options = get_options();
+  smartlist_t *direct, *tunnel;
+  smartlist_t *overloaded_direct, *overloaded_tunnel;
+  const routerinfo_t *me = router_get_my_routerinfo();
+  const routerstatus_t *result = NULL;
+  time_t now = time(NULL);
+  const int requireother = ! (flags & PDS_ALLOW_SELF);
+  const int fascistfirewall = ! (flags & PDS_IGNORE_FASCISTFIREWALL);
+  const int prefer_tunnel = (flags & PDS_PREFER_TUNNELED_DIR_CONNS_);
+  const int no_serverdesc_fetching =(flags & PDS_NO_EXISTING_SERVERDESC_FETCH);
+  const int no_microdesc_fetching =(flags & PDS_NO_EXISTING_MICRODESC_FETCH);
+  const double auth_weight = (sourcelist == fallback_dir_servers) ?
+    options->DirAuthorityFallbackRate : 1.0;
+  smartlist_t *pick_from;
+  int n_busy = 0;
+  int try_excluding = 1, n_excluded = 0;
+
+  if (!sourcelist)
+    return NULL;
+
+ retry_without_exclude:
+
+  direct = smartlist_new();
+  tunnel = smartlist_new();
+  overloaded_direct = smartlist_new();
+  overloaded_tunnel = smartlist_new();
+
+  SMARTLIST_FOREACH_BEGIN(sourcelist, const dir_server_t *, d)
+    {
+      int is_overloaded =
+          d->fake_status.last_dir_503_at + DIR_503_TIMEOUT > now;
+      tor_addr_t addr;
+      if (!d->is_running) continue;
+      if ((type & d->type) == 0)
+        continue;
+      if ((type & EXTRAINFO_DIRINFO) &&
+          !router_supports_extrainfo(d->digest, 1))
+        continue;
+      if (requireother && me && router_digest_is_me(d->digest))
+          continue;
+      if (try_excluding &&
+          routerset_contains_routerstatus(options->ExcludeNodes,
+                                          &d->fake_status, -1)) {
+        ++n_excluded;
+        continue;
+      }
+
+      /* XXXX IP6 proposal 118 */
+      tor_addr_from_ipv4h(&addr, d->addr);
+
+      if (no_serverdesc_fetching) {
+        if (connection_get_by_type_addr_port_purpose(
+            CONN_TYPE_DIR, &addr, d->dir_port, DIR_PURPOSE_FETCH_SERVERDESC)
+         || connection_get_by_type_addr_port_purpose(
+             CONN_TYPE_DIR, &addr, d->dir_port, DIR_PURPOSE_FETCH_EXTRAINFO)) {
+          //log_debug(LD_DIR, "We have an existing connection to fetch "
+          //           "descriptor from %s; delaying",d->description);
+          ++n_busy;
+          continue;
+ 
