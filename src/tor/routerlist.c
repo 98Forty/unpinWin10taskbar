@@ -1028,4 +1028,322 @@ router_rebuild_store(int flags, desc_store_t *store)
   chunk_list = smartlist_new();
 
   /* We sort the routers by age to enhance locality on disk. */
-  signed
+  signed_descriptors = smartlist_new();
+  if (store->type == EXTRAINFO_STORE) {
+    eimap_iter_t *iter;
+    for (iter = eimap_iter_init(routerlist->extra_info_map);
+         !eimap_iter_done(iter);
+         iter = eimap_iter_next(routerlist->extra_info_map, iter)) {
+      const char *key;
+      extrainfo_t *ei;
+      eimap_iter_get(iter, &key, &ei);
+      smartlist_add(signed_descriptors, &ei->cache_info);
+    }
+  } else {
+    SMARTLIST_FOREACH(routerlist->old_routers, signed_descriptor_t *, sd,
+                      smartlist_add(signed_descriptors, sd));
+    SMARTLIST_FOREACH(routerlist->routers, routerinfo_t *, ri,
+                      smartlist_add(signed_descriptors, &ri->cache_info));
+  }
+
+  smartlist_sort(signed_descriptors, compare_signed_descriptors_by_age_);
+
+  /* Now, add the appropriate members to chunk_list */
+  SMARTLIST_FOREACH_BEGIN(signed_descriptors, signed_descriptor_t *, sd) {
+      sized_chunk_t *c;
+      const char *body = signed_descriptor_get_body_impl(sd, 1);
+      if (!body) {
+        log_warn(LD_BUG, "No descriptor available for router.");
+        goto done;
+      }
+      if (sd->do_not_cache) {
+        ++nocache;
+        continue;
+      }
+      c = tor_malloc(sizeof(sized_chunk_t));
+      c->bytes = body;
+      c->len = sd->signed_descriptor_len + sd->annotations_len;
+      total_expected_len += c->len;
+      smartlist_add(chunk_list, c);
+  } SMARTLIST_FOREACH_END(sd);
+
+  if (write_chunks_to_file(fname_tmp, chunk_list, 1, 1)<0) {
+    log_warn(LD_FS, "Error writing router store to disk.");
+    goto done;
+  }
+
+  /* Our mmap is now invalid. */
+  if (store->mmap) {
+    tor_munmap_file(store->mmap);
+    store->mmap = NULL;
+  }
+
+  if (replace_file(fname_tmp, fname)<0) {
+    log_warn(LD_FS, "Error replacing old router store: %s", strerror(errno));
+    goto done;
+  }
+
+  errno = 0;
+  store->mmap = tor_mmap_file(fname);
+  if (! store->mmap) {
+    if (errno == ERANGE) {
+      /* empty store.*/
+      if (total_expected_len) {
+        log_warn(LD_FS, "We wrote some bytes to a new descriptor file at '%s',"
+                 " but when we went to mmap it, it was empty!", fname);
+      } else if (had_any) {
+        log_info(LD_FS, "We just removed every descriptor in '%s'.  This is "
+                 "okay if we're just starting up after a long time. "
+                 "Otherwise, it's a bug.", fname);
+      }
+    } else {
+      log_warn(LD_FS, "Unable to mmap new descriptor file at '%s'.",fname);
+    }
+  }
+
+  log_info(LD_DIR, "Reconstructing pointers into cache");
+
+  offset = 0;
+  SMARTLIST_FOREACH_BEGIN(signed_descriptors, signed_descriptor_t *, sd) {
+      if (sd->do_not_cache)
+        continue;
+      sd->saved_location = SAVED_IN_CACHE;
+      if (store->mmap) {
+        tor_free(sd->signed_descriptor_body); // sets it to null
+        sd->saved_offset = offset;
+      }
+      offset += sd->signed_descriptor_len + sd->annotations_len;
+      signed_descriptor_get_body(sd); /* reconstruct and assert */
+  } SMARTLIST_FOREACH_END(sd);
+
+  tor_free(fname);
+  fname = get_datadir_fname_suffix(store->fname_base, ".new");
+  write_str_to_file(fname, "", 1);
+
+  r = 0;
+  store->store_len = (size_t) offset;
+  store->journal_len = 0;
+  store->bytes_dropped = 0;
+ done:
+  smartlist_free(signed_descriptors);
+  tor_free(fname);
+  tor_free(fname_tmp);
+  if (chunk_list) {
+    SMARTLIST_FOREACH(chunk_list, sized_chunk_t *, c, tor_free(c));
+    smartlist_free(chunk_list);
+  }
+
+  return r;
+}
+
+/** Helper: Reload a cache file and its associated journal, setting metadata
+ * appropriately.  If <b>extrainfo</b> is true, reload the extrainfo store;
+ * else reload the router descriptor store. */
+static int
+router_reload_router_list_impl(desc_store_t *store)
+{
+  char *fname = NULL, *contents = NULL;
+  struct stat st;
+  int extrainfo = (store->type == EXTRAINFO_STORE);
+  store->journal_len = store->store_len = 0;
+
+  fname = get_datadir_fname(store->fname_base);
+
+  if (store->mmap) /* get rid of it first */
+    tor_munmap_file(store->mmap);
+  store->mmap = NULL;
+
+  store->mmap = tor_mmap_file(fname);
+  if (store->mmap) {
+    store->store_len = store->mmap->size;
+    if (extrainfo)
+      router_load_extrainfo_from_string(store->mmap->data,
+                                        store->mmap->data+store->mmap->size,
+                                        SAVED_IN_CACHE, NULL, 0);
+    else
+      router_load_routers_from_string(store->mmap->data,
+                                      store->mmap->data+store->mmap->size,
+                                      SAVED_IN_CACHE, NULL, 0, NULL);
+  }
+
+  tor_free(fname);
+  fname = get_datadir_fname_suffix(store->fname_base, ".new");
+  if (file_status(fname) == FN_FILE)
+    contents = read_file_to_str(fname, RFTS_BIN|RFTS_IGNORE_MISSING, &st);
+  if (contents) {
+    if (extrainfo)
+      router_load_extrainfo_from_string(contents, NULL,SAVED_IN_JOURNAL,
+                                        NULL, 0);
+    else
+      router_load_routers_from_string(contents, NULL, SAVED_IN_JOURNAL,
+                                      NULL, 0, NULL);
+    store->journal_len = (size_t) st.st_size;
+    tor_free(contents);
+  }
+
+  tor_free(fname);
+
+  if (store->journal_len) {
+    /* Always clear the journal on startup.*/
+    router_rebuild_store(RRS_FORCE, store);
+  } else if (!extrainfo) {
+    /* Don't cache expired routers. (This is in an else because
+     * router_rebuild_store() also calls remove_old_routers().) */
+    routerlist_remove_old_routers();
+  }
+
+  return 0;
+}
+
+/** Load all cached router descriptors and extra-info documents from the
+ * store. Return 0 on success and -1 on failure.
+ */
+int
+router_reload_router_list(void)
+{
+  routerlist_t *rl = router_get_routerlist();
+  if (router_reload_router_list_impl(&rl->desc_store))
+    return -1;
+  if (router_reload_router_list_impl(&rl->extrainfo_store))
+    return -1;
+  return 0;
+}
+
+/** Return a smartlist containing a list of dir_server_t * for all
+ * known trusted dirservers.  Callers must not modify the list or its
+ * contents.
+ */
+const smartlist_t *
+router_get_trusted_dir_servers(void)
+{
+  if (!trusted_dir_servers)
+    trusted_dir_servers = smartlist_new();
+
+  return trusted_dir_servers;
+}
+
+const smartlist_t *
+router_get_fallback_dir_servers(void)
+{
+  if (!fallback_dir_servers)
+    fallback_dir_servers = smartlist_new();
+
+  return fallback_dir_servers;
+}
+
+/** Try to find a running dirserver that supports operations of <b>type</b>.
+ *
+ * If there are no running dirservers in our routerlist and the
+ * <b>PDS_RETRY_IF_NO_SERVERS</b> flag is set, set all the authoritative ones
+ * as running again, and pick one.
+ *
+ * If the <b>PDS_IGNORE_FASCISTFIREWALL</b> flag is set, then include
+ * dirservers that we can't reach.
+ *
+ * If the <b>PDS_ALLOW_SELF</b> flag is not set, then don't include ourself
+ * (if we're a dirserver).
+ *
+ * Don't pick an authority if any non-authority is viable; try to avoid using
+ * servers that have returned 503 recently.
+ */
+const routerstatus_t *
+router_pick_directory_server(dirinfo_type_t type, int flags)
+{
+  const routerstatus_t *choice;
+  if (get_options()->PreferTunneledDirConns)
+    flags |= PDS_PREFER_TUNNELED_DIR_CONNS_;
+
+  if (!routerlist)
+    return NULL;
+
+  choice = router_pick_directory_server_impl(type, flags);
+  if (choice || !(flags & PDS_RETRY_IF_NO_SERVERS))
+    return choice;
+
+  log_info(LD_DIR,
+           "No reachable router entries for dirservers. "
+           "Trying them all again.");
+  /* mark all authdirservers as up again */
+  mark_all_dirservers_up(fallback_dir_servers);
+  /* try again */
+  choice = router_pick_directory_server_impl(type, flags);
+  return choice;
+}
+
+/** Try to determine which fraction ofv3 directory requests aimed at
+ * caches will be sent to us. Set
+ * *<b>v3_share_out</b> to the fraction of v3 protocol shares we
+ * expect to see.  Return 0 on success, negative on failure. */
+/* XXXX This function is unused. */
+int
+router_get_my_share_of_directory_requests(double *v3_share_out)
+{
+  const routerinfo_t *me = router_get_my_routerinfo();
+  const routerstatus_t *rs;
+  const int pds_flags = PDS_ALLOW_SELF|PDS_IGNORE_FASCISTFIREWALL;
+  *v3_share_out = 0.0;
+  if (!me)
+    return -1;
+  rs = router_get_consensus_status_by_id(me->cache_info.identity_digest);
+  if (!rs)
+    return -1;
+
+  /* Calling for side effect */
+  /* XXXX This is a bit of a kludge */
+  {
+    sl_last_total_weighted_bw = 0;
+    router_pick_directory_server(V3_DIRINFO, pds_flags);
+    if (sl_last_total_weighted_bw != 0) {
+      *v3_share_out = U64_TO_DBL(sl_last_weighted_bw_of_me) /
+        U64_TO_DBL(sl_last_total_weighted_bw);
+    }
+  }
+
+  return 0;
+}
+
+/** Return the dir_server_t for the directory authority whose identity
+ * key hashes to <b>digest</b>, or NULL if no such authority is known.
+ */
+dir_server_t *
+router_get_trusteddirserver_by_digest(const char *digest)
+{
+  if (!trusted_dir_servers)
+    return NULL;
+
+  SMARTLIST_FOREACH(trusted_dir_servers, dir_server_t *, ds,
+     {
+       if (tor_memeq(ds->digest, digest, DIGEST_LEN))
+         return ds;
+     });
+
+  return NULL;
+}
+
+/** Return the dir_server_t for the fallback dirserver whose identity
+ * key hashes to <b>digest</b>, or NULL if no such authority is known.
+ */
+dir_server_t *
+router_get_fallback_dirserver_by_digest(const char *digest)
+{
+  if (!trusted_dir_servers)
+    return NULL;
+
+  SMARTLIST_FOREACH(trusted_dir_servers, dir_server_t *, ds,
+     {
+       if (tor_memeq(ds->digest, digest, DIGEST_LEN))
+         return ds;
+     });
+
+  return NULL;
+}
+
+/** Return the dir_server_t for the directory authority whose
+ * v3 identity key hashes to <b>digest</b>, or NULL if no such authority
+ * is known.
+ */
+dir_server_t *
+trusteddirserver_get_by_v3_auth_digest(const char *digest)
+{
+  if (!trusted_dir_servers)
+    return NUL
