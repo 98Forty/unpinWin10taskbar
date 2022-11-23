@@ -1620,4 +1620,325 @@ router_pick_trusteddirserver_impl(const smartlist_t *sourcelist,
           //           "descriptor from %s; delaying",d->description);
           ++n_busy;
           continue;
- 
+        }
+      }
+      if (no_microdesc_fetching) {
+        if (connection_get_by_type_addr_port_purpose(
+             CONN_TYPE_DIR, &addr, d->dir_port, DIR_PURPOSE_FETCH_MICRODESC)) {
+          ++n_busy;
+          continue;
+        }
+      }
+
+      if (prefer_tunnel &&
+          d->or_port &&
+          (!fascistfirewall ||
+           fascist_firewall_allows_address_or(&addr, d->or_port)))
+        smartlist_add(is_overloaded ? overloaded_tunnel : tunnel, (void*)d);
+      else if (!fascistfirewall ||
+               fascist_firewall_allows_address_dir(&addr, d->dir_port))
+        smartlist_add(is_overloaded ? overloaded_direct : direct, (void*)d);
+    }
+  SMARTLIST_FOREACH_END(d);
+
+  if (smartlist_len(tunnel)) {
+    pick_from = tunnel;
+  } else if (smartlist_len(overloaded_tunnel)) {
+    pick_from = overloaded_tunnel;
+  } else if (smartlist_len(direct)) {
+    pick_from = direct;
+  } else {
+    pick_from = overloaded_direct;
+  }
+
+  {
+    const dir_server_t *selection =
+      dirserver_choose_by_weight(pick_from, auth_weight);
+
+    if (selection)
+      result = &selection->fake_status;
+  }
+
+  if (n_busy_out)
+    *n_busy_out = n_busy;
+
+  smartlist_free(direct);
+  smartlist_free(tunnel);
+  smartlist_free(overloaded_direct);
+  smartlist_free(overloaded_tunnel);
+
+  if (result == NULL && try_excluding && !options->StrictNodes && n_excluded) {
+    /* If we got no result, and we are excluding nodes, and StrictNodes is
+     * not set, try again without excluding nodes. */
+    try_excluding = 0;
+    n_excluded = 0;
+    goto retry_without_exclude;
+  }
+
+  return result;
+}
+
+/** Mark as running every dir_server_t in <b>server_list</b>. */
+static void
+mark_all_dirservers_up(smartlist_t *server_list)
+{
+  if (server_list) {
+    SMARTLIST_FOREACH_BEGIN(server_list, dir_server_t *, dir) {
+      routerstatus_t *rs;
+      node_t *node;
+      dir->is_running = 1;
+      node = node_get_mutable_by_id(dir->digest);
+      if (node)
+        node->is_running = 1;
+      rs = router_get_mutable_consensus_status_by_id(dir->digest);
+      if (rs) {
+        rs->last_dir_503_at = 0;
+        control_event_networkstatus_changed_single(rs);
+      }
+    } SMARTLIST_FOREACH_END(dir);
+  }
+  router_dir_info_changed();
+}
+
+/** Return true iff r1 and r2 have the same address and OR port. */
+int
+routers_have_same_or_addrs(const routerinfo_t *r1, const routerinfo_t *r2)
+{
+  return r1->addr == r2->addr && r1->or_port == r2->or_port &&
+    tor_addr_eq(&r1->ipv6_addr, &r2->ipv6_addr) &&
+    r1->ipv6_orport == r2->ipv6_orport;
+}
+
+/** Reset all internal variables used to count failed downloads of network
+ * status objects. */
+void
+router_reset_status_download_failures(void)
+{
+  mark_all_dirservers_up(fallback_dir_servers);
+}
+
+/** Given a <b>router</b>, add every node_t in its family (including the
+ * node itself!) to <b>sl</b>.
+ *
+ * Note the type mismatch: This function takes a routerinfo, but adds nodes
+ * to the smartlist!
+ */
+static void
+routerlist_add_node_and_family(smartlist_t *sl, const routerinfo_t *router)
+{
+  /* XXXX MOVE ? */
+  node_t fake_node;
+  const node_t *node = node_get_by_id(router->cache_info.identity_digest);;
+  if (node == NULL) {
+    memset(&fake_node, 0, sizeof(fake_node));
+    fake_node.ri = (routerinfo_t *)router;
+    memcpy(fake_node.identity, router->cache_info.identity_digest, DIGEST_LEN);
+    node = &fake_node;
+  }
+  nodelist_add_node_and_family(sl, node);
+}
+
+/** Add every suitable node from our nodelist to <b>sl</b>, so that
+ * we can pick a node for a circuit.
+ */
+static void
+router_add_running_nodes_to_smartlist(smartlist_t *sl, int allow_invalid,
+                                      int need_uptime, int need_capacity,
+                                      int need_guard, int need_desc)
+{ /* XXXX MOVE */
+  SMARTLIST_FOREACH_BEGIN(nodelist_get_list(), const node_t *, node) {
+    if (!node->is_running ||
+        (!node->is_valid && !allow_invalid))
+      continue;
+    if (need_desc && !(node->ri || (node->rs && node->md)))
+      continue;
+    if (node->ri && node->ri->purpose != ROUTER_PURPOSE_GENERAL)
+      continue;
+    if (node_is_unreliable(node, need_uptime, need_capacity, need_guard))
+      continue;
+
+    smartlist_add(sl, (void *)node);
+  } SMARTLIST_FOREACH_END(node);
+}
+
+/** Look through the routerlist until we find a router that has my key.
+ Return it. */
+const routerinfo_t *
+routerlist_find_my_routerinfo(void)
+{
+  if (!routerlist)
+    return NULL;
+
+  SMARTLIST_FOREACH(routerlist->routers, routerinfo_t *, router,
+  {
+    if (router_is_me(router))
+      return router;
+  });
+  return NULL;
+}
+
+/** Return the smaller of the router's configured BandwidthRate
+ * and its advertised capacity. */
+uint32_t
+router_get_advertised_bandwidth(const routerinfo_t *router)
+{
+  if (router->bandwidthcapacity < router->bandwidthrate)
+    return router->bandwidthcapacity;
+  return router->bandwidthrate;
+}
+
+/** Do not weight any declared bandwidth more than this much when picking
+ * routers by bandwidth. */
+#define DEFAULT_MAX_BELIEVABLE_BANDWIDTH 10000000 /* 10 MB/sec */
+
+/** Return the smaller of the router's configured BandwidthRate
+ * and its advertised capacity, capped by max-believe-bw. */
+uint32_t
+router_get_advertised_bandwidth_capped(const routerinfo_t *router)
+{
+  uint32_t result = router->bandwidthcapacity;
+  if (result > router->bandwidthrate)
+    result = router->bandwidthrate;
+  if (result > DEFAULT_MAX_BELIEVABLE_BANDWIDTH)
+    result = DEFAULT_MAX_BELIEVABLE_BANDWIDTH;
+  return result;
+}
+
+/** Given an array of double/uint64_t unions that are currently being used as
+ * doubles, convert them to uint64_t, and try to scale them linearly so as to
+ * much of the range of uint64_t. If <b>total_out</b> is provided, set it to
+ * the sum of all elements in the array _before_ scaling. */
+STATIC void
+scale_array_elements_to_u64(u64_dbl_t *entries, int n_entries,
+                            uint64_t *total_out)
+{
+  double total = 0.0;
+  double scale_factor;
+  int i;
+  /* big, but far away from overflowing an int64_t */
+#define SCALE_TO_U64_MAX (INT64_MAX / 4)
+
+  for (i = 0; i < n_entries; ++i)
+    total += entries[i].dbl;
+
+  scale_factor = SCALE_TO_U64_MAX / total;
+
+  for (i = 0; i < n_entries; ++i)
+    entries[i].u64 = tor_llround(entries[i].dbl * scale_factor);
+
+  if (total_out)
+    *total_out = (uint64_t) total;
+
+#undef SCALE_TO_U64_MAX
+}
+
+/** Time-invariant 64-bit greater-than; works on two integers in the range
+ * (0,INT64_MAX). */
+#if SIZEOF_VOID_P == 8
+#define gt_i64_timei(a,b) ((a) > (b))
+#else
+static INLINE int
+gt_i64_timei(uint64_t a, uint64_t b)
+{
+  int64_t diff = (int64_t) (b - a);
+  int res = diff >> 63;
+  return res & 1;
+}
+#endif
+
+/** Pick a random element of <b>n_entries</b>-element array <b>entries</b>,
+ * choosing each element with a probability proportional to its (uint64_t)
+ * value, and return the index of that element.  If all elements are 0, choose
+ * an index at random. Return -1 on error.
+ */
+STATIC int
+choose_array_element_by_weight(const u64_dbl_t *entries, int n_entries)
+{
+  int i, i_chosen=-1, n_chosen=0;
+  uint64_t total_so_far = 0;
+  uint64_t rand_val;
+  uint64_t total = 0;
+
+  for (i = 0; i < n_entries; ++i)
+    total += entries[i].u64;
+
+  if (n_entries < 1)
+    return -1;
+
+  if (total == 0)
+    return crypto_rand_int(n_entries);
+
+  tor_assert(total < INT64_MAX);
+
+  rand_val = crypto_rand_uint64(total);
+
+  for (i = 0; i < n_entries; ++i) {
+    total_so_far += entries[i].u64;
+    if (gt_i64_timei(total_so_far, rand_val)) {
+      i_chosen = i;
+      n_chosen++;
+      /* Set rand_val to INT64_MAX rather than stopping the loop. This way,
+       * the time we spend in the loop does not leak which element we chose. */
+      rand_val = INT64_MAX;
+    }
+  }
+  tor_assert(total_so_far == total);
+  tor_assert(n_chosen == 1);
+  tor_assert(i_chosen >= 0);
+  tor_assert(i_chosen < n_entries);
+
+  return i_chosen;
+}
+
+/** When weighting bridges, enforce these values as lower and upper
+ * bound for believable bandwidth, because there is no way for us
+ * to verify a bridge's bandwidth currently. */
+#define BRIDGE_MIN_BELIEVABLE_BANDWIDTH 20000  /* 20 kB/sec */
+#define BRIDGE_MAX_BELIEVABLE_BANDWIDTH 100000 /* 100 kB/sec */
+
+/** Return the smaller of the router's configured BandwidthRate
+ * and its advertised capacity, making sure to stay within the
+ * interval between bridge-min-believe-bw and
+ * bridge-max-believe-bw. */
+static uint32_t
+bridge_get_advertised_bandwidth_bounded(routerinfo_t *router)
+{
+  uint32_t result = router->bandwidthcapacity;
+  if (result > router->bandwidthrate)
+    result = router->bandwidthrate;
+  if (result > BRIDGE_MAX_BELIEVABLE_BANDWIDTH)
+    result = BRIDGE_MAX_BELIEVABLE_BANDWIDTH;
+  else if (result < BRIDGE_MIN_BELIEVABLE_BANDWIDTH)
+    result = BRIDGE_MIN_BELIEVABLE_BANDWIDTH;
+  return result;
+}
+
+/** Return bw*1000, unless bw*1000 would overflow, in which case return
+ * INT32_MAX. */
+static INLINE int32_t
+kb_to_bytes(uint32_t bw)
+{
+  return (bw > (INT32_MAX/1000)) ? INT32_MAX : bw*1000;
+}
+
+/** Helper function:
+ * choose a random element of smartlist <b>sl</b> of nodes, weighted by
+ * the advertised bandwidth of each element using the consensus
+ * bandwidth weights.
+ *
+ * If <b>rule</b>==WEIGHT_FOR_EXIT. we're picking an exit node: consider all
+ * nodes' bandwidth equally regardless of their Exit status, since there may
+ * be some in the list because they exit to obscure ports. If
+ * <b>rule</b>==NO_WEIGHTING, we're picking a non-exit node: weight
+ * exit-node's bandwidth less depending on the smallness of the fraction of
+ * Exit-to-total bandwidth.  If <b>rule</b>==WEIGHT_FOR_GUARD, we're picking a
+ * guard node: consider all guard's bandwidth equally. Otherwise, weight
+ * guards proportionally less.
+ */
+static const node_t *
+smartlist_choose_node_by_bandwidth_weights(const smartlist_t *sl,
+                                           bandwidth_weight_rule_t rule)
+{
+  u64_dbl_t *bandwidths=NULL;
+
+  if (compute_wei
