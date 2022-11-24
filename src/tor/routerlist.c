@@ -1941,4 +1941,288 @@ smartlist_choose_node_by_bandwidth_weights(const smartlist_t *sl,
 {
   u64_dbl_t *bandwidths=NULL;
 
-  if (compute_wei
+  if (compute_weighted_bandwidths(sl, rule, &bandwidths) < 0)
+    return NULL;
+
+  scale_array_elements_to_u64(bandwidths, smartlist_len(sl),
+                              &sl_last_total_weighted_bw);
+
+  {
+    int idx = choose_array_element_by_weight(bandwidths,
+                                             smartlist_len(sl));
+    tor_free(bandwidths);
+    return idx < 0 ? NULL : smartlist_get(sl, idx);
+  }
+}
+
+/** Given a list of routers and a weighting rule as in
+ * smartlist_choose_node_by_bandwidth_weights, compute weighted bandwidth
+ * values for each node and store them in a freshly allocated
+ * *<b>bandwidths_out</b> of the same length as <b>sl</b>, and holding results
+ * as doubles. Return 0 on success, -1 on failure. */
+static int
+compute_weighted_bandwidths(const smartlist_t *sl,
+                            bandwidth_weight_rule_t rule,
+                            u64_dbl_t **bandwidths_out)
+{
+  int64_t weight_scale;
+  double Wg = -1, Wm = -1, We = -1, Wd = -1;
+  double Wgb = -1, Wmb = -1, Web = -1, Wdb = -1;
+  uint64_t weighted_bw = 0;
+  u64_dbl_t *bandwidths;
+
+  /* Can't choose exit and guard at same time */
+  tor_assert(rule == NO_WEIGHTING ||
+             rule == WEIGHT_FOR_EXIT ||
+             rule == WEIGHT_FOR_GUARD ||
+             rule == WEIGHT_FOR_MID ||
+             rule == WEIGHT_FOR_DIR);
+
+  if (smartlist_len(sl) == 0) {
+    log_info(LD_CIRC,
+             "Empty routerlist passed in to consensus weight node "
+             "selection for rule %s",
+             bandwidth_weight_rule_to_string(rule));
+    return -1;
+  }
+
+  weight_scale = networkstatus_get_weight_scale_param(NULL);
+
+  if (rule == WEIGHT_FOR_GUARD) {
+    Wg = networkstatus_get_bw_weight(NULL, "Wgg", -1);
+    Wm = networkstatus_get_bw_weight(NULL, "Wgm", -1); /* Bridges */
+    We = 0;
+    Wd = networkstatus_get_bw_weight(NULL, "Wgd", -1);
+
+    Wgb = networkstatus_get_bw_weight(NULL, "Wgb", -1);
+    Wmb = networkstatus_get_bw_weight(NULL, "Wmb", -1);
+    Web = networkstatus_get_bw_weight(NULL, "Web", -1);
+    Wdb = networkstatus_get_bw_weight(NULL, "Wdb", -1);
+  } else if (rule == WEIGHT_FOR_MID) {
+    Wg = networkstatus_get_bw_weight(NULL, "Wmg", -1);
+    Wm = networkstatus_get_bw_weight(NULL, "Wmm", -1);
+    We = networkstatus_get_bw_weight(NULL, "Wme", -1);
+    Wd = networkstatus_get_bw_weight(NULL, "Wmd", -1);
+
+    Wgb = networkstatus_get_bw_weight(NULL, "Wgb", -1);
+    Wmb = networkstatus_get_bw_weight(NULL, "Wmb", -1);
+    Web = networkstatus_get_bw_weight(NULL, "Web", -1);
+    Wdb = networkstatus_get_bw_weight(NULL, "Wdb", -1);
+  } else if (rule == WEIGHT_FOR_EXIT) {
+    // Guards CAN be exits if they have weird exit policies
+    // They are d then I guess...
+    We = networkstatus_get_bw_weight(NULL, "Wee", -1);
+    Wm = networkstatus_get_bw_weight(NULL, "Wem", -1); /* Odd exit policies */
+    Wd = networkstatus_get_bw_weight(NULL, "Wed", -1);
+    Wg = networkstatus_get_bw_weight(NULL, "Weg", -1); /* Odd exit policies */
+
+    Wgb = networkstatus_get_bw_weight(NULL, "Wgb", -1);
+    Wmb = networkstatus_get_bw_weight(NULL, "Wmb", -1);
+    Web = networkstatus_get_bw_weight(NULL, "Web", -1);
+    Wdb = networkstatus_get_bw_weight(NULL, "Wdb", -1);
+  } else if (rule == WEIGHT_FOR_DIR) {
+    We = networkstatus_get_bw_weight(NULL, "Wbe", -1);
+    Wm = networkstatus_get_bw_weight(NULL, "Wbm", -1);
+    Wd = networkstatus_get_bw_weight(NULL, "Wbd", -1);
+    Wg = networkstatus_get_bw_weight(NULL, "Wbg", -1);
+
+    Wgb = Wmb = Web = Wdb = weight_scale;
+  } else if (rule == NO_WEIGHTING) {
+    Wg = Wm = We = Wd = weight_scale;
+    Wgb = Wmb = Web = Wdb = weight_scale;
+  }
+
+  if (Wg < 0 || Wm < 0 || We < 0 || Wd < 0 || Wgb < 0 || Wmb < 0 || Wdb < 0
+      || Web < 0) {
+    log_debug(LD_CIRC,
+              "Got negative bandwidth weights. Defaulting to old selection"
+              " algorithm.");
+    return -1; // Use old algorithm.
+  }
+
+  Wg /= weight_scale;
+  Wm /= weight_scale;
+  We /= weight_scale;
+  Wd /= weight_scale;
+
+  Wgb /= weight_scale;
+  Wmb /= weight_scale;
+  Web /= weight_scale;
+  Wdb /= weight_scale;
+
+  bandwidths = tor_malloc_zero(sizeof(u64_dbl_t)*smartlist_len(sl));
+
+  // Cycle through smartlist and total the bandwidth.
+  SMARTLIST_FOREACH_BEGIN(sl, const node_t *, node) {
+    int is_exit = 0, is_guard = 0, is_dir = 0, this_bw = 0, is_me = 0;
+    double weight = 1;
+    is_exit = node->is_exit && ! node->is_bad_exit;
+    is_guard = node->is_possible_guard;
+    is_dir = node_is_dir(node);
+    if (node->rs) {
+      if (!node->rs->has_bandwidth) {
+        tor_free(bandwidths);
+        /* This should never happen, unless all the authorites downgrade
+         * to 0.2.0 or rogue routerstatuses get inserted into our consensus. */
+        log_warn(LD_BUG,
+                 "Consensus is not listing bandwidths. Defaulting back to "
+                 "old router selection algorithm.");
+        return -1;
+      }
+      this_bw = kb_to_bytes(node->rs->bandwidth_kb);
+    } else if (node->ri) {
+      /* bridge or other descriptor not in our consensus */
+      this_bw = bridge_get_advertised_bandwidth_bounded(node->ri);
+    } else {
+      /* We can't use this one. */
+      continue;
+    }
+    is_me = router_digest_is_me(node->identity);
+
+    if (is_guard && is_exit) {
+      weight = (is_dir ? Wdb*Wd : Wd);
+    } else if (is_guard) {
+      weight = (is_dir ? Wgb*Wg : Wg);
+    } else if (is_exit) {
+      weight = (is_dir ? Web*We : We);
+    } else { // middle
+      weight = (is_dir ? Wmb*Wm : Wm);
+    }
+    /* These should be impossible; but overflows here would be bad, so let's
+     * make sure. */
+    if (this_bw < 0)
+      this_bw = 0;
+    if (weight < 0.0)
+      weight = 0.0;
+
+    bandwidths[node_sl_idx].dbl = weight*this_bw + 0.5;
+    if (is_me)
+      sl_last_weighted_bw_of_me = (uint64_t) bandwidths[node_sl_idx].dbl;
+  } SMARTLIST_FOREACH_END(node);
+
+  log_debug(LD_CIRC, "Generated weighted bandwidths for rule %s based "
+            "on weights "
+            "Wg=%f Wm=%f We=%f Wd=%f with total bw "U64_FORMAT,
+            bandwidth_weight_rule_to_string(rule),
+            Wg, Wm, We, Wd, U64_PRINTF_ARG(weighted_bw));
+
+  *bandwidths_out = bandwidths;
+
+  return 0;
+}
+
+/** For all nodes in <b>sl</b>, return the fraction of those nodes, weighted
+ * by their weighted bandwidths with rule <b>rule</b>, for which we have
+ * descriptors. */
+double
+frac_nodes_with_descriptors(const smartlist_t *sl,
+                            bandwidth_weight_rule_t rule)
+{
+  u64_dbl_t *bandwidths = NULL;
+  double total, present;
+
+  if (smartlist_len(sl) == 0)
+    return 0.0;
+
+  if (compute_weighted_bandwidths(sl, rule, &bandwidths) < 0) {
+    int n_with_descs = 0;
+    SMARTLIST_FOREACH(sl, const node_t *, node, {
+      if (node_has_descriptor(node))
+        n_with_descs++;
+    });
+    return ((double)n_with_descs) / (double)smartlist_len(sl);
+  }
+
+  total = present = 0.0;
+  SMARTLIST_FOREACH_BEGIN(sl, const node_t *, node) {
+    const double bw = bandwidths[node_sl_idx].dbl;
+    total += bw;
+    if (node_has_descriptor(node))
+      present += bw;
+  } SMARTLIST_FOREACH_END(node);
+
+  tor_free(bandwidths);
+
+  if (total < 1.0)
+    return 0;
+
+  return present / total;
+}
+
+/** Helper function:
+ * choose a random node_t element of smartlist <b>sl</b>, weighted by
+ * the advertised bandwidth of each element.
+ *
+ * If <b>rule</b>==WEIGHT_FOR_EXIT. we're picking an exit node: consider all
+ * nodes' bandwidth equally regardless of their Exit status, since there may
+ * be some in the list because they exit to obscure ports. If
+ * <b>rule</b>==NO_WEIGHTING, we're picking a non-exit node: weight
+ * exit-node's bandwidth less depending on the smallness of the fraction of
+ * Exit-to-total bandwidth.  If <b>rule</b>==WEIGHT_FOR_GUARD, we're picking a
+ * guard node: consider all guard's bandwidth equally. Otherwise, weight
+ * guards proportionally less.
+ */
+static const node_t *
+smartlist_choose_node_by_bandwidth(const smartlist_t *sl,
+                                   bandwidth_weight_rule_t rule)
+{
+  unsigned int i;
+  u64_dbl_t *bandwidths;
+  int is_exit;
+  int is_guard;
+  int is_fast;
+  double total_nonexit_bw = 0, total_exit_bw = 0;
+  double total_nonguard_bw = 0, total_guard_bw = 0;
+  double exit_weight;
+  double guard_weight;
+  int n_unknown = 0;
+  bitarray_t *fast_bits;
+  bitarray_t *exit_bits;
+  bitarray_t *guard_bits;
+  int me_idx = -1;
+
+  // This function does not support WEIGHT_FOR_DIR
+  // or WEIGHT_FOR_MID
+  if (rule == WEIGHT_FOR_DIR || rule == WEIGHT_FOR_MID) {
+    rule = NO_WEIGHTING;
+  }
+
+  /* Can't choose exit and guard at same time */
+  tor_assert(rule == NO_WEIGHTING ||
+             rule == WEIGHT_FOR_EXIT ||
+             rule == WEIGHT_FOR_GUARD);
+
+  if (smartlist_len(sl) == 0) {
+    log_info(LD_CIRC,
+             "Empty routerlist passed in to old node selection for rule %s",
+             bandwidth_weight_rule_to_string(rule));
+    return NULL;
+  }
+
+  /* First count the total bandwidth weight, and make a list
+   * of each value.  We use UINT64_MAX to indicate "unknown". */
+  bandwidths = tor_malloc_zero(sizeof(u64_dbl_t)*smartlist_len(sl));
+  fast_bits = bitarray_init_zero(smartlist_len(sl));
+  exit_bits = bitarray_init_zero(smartlist_len(sl));
+  guard_bits = bitarray_init_zero(smartlist_len(sl));
+
+  /* Iterate over all the routerinfo_t or routerstatus_t, and */
+  SMARTLIST_FOREACH_BEGIN(sl, const node_t *, node) {
+    /* first, learn what bandwidth we think i has */
+    int is_known = 1;
+    uint32_t this_bw = 0;
+    i = node_sl_idx;
+
+    if (router_digest_is_me(node->identity))
+      me_idx = node_sl_idx;
+
+    is_exit = node->is_exit;
+    is_guard = node->is_possible_guard;
+    if (node->rs) {
+      if (node->rs->has_bandwidth) {
+        this_bw = kb_to_bytes(node->rs->bandwidth_kb);
+      } else { /* guess */
+        is_known = 0;
+      }
+    } else if (node->ri) {
+      /* Must be a bridge if
