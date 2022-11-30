@@ -2225,4 +2225,286 @@ smartlist_choose_node_by_bandwidth(const smartlist_t *sl,
         is_known = 0;
       }
     } else if (node->ri) {
-      /* Must be a bridge if
+      /* Must be a bridge if we're willing to use it */
+      this_bw = bridge_get_advertised_bandwidth_bounded(node->ri);
+    }
+
+    if (is_exit)
+      bitarray_set(exit_bits, i);
+    if (is_guard)
+      bitarray_set(guard_bits, i);
+    if (node->is_fast)
+      bitarray_set(fast_bits, i);
+
+    if (is_known) {
+      bandwidths[i].dbl = this_bw;
+      if (is_guard)
+        total_guard_bw += this_bw;
+      else
+        total_nonguard_bw += this_bw;
+      if (is_exit)
+        total_exit_bw += this_bw;
+      else
+        total_nonexit_bw += this_bw;
+    } else {
+      ++n_unknown;
+      bandwidths[i].dbl = -1.0;
+    }
+  } SMARTLIST_FOREACH_END(node);
+
+#define EPSILON .1
+
+  /* Now, fill in the unknown values. */
+  if (n_unknown) {
+    int32_t avg_fast, avg_slow;
+    if (total_exit_bw+total_nonexit_bw < EPSILON) {
+      /* if there's some bandwidth, there's at least one known router,
+       * so no worries about div by 0 here */
+      int n_known = smartlist_len(sl)-n_unknown;
+      avg_fast = avg_slow = (int32_t)
+        ((total_exit_bw+total_nonexit_bw)/((uint64_t) n_known));
+    } else {
+      avg_fast = 40000;
+      avg_slow = 20000;
+    }
+    for (i=0; i<(unsigned)smartlist_len(sl); ++i) {
+      if (bandwidths[i].dbl >= 0.0)
+        continue;
+      is_fast = bitarray_is_set(fast_bits, i);
+      is_exit = bitarray_is_set(exit_bits, i);
+      is_guard = bitarray_is_set(guard_bits, i);
+      bandwidths[i].dbl = is_fast ? avg_fast : avg_slow;
+      if (is_exit)
+        total_exit_bw += bandwidths[i].dbl;
+      else
+        total_nonexit_bw += bandwidths[i].dbl;
+      if (is_guard)
+        total_guard_bw += bandwidths[i].dbl;
+      else
+        total_nonguard_bw += bandwidths[i].dbl;
+    }
+  }
+
+  /* If there's no bandwidth at all, pick at random. */
+  if (total_exit_bw+total_nonexit_bw < EPSILON) {
+    tor_free(bandwidths);
+    tor_free(fast_bits);
+    tor_free(exit_bits);
+    tor_free(guard_bits);
+    return smartlist_choose(sl);
+  }
+
+  /* Figure out how to weight exits and guards */
+  {
+    double all_bw = U64_TO_DBL(total_exit_bw+total_nonexit_bw);
+    double exit_bw = U64_TO_DBL(total_exit_bw);
+    double guard_bw = U64_TO_DBL(total_guard_bw);
+    /*
+     * For detailed derivation of this formula, see
+     *   http://archives.seul.org/or/dev/Jul-2007/msg00056.html
+     */
+    if (rule == WEIGHT_FOR_EXIT || total_exit_bw<EPSILON)
+      exit_weight = 1.0;
+    else
+      exit_weight = 1.0 - all_bw/(3.0*exit_bw);
+
+    if (rule == WEIGHT_FOR_GUARD || total_guard_bw<EPSILON)
+      guard_weight = 1.0;
+    else
+      guard_weight = 1.0 - all_bw/(3.0*guard_bw);
+
+    if (exit_weight <= 0.0)
+      exit_weight = 0.0;
+
+    if (guard_weight <= 0.0)
+      guard_weight = 0.0;
+
+    sl_last_weighted_bw_of_me = 0;
+    for (i=0; i < (unsigned)smartlist_len(sl); i++) {
+      tor_assert(bandwidths[i].dbl >= 0.0);
+
+      is_exit = bitarray_is_set(exit_bits, i);
+      is_guard = bitarray_is_set(guard_bits, i);
+      if (is_exit && is_guard)
+        bandwidths[i].dbl *= exit_weight * guard_weight;
+      else if (is_guard)
+        bandwidths[i].dbl *= guard_weight;
+      else if (is_exit)
+        bandwidths[i].dbl *= exit_weight;
+
+      if (i == (unsigned) me_idx)
+        sl_last_weighted_bw_of_me = (uint64_t) bandwidths[i].dbl;
+    }
+  }
+
+#if 0
+  log_debug(LD_CIRC, "Total weighted bw = "U64_FORMAT
+            ", exit bw = "U64_FORMAT
+            ", nonexit bw = "U64_FORMAT", exit weight = %f "
+            "(for exit == %d)"
+            ", guard bw = "U64_FORMAT
+            ", nonguard bw = "U64_FORMAT", guard weight = %f "
+            "(for guard == %d)",
+            U64_PRINTF_ARG(total_bw),
+            U64_PRINTF_ARG(total_exit_bw), U64_PRINTF_ARG(total_nonexit_bw),
+            exit_weight, (int)(rule == WEIGHT_FOR_EXIT),
+            U64_PRINTF_ARG(total_guard_bw), U64_PRINTF_ARG(total_nonguard_bw),
+            guard_weight, (int)(rule == WEIGHT_FOR_GUARD));
+#endif
+
+  scale_array_elements_to_u64(bandwidths, smartlist_len(sl),
+                              &sl_last_total_weighted_bw);
+
+  {
+    int idx = choose_array_element_by_weight(bandwidths,
+                                             smartlist_len(sl));
+    tor_free(bandwidths);
+    tor_free(fast_bits);
+    tor_free(exit_bits);
+    tor_free(guard_bits);
+    return idx < 0 ? NULL : smartlist_get(sl, idx);
+  }
+}
+
+/** Choose a random element of status list <b>sl</b>, weighted by
+ * the advertised bandwidth of each node */
+const node_t *
+node_sl_choose_by_bandwidth(const smartlist_t *sl,
+                            bandwidth_weight_rule_t rule)
+{ /*XXXX MOVE */
+  const node_t *ret;
+  if ((ret = smartlist_choose_node_by_bandwidth_weights(sl, rule))) {
+    return ret;
+  } else {
+    return smartlist_choose_node_by_bandwidth(sl, rule);
+  }
+}
+
+/** Return a random running node from the nodelist. Never
+ * pick a node that is in
+ * <b>excludedsmartlist</b>, or which matches <b>excludedset</b>,
+ * even if they are the only nodes available.
+ * If <b>CRN_NEED_UPTIME</b> is set in flags and any router has more than
+ * a minimum uptime, return one of those.
+ * If <b>CRN_NEED_CAPACITY</b> is set in flags, weight your choice by the
+ * advertised capacity of each router.
+ * If <b>CRN_ALLOW_INVALID</b> is not set in flags, consider only Valid
+ * routers.
+ * If <b>CRN_NEED_GUARD</b> is set in flags, consider only Guard routers.
+ * If <b>CRN_WEIGHT_AS_EXIT</b> is set in flags, we weight bandwidths as if
+ * picking an exit node, otherwise we weight bandwidths for picking a relay
+ * node (that is, possibly discounting exit nodes).
+ * If <b>CRN_NEED_DESC</b> is set in flags, we only consider nodes that
+ * have a routerinfo or microdescriptor -- that is, enough info to be
+ * used to build a circuit.
+ */
+const node_t *
+router_choose_random_node(smartlist_t *excludedsmartlist,
+                          routerset_t *excludedset,
+                          router_crn_flags_t flags)
+{ /* XXXX MOVE */
+  const int need_uptime = (flags & CRN_NEED_UPTIME) != 0;
+  const int need_capacity = (flags & CRN_NEED_CAPACITY) != 0;
+  const int need_guard = (flags & CRN_NEED_GUARD) != 0;
+  const int allow_invalid = (flags & CRN_ALLOW_INVALID) != 0;
+  const int weight_for_exit = (flags & CRN_WEIGHT_AS_EXIT) != 0;
+  const int need_desc = (flags & CRN_NEED_DESC) != 0;
+
+  smartlist_t *sl=smartlist_new(),
+    *excludednodes=smartlist_new();
+  const node_t *choice = NULL;
+  const routerinfo_t *r;
+  bandwidth_weight_rule_t rule;
+
+  tor_assert(!(weight_for_exit && need_guard));
+  rule = weight_for_exit ? WEIGHT_FOR_EXIT :
+    (need_guard ? WEIGHT_FOR_GUARD : WEIGHT_FOR_MID);
+
+  /* Exclude relays that allow single hop exit circuits, if the user
+   * wants to (such relays might be risky) */
+  if (get_options()->ExcludeSingleHopRelays) {
+    SMARTLIST_FOREACH(nodelist_get_list(), node_t *, node,
+      if (node_allows_single_hop_exits(node)) {
+        smartlist_add(excludednodes, node);
+      });
+  }
+
+  if ((r = routerlist_find_my_routerinfo()))
+    routerlist_add_node_and_family(excludednodes, r);
+
+  router_add_running_nodes_to_smartlist(sl, allow_invalid,
+                                        need_uptime, need_capacity,
+                                        need_guard, need_desc);
+  smartlist_subtract(sl,excludednodes);
+  if (excludedsmartlist)
+    smartlist_subtract(sl,excludedsmartlist);
+  if (excludedset)
+    routerset_subtract_nodes(sl,excludedset);
+
+  // Always weight by bandwidth
+  choice = node_sl_choose_by_bandwidth(sl, rule);
+
+  smartlist_free(sl);
+  if (!choice && (need_uptime || need_capacity || need_guard)) {
+    /* try once more -- recurse but with fewer restrictions. */
+    log_info(LD_CIRC,
+             "We couldn't find any live%s%s%s routers; falling back "
+             "to list of all routers.",
+             need_capacity?", fast":"",
+             need_uptime?", stable":"",
+             need_guard?", guard":"");
+    flags &= ~ (CRN_NEED_UPTIME|CRN_NEED_CAPACITY|CRN_NEED_GUARD);
+    choice = router_choose_random_node(
+                     excludedsmartlist, excludedset, flags);
+  }
+  smartlist_free(excludednodes);
+  if (!choice) {
+    log_warn(LD_CIRC,
+             "No available nodes when trying to choose node. Failing.");
+  }
+  return choice;
+}
+
+/** Helper: given an extended nickname in <b>hexdigest</b> try to decode it.
+ * Return 0 on success, -1 on failure.  Store the result into the
+ * DIGEST_LEN-byte buffer at <b>digest_out</b>, the single character at
+ * <b>nickname_qualifier_char_out</b>, and the MAXNICKNAME_LEN+1-byte buffer
+ * at <b>nickname_out</b>.
+ *
+ * The recognized format is:
+ *   HexName = Dollar? HexDigest NamePart?
+ *   Dollar = '?'
+ *   HexDigest = HexChar*20
+ *   HexChar = 'a'..'f' | 'A'..'F' | '0'..'9'
+ *   NamePart = QualChar Name
+ *   QualChar = '=' | '~'
+ *   Name = NameChar*(1..MAX_NICKNAME_LEN)
+ *   NameChar = Any ASCII alphanumeric character
+ */
+int
+hex_digest_nickname_decode(const char *hexdigest,
+                           char *digest_out,
+                           char *nickname_qualifier_char_out,
+                           char *nickname_out)
+{
+  size_t len;
+
+  tor_assert(hexdigest);
+  if (hexdigest[0] == '$')
+    ++hexdigest;
+
+  len = strlen(hexdigest);
+  if (len < HEX_DIGEST_LEN) {
+    return -1;
+  } else if (len > HEX_DIGEST_LEN && (hexdigest[HEX_DIGEST_LEN] == '=' ||
+                                    hexdigest[HEX_DIGEST_LEN] == '~') &&
+           len <= HEX_DIGEST_LEN+1+MAX_NICKNAME_LEN) {
+    *nickname_qualifier_char_out = hexdigest[HEX_DIGEST_LEN];
+    strlcpy(nickname_out, hexdigest+HEX_DIGEST_LEN+1 , MAX_NICKNAME_LEN+1);
+  } else if (len == HEX_DIGEST_LEN) {
+    ;
+  } else {
+    return -1;
+  }
+
+  if (base16_decode(digest_out, DIGEST_LEN, hexdigest,
