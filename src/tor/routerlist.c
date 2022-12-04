@@ -2507,4 +2507,338 @@ hex_digest_nickname_decode(const char *hexdigest,
     return -1;
   }
 
-  if (base16_decode(digest_out, DIGEST_LEN, hexdigest,
+  if (base16_decode(digest_out, DIGEST_LEN, hexdigest, HEX_DIGEST_LEN)<0)
+    return -1;
+  return 0;
+}
+
+/** Helper: Return true iff the <b>identity_digest</b> and <b>nickname</b>
+ * combination of a router, encoded in hexadecimal, matches <b>hexdigest</b>
+ * (which is optionally prefixed with a single dollar sign).  Return false if
+ * <b>hexdigest</b> is malformed, or it doesn't match.  */
+int
+hex_digest_nickname_matches(const char *hexdigest, const char *identity_digest,
+                            const char *nickname, int is_named)
+{
+  char digest[DIGEST_LEN];
+  char nn_char='\0';
+  char nn_buf[MAX_NICKNAME_LEN+1];
+
+  if (hex_digest_nickname_decode(hexdigest, digest, &nn_char, nn_buf) == -1)
+    return 0;
+
+  if (nn_char == '=' || nn_char == '~') {
+    if (!nickname)
+      return 0;
+    if (strcasecmp(nn_buf, nickname))
+      return 0;
+    if (nn_char == '=' && !is_named)
+      return 0;
+  }
+
+  return tor_memeq(digest, identity_digest, DIGEST_LEN);
+}
+
+/** Return true iff <b>router</b> is listed as named in the current
+ * consensus. */
+int
+router_is_named(const routerinfo_t *router)
+{
+  const char *digest =
+    networkstatus_get_router_digest_by_nickname(router->nickname);
+
+  return (digest &&
+          tor_memeq(digest, router->cache_info.identity_digest, DIGEST_LEN));
+}
+
+/** Return true iff <b>digest</b> is the digest of the identity key of a
+ * trusted directory matching at least one bit of <b>type</b>.  If <b>type</b>
+ * is zero, any authority is okay. */
+int
+router_digest_is_trusted_dir_type(const char *digest, dirinfo_type_t type)
+{
+  if (!trusted_dir_servers)
+    return 0;
+  if (authdir_mode(get_options()) && router_digest_is_me(digest))
+    return 1;
+  SMARTLIST_FOREACH(trusted_dir_servers, dir_server_t *, ent,
+    if (tor_memeq(digest, ent->digest, DIGEST_LEN)) {
+      return (!type) || ((type & ent->type) != 0);
+    });
+  return 0;
+}
+
+/** Return true iff <b>addr</b> is the address of one of our trusted
+ * directory authorities. */
+int
+router_addr_is_trusted_dir(uint32_t addr)
+{
+  if (!trusted_dir_servers)
+    return 0;
+  SMARTLIST_FOREACH(trusted_dir_servers, dir_server_t *, ent,
+    if (ent->addr == addr)
+      return 1;
+    );
+  return 0;
+}
+
+/** If hexdigest is correctly formed, base16_decode it into
+ * digest, which must have DIGEST_LEN space in it.
+ * Return 0 on success, -1 on failure.
+ */
+int
+hexdigest_to_digest(const char *hexdigest, char *digest)
+{
+  if (hexdigest[0]=='$')
+    ++hexdigest;
+  if (strlen(hexdigest) < HEX_DIGEST_LEN ||
+      base16_decode(digest,DIGEST_LEN,hexdigest,HEX_DIGEST_LEN) < 0)
+    return -1;
+  return 0;
+}
+
+/** As router_get_by_id_digest,but return a pointer that you're allowed to
+ * modify */
+routerinfo_t *
+router_get_mutable_by_digest(const char *digest)
+{
+  tor_assert(digest);
+
+  if (!routerlist) return NULL;
+
+  // routerlist_assert_ok(routerlist);
+
+  return rimap_get(routerlist->identity_map, digest);
+}
+
+/** Return the router in our routerlist whose 20-byte key digest
+ * is <b>digest</b>.  Return NULL if no such router is known. */
+const routerinfo_t *
+router_get_by_id_digest(const char *digest)
+{
+  return router_get_mutable_by_digest(digest);
+}
+
+/** Return the router in our routerlist whose 20-byte descriptor
+ * is <b>digest</b>.  Return NULL if no such router is known. */
+signed_descriptor_t *
+router_get_by_descriptor_digest(const char *digest)
+{
+  tor_assert(digest);
+
+  if (!routerlist) return NULL;
+
+  return sdmap_get(routerlist->desc_digest_map, digest);
+}
+
+/** Return the signed descriptor for the router in our routerlist whose
+ * 20-byte extra-info digest is <b>digest</b>.  Return NULL if no such router
+ * is known. */
+signed_descriptor_t *
+router_get_by_extrainfo_digest(const char *digest)
+{
+  tor_assert(digest);
+
+  if (!routerlist) return NULL;
+
+  return sdmap_get(routerlist->desc_by_eid_map, digest);
+}
+
+/** Return the signed descriptor for the extrainfo_t in our routerlist whose
+ * extra-info-digest is <b>digest</b>. Return NULL if no such extra-info
+ * document is known. */
+signed_descriptor_t *
+extrainfo_get_by_descriptor_digest(const char *digest)
+{
+  extrainfo_t *ei;
+  tor_assert(digest);
+  if (!routerlist) return NULL;
+  ei = eimap_get(routerlist->extra_info_map, digest);
+  return ei ? &ei->cache_info : NULL;
+}
+
+/** Return a pointer to the signed textual representation of a descriptor.
+ * The returned string is not guaranteed to be NUL-terminated: the string's
+ * length will be in desc-\>signed_descriptor_len.
+ *
+ * If <b>with_annotations</b> is set, the returned string will include
+ * the annotations
+ * (if any) preceding the descriptor.  This will increase the length of the
+ * string by desc-\>annotations_len.
+ *
+ * The caller must not free the string returned.
+ */
+static const char *
+signed_descriptor_get_body_impl(const signed_descriptor_t *desc,
+                                int with_annotations)
+{
+  const char *r = NULL;
+  size_t len = desc->signed_descriptor_len;
+  off_t offset = desc->saved_offset;
+  if (with_annotations)
+    len += desc->annotations_len;
+  else
+    offset += desc->annotations_len;
+
+  tor_assert(len > 32);
+  if (desc->saved_location == SAVED_IN_CACHE && routerlist) {
+    desc_store_t *store = desc_get_store(router_get_routerlist(), desc);
+    if (store && store->mmap) {
+      tor_assert(desc->saved_offset + len <= store->mmap->size);
+      r = store->mmap->data + offset;
+    } else if (store) {
+      log_err(LD_DIR, "We couldn't read a descriptor that is supposedly "
+              "mmaped in our cache.  Is another process running in our data "
+              "directory?  Exiting.");
+      exit(1);
+    }
+  }
+  if (!r) /* no mmap, or not in cache. */
+    r = desc->signed_descriptor_body +
+      (with_annotations ? 0 : desc->annotations_len);
+
+  tor_assert(r);
+  if (!with_annotations) {
+    if (fast_memcmp("router ", r, 7) && fast_memcmp("extra-info ", r, 11)) {
+      char *cp = tor_strndup(r, 64);
+      log_err(LD_DIR, "descriptor at %p begins with unexpected string %s.  "
+              "Is another process running in our data directory?  Exiting.",
+              desc, escaped(cp));
+      exit(1);
+    }
+  }
+
+  return r;
+}
+
+/** Return a pointer to the signed textual representation of a descriptor.
+ * The returned string is not guaranteed to be NUL-terminated: the string's
+ * length will be in desc-\>signed_descriptor_len.
+ *
+ * The caller must not free the string returned.
+ */
+const char *
+signed_descriptor_get_body(const signed_descriptor_t *desc)
+{
+  return signed_descriptor_get_body_impl(desc, 0);
+}
+
+/** As signed_descriptor_get_body(), but points to the beginning of the
+ * annotations section rather than the beginning of the descriptor. */
+const char *
+signed_descriptor_get_annotations(const signed_descriptor_t *desc)
+{
+  return signed_descriptor_get_body_impl(desc, 1);
+}
+
+/** Return the current list of all known routers. */
+routerlist_t *
+router_get_routerlist(void)
+{
+  if (PREDICT_UNLIKELY(!routerlist)) {
+    routerlist = tor_malloc_zero(sizeof(routerlist_t));
+    routerlist->routers = smartlist_new();
+    routerlist->old_routers = smartlist_new();
+    routerlist->identity_map = rimap_new();
+    routerlist->desc_digest_map = sdmap_new();
+    routerlist->desc_by_eid_map = sdmap_new();
+    routerlist->extra_info_map = eimap_new();
+
+    routerlist->desc_store.fname_base = "cached-descriptors";
+    routerlist->extrainfo_store.fname_base = "cached-extrainfo";
+
+    routerlist->desc_store.type = ROUTER_STORE;
+    routerlist->extrainfo_store.type = EXTRAINFO_STORE;
+
+    routerlist->desc_store.description = "router descriptors";
+    routerlist->extrainfo_store.description = "extra-info documents";
+  }
+  return routerlist;
+}
+
+/** Free all storage held by <b>router</b>. */
+void
+routerinfo_free(routerinfo_t *router)
+{
+  if (!router)
+    return;
+
+  tor_free(router->cache_info.signed_descriptor_body);
+  tor_free(router->address);
+  tor_free(router->nickname);
+  tor_free(router->platform);
+  tor_free(router->contact_info);
+  if (router->onion_pkey)
+    crypto_pk_free(router->onion_pkey);
+  tor_free(router->onion_curve25519_pkey);
+  if (router->identity_pkey)
+    crypto_pk_free(router->identity_pkey);
+  if (router->declared_family) {
+    SMARTLIST_FOREACH(router->declared_family, char *, s, tor_free(s));
+    smartlist_free(router->declared_family);
+  }
+  addr_policy_list_free(router->exit_policy);
+  short_policy_free(router->ipv6_exit_policy);
+
+  memset(router, 77, sizeof(routerinfo_t));
+
+  tor_free(router);
+}
+
+/** Release all storage held by <b>extrainfo</b> */
+void
+extrainfo_free(extrainfo_t *extrainfo)
+{
+  if (!extrainfo)
+    return;
+  tor_free(extrainfo->cache_info.signed_descriptor_body);
+  tor_free(extrainfo->pending_sig);
+
+  memset(extrainfo, 88, sizeof(extrainfo_t)); /* debug bad memory usage */
+  tor_free(extrainfo);
+}
+
+/** Release storage held by <b>sd</b>. */
+static void
+signed_descriptor_free(signed_descriptor_t *sd)
+{
+  if (!sd)
+    return;
+
+  tor_free(sd->signed_descriptor_body);
+
+  memset(sd, 99, sizeof(signed_descriptor_t)); /* Debug bad mem usage */
+  tor_free(sd);
+}
+
+/** Extract a signed_descriptor_t from a general routerinfo, and free the
+ * routerinfo.
+ */
+static signed_descriptor_t *
+signed_descriptor_from_routerinfo(routerinfo_t *ri)
+{
+  signed_descriptor_t *sd;
+  tor_assert(ri->purpose == ROUTER_PURPOSE_GENERAL);
+  sd = tor_malloc_zero(sizeof(signed_descriptor_t));
+  memcpy(sd, &(ri->cache_info), sizeof(signed_descriptor_t));
+  sd->routerlist_index = -1;
+  ri->cache_info.signed_descriptor_body = NULL;
+  routerinfo_free(ri);
+  return sd;
+}
+
+/** Helper: free the storage held by the extrainfo_t in <b>e</b>. */
+static void
+extrainfo_free_(void *e)
+{
+  extrainfo_free(e);
+}
+
+/** Free all storage held by a routerlist <b>rl</b>. */
+void
+routerlist_free(routerlist_t *rl)
+{
+  if (!rl)
+    return;
+  rimap_free(rl->identity_map, NULL);
+  sdmap_fre
