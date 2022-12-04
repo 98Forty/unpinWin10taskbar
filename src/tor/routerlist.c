@@ -3116,4 +3116,273 @@ routerlist_remove_old(routerlist_t *rl, signed_descriptor_t *sd, int idx)
   sd->routerlist_index = -1;
   smartlist_del(rl->old_routers, idx);
   if (idx < smartlist_len(rl->old_routers)) {
-    signed_descriptor
+    signed_descriptor_t *d = smartlist_get(rl->old_routers, idx);
+    d->routerlist_index = idx;
+  }
+  sd_tmp = sdmap_remove(rl->desc_digest_map,
+                        sd->signed_descriptor_digest);
+  tor_assert(sd_tmp == sd);
+  store = desc_get_store(rl, sd);
+  if (store)
+    store->bytes_dropped += sd->signed_descriptor_len;
+
+  ei_tmp = eimap_remove(rl->extra_info_map,
+                        sd->extra_info_digest);
+  if (ei_tmp) {
+    rl->extrainfo_store.bytes_dropped +=
+      ei_tmp->cache_info.signed_descriptor_len;
+    extrainfo_free(ei_tmp);
+  }
+  if (!tor_digest_is_zero(sd->extra_info_digest))
+    sdmap_remove(rl->desc_by_eid_map, sd->extra_info_digest);
+
+  signed_descriptor_free(sd);
+#ifdef DEBUG_ROUTERLIST
+  routerlist_assert_ok(rl);
+#endif
+}
+
+/** Remove <b>ri_old</b> from the routerlist <b>rl</b>, and replace it with
+ * <b>ri_new</b>, updating all index info.  If <b>idx</b> is nonnegative and
+ * smartlist_get(rl-&gt;routers, idx) == ri, we don't need to do a linear
+ * search over the list to decide which to remove.  We put ri_new in the same
+ * index as ri_old, if possible.  ri is freed as appropriate.
+ *
+ * If should_cache_descriptors() is true, instead of deleting the router,
+ * we add it to rl-&gt;old_routers. */
+static void
+routerlist_replace(routerlist_t *rl, routerinfo_t *ri_old,
+                   routerinfo_t *ri_new)
+{
+  int idx;
+  int same_descriptors;
+
+  routerinfo_t *ri_tmp;
+  extrainfo_t *ei_tmp;
+  {
+    const routerinfo_t *ri_generated = router_get_my_routerinfo();
+    tor_assert(ri_generated != ri_new);
+  }
+  tor_assert(ri_old != ri_new);
+  tor_assert(ri_new->cache_info.routerlist_index == -1);
+
+  idx = ri_old->cache_info.routerlist_index;
+  tor_assert(0 <= idx && idx < smartlist_len(rl->routers));
+  tor_assert(smartlist_get(rl->routers, idx) == ri_old);
+
+  {
+    routerinfo_t *ri_old_tmp=NULL;
+    nodelist_set_routerinfo(ri_new, &ri_old_tmp);
+    tor_assert(ri_old == ri_old_tmp);
+  }
+
+  router_dir_info_changed();
+  if (idx >= 0) {
+    smartlist_set(rl->routers, idx, ri_new);
+    ri_old->cache_info.routerlist_index = -1;
+    ri_new->cache_info.routerlist_index = idx;
+    /* Check that ri_old is not in rl->routers anymore: */
+    tor_assert( routerlist_find_elt_(rl->routers, ri_old, -1) == -1 );
+  } else {
+    log_warn(LD_BUG, "Appending entry from routerlist_replace.");
+    routerlist_insert(rl, ri_new);
+    return;
+  }
+  if (tor_memneq(ri_old->cache_info.identity_digest,
+             ri_new->cache_info.identity_digest, DIGEST_LEN)) {
+    /* digests don't match; digestmap_set won't replace */
+    rimap_remove(rl->identity_map, ri_old->cache_info.identity_digest);
+  }
+  ri_tmp = rimap_set(rl->identity_map,
+                     ri_new->cache_info.identity_digest, ri_new);
+  tor_assert(!ri_tmp || ri_tmp == ri_old);
+  sdmap_set(rl->desc_digest_map,
+            ri_new->cache_info.signed_descriptor_digest,
+            &(ri_new->cache_info));
+
+  if (!tor_digest_is_zero(ri_new->cache_info.extra_info_digest)) {
+    sdmap_set(rl->desc_by_eid_map, ri_new->cache_info.extra_info_digest,
+              &ri_new->cache_info);
+  }
+
+  same_descriptors = tor_memeq(ri_old->cache_info.signed_descriptor_digest,
+                              ri_new->cache_info.signed_descriptor_digest,
+                              DIGEST_LEN);
+
+  if (should_cache_old_descriptors() &&
+      ri_old->purpose == ROUTER_PURPOSE_GENERAL &&
+      !same_descriptors) {
+    /* ri_old is going to become a signed_descriptor_t and go into
+     * old_routers */
+    signed_descriptor_t *sd = signed_descriptor_from_routerinfo(ri_old);
+    smartlist_add(rl->old_routers, sd);
+    sd->routerlist_index = smartlist_len(rl->old_routers)-1;
+    sdmap_set(rl->desc_digest_map, sd->signed_descriptor_digest, sd);
+    if (!tor_digest_is_zero(sd->extra_info_digest))
+      sdmap_set(rl->desc_by_eid_map, sd->extra_info_digest, sd);
+  } else {
+    /* We're dropping ri_old. */
+    if (!same_descriptors) {
+      /* digests don't match; The sdmap_set above didn't replace */
+      sdmap_remove(rl->desc_digest_map,
+                   ri_old->cache_info.signed_descriptor_digest);
+
+      if (tor_memneq(ri_old->cache_info.extra_info_digest,
+                 ri_new->cache_info.extra_info_digest, DIGEST_LEN)) {
+        ei_tmp = eimap_remove(rl->extra_info_map,
+                              ri_old->cache_info.extra_info_digest);
+        if (ei_tmp) {
+          rl->extrainfo_store.bytes_dropped +=
+            ei_tmp->cache_info.signed_descriptor_len;
+          extrainfo_free(ei_tmp);
+        }
+      }
+
+      if (!tor_digest_is_zero(ri_old->cache_info.extra_info_digest)) {
+        sdmap_remove(rl->desc_by_eid_map,
+                     ri_old->cache_info.extra_info_digest);
+      }
+    }
+    rl->desc_store.bytes_dropped += ri_old->cache_info.signed_descriptor_len;
+    routerinfo_free(ri_old);
+  }
+#ifdef DEBUG_ROUTERLIST
+  routerlist_assert_ok(rl);
+#endif
+}
+
+/** Extract the descriptor <b>sd</b> from old_routerlist, and re-parse
+ * it as a fresh routerinfo_t. */
+static routerinfo_t *
+routerlist_reparse_old(routerlist_t *rl, signed_descriptor_t *sd)
+{
+  routerinfo_t *ri;
+  const char *body;
+
+  body = signed_descriptor_get_annotations(sd);
+
+  ri = router_parse_entry_from_string(body,
+                         body+sd->signed_descriptor_len+sd->annotations_len,
+                         0, 1, NULL);
+  if (!ri)
+    return NULL;
+  memcpy(&ri->cache_info, sd, sizeof(signed_descriptor_t));
+  sd->signed_descriptor_body = NULL; /* Steal reference. */
+  ri->cache_info.routerlist_index = -1;
+
+  routerlist_remove_old(rl, sd, -1);
+
+  return ri;
+}
+
+/** Free all memory held by the routerlist module. */
+void
+routerlist_free_all(void)
+{
+  routerlist_free(routerlist);
+  routerlist = NULL;
+  if (warned_nicknames) {
+    SMARTLIST_FOREACH(warned_nicknames, char *, cp, tor_free(cp));
+    smartlist_free(warned_nicknames);
+    warned_nicknames = NULL;
+  }
+  clear_dir_servers();
+  smartlist_free(trusted_dir_servers);
+  smartlist_free(fallback_dir_servers);
+  trusted_dir_servers = fallback_dir_servers = NULL;
+  if (trusted_dir_certs) {
+    digestmap_free(trusted_dir_certs, cert_list_free_);
+    trusted_dir_certs = NULL;
+  }
+}
+
+/** Forget that we have issued any router-related warnings, so that we'll
+ * warn again if we see the same errors. */
+void
+routerlist_reset_warnings(void)
+{
+  if (!warned_nicknames)
+    warned_nicknames = smartlist_new();
+  SMARTLIST_FOREACH(warned_nicknames, char *, cp, tor_free(cp));
+  smartlist_clear(warned_nicknames); /* now the list is empty. */
+
+  networkstatus_reset_warnings();
+}
+
+/** Add <b>router</b> to the routerlist, if we don't already have it.  Replace
+ * older entries (if any) with the same key.  Note: Callers should not hold
+ * their pointers to <b>router</b> if this function fails; <b>router</b>
+ * will either be inserted into the routerlist or freed. Similarly, even
+ * if this call succeeds, they should not hold their pointers to
+ * <b>router</b> after subsequent calls with other routerinfo's -- they
+ * might cause the original routerinfo to get freed.
+ *
+ * Returns the status for the operation. Might set *<b>msg</b> if it wants
+ * the poster of the router to know something.
+ *
+ * If <b>from_cache</b>, this descriptor came from our disk cache. If
+ * <b>from_fetch</b>, we received it in response to a request we made.
+ * (If both are false, that means it was uploaded to us as an auth dir
+ * server or via the controller.)
+ *
+ * This function should be called *after*
+ * routers_update_status_from_consensus_networkstatus; subsequently, you
+ * should call router_rebuild_store and routerlist_descriptors_added.
+ */
+was_router_added_t
+router_add_to_routerlist(routerinfo_t *router, const char **msg,
+                         int from_cache, int from_fetch)
+{
+  const char *id_digest;
+  const or_options_t *options = get_options();
+  int authdir = authdir_mode_handles_descs(options, router->purpose);
+  int authdir_believes_valid = 0;
+  routerinfo_t *old_router;
+  networkstatus_t *consensus =
+    networkstatus_get_latest_consensus_by_flavor(FLAV_NS);
+  int in_consensus = 0;
+
+  tor_assert(msg);
+
+  if (!routerlist)
+    router_get_routerlist();
+
+  id_digest = router->cache_info.identity_digest;
+
+  old_router = router_get_mutable_by_digest(id_digest);
+
+  /* Make sure that we haven't already got this exact descriptor. */
+  if (sdmap_get(routerlist->desc_digest_map,
+                router->cache_info.signed_descriptor_digest)) {
+    /* If we have this descriptor already and the new descriptor is a bridge
+     * descriptor, replace it. If we had a bridge descriptor before and the
+     * new one is not a bridge descriptor, don't replace it. */
+
+    /* Only members of routerlist->identity_map can be bridges; we don't
+     * put bridges in old_routers. */
+    const int was_bridge = old_router &&
+      old_router->purpose == ROUTER_PURPOSE_BRIDGE;
+
+    if (routerinfo_is_a_configured_bridge(router) &&
+        router->purpose == ROUTER_PURPOSE_BRIDGE &&
+        !was_bridge) {
+      log_info(LD_DIR, "Replacing non-bridge descriptor with bridge "
+               "descriptor for router %s",
+               router_describe(router));
+    } else {
+      log_info(LD_DIR,
+               "Dropping descriptor that we already have for router %s",
+               router_describe(router));
+      *msg = "Router descriptor was not new.";
+      routerinfo_free(router);
+      return ROUTER_WAS_NOT_NEW;
+    }
+  }
+
+  if (authdir) {
+    if (authdir_wants_to_reject_router(router, msg,
+                                       !from_cache && !from_fetch,
+                                       &authdir_believes_valid)) {
+      tor_assert(*msg);
+      routerinfo_free(router);
+      return ROUTER_AUTHDIR
