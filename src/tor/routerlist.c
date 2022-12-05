@@ -3385,4 +3385,261 @@ router_add_to_routerlist(routerinfo_t *router, const char **msg,
                                        &authdir_believes_valid)) {
       tor_assert(*msg);
       routerinfo_free(router);
-      return ROUTER_AUTHDIR
+      return ROUTER_AUTHDIR_REJECTS;
+    }
+  } else if (from_fetch) {
+    /* Only check the descriptor digest against the network statuses when
+     * we are receiving in response to a fetch. */
+
+    if (!signed_desc_digest_is_recognized(&router->cache_info) &&
+        !routerinfo_is_a_configured_bridge(router)) {
+      /* We asked for it, so some networkstatus must have listed it when we
+       * did.  Save it if we're a cache in case somebody else asks for it. */
+      log_info(LD_DIR,
+               "Received a no-longer-recognized descriptor for router %s",
+               router_describe(router));
+      *msg = "Router descriptor is not referenced by any network-status.";
+
+      /* Only journal this desc if we'll be serving it. */
+      if (!from_cache && should_cache_old_descriptors())
+        signed_desc_append_to_journal(&router->cache_info,
+                                      &routerlist->desc_store);
+      routerlist_insert_old(routerlist, router);
+      return ROUTER_NOT_IN_CONSENSUS_OR_NETWORKSTATUS;
+    }
+  }
+
+  /* We no longer need a router with this descriptor digest. */
+  if (consensus) {
+    routerstatus_t *rs = networkstatus_vote_find_mutable_entry(
+                                                     consensus, id_digest);
+    if (rs && tor_memeq(rs->descriptor_digest,
+                      router->cache_info.signed_descriptor_digest,
+                      DIGEST_LEN)) {
+      in_consensus = 1;
+    }
+  }
+
+  if (router->purpose == ROUTER_PURPOSE_GENERAL &&
+      consensus && !in_consensus && !authdir) {
+    /* If it's a general router not listed in the consensus, then don't
+     * consider replacing the latest router with it. */
+    if (!from_cache && should_cache_old_descriptors())
+      signed_desc_append_to_journal(&router->cache_info,
+                                    &routerlist->desc_store);
+    routerlist_insert_old(routerlist, router);
+    *msg = "Skipping router descriptor: not in consensus.";
+    return ROUTER_NOT_IN_CONSENSUS;
+  }
+
+  /* If we're reading a bridge descriptor from our cache, and we don't
+   * recognize it as one of our currently configured bridges, drop the
+   * descriptor. Otherwise we could end up using it as one of our entry
+   * guards even if it isn't in our Bridge config lines. */
+  if (router->purpose == ROUTER_PURPOSE_BRIDGE && from_cache &&
+      !authdir_mode_bridge(options) &&
+      !routerinfo_is_a_configured_bridge(router)) {
+    log_info(LD_DIR, "Dropping bridge descriptor for %s because we have "
+             "no bridge configured at that address.",
+             safe_str_client(router_describe(router)));
+    *msg = "Router descriptor was not a configured bridge.";
+    routerinfo_free(router);
+    return ROUTER_WAS_NOT_WANTED;
+  }
+
+  /* If we have a router with the same identity key, choose the newer one. */
+  if (old_router) {
+    if (!in_consensus && (router->cache_info.published_on <=
+                          old_router->cache_info.published_on)) {
+      /* Same key, but old.  This one is not listed in the consensus. */
+      log_debug(LD_DIR, "Not-new descriptor for router %s",
+                router_describe(router));
+      /* Only journal this desc if we'll be serving it. */
+      if (!from_cache && should_cache_old_descriptors())
+        signed_desc_append_to_journal(&router->cache_info,
+                                      &routerlist->desc_store);
+      routerlist_insert_old(routerlist, router);
+      *msg = "Router descriptor was not new.";
+      return ROUTER_WAS_NOT_NEW;
+    } else {
+      /* Same key, and either new, or listed in the consensus. */
+      log_debug(LD_DIR, "Replacing entry for router %s",
+                router_describe(router));
+      routerlist_replace(routerlist, old_router, router);
+      if (!from_cache) {
+        signed_desc_append_to_journal(&router->cache_info,
+                                      &routerlist->desc_store);
+      }
+      directory_set_dirty();
+      *msg = authdir_believes_valid ? "Valid server updated" :
+        ("Invalid server updated. (This dirserver is marking your "
+         "server as unapproved.)");
+      return ROUTER_ADDED_SUCCESSFULLY;
+    }
+  }
+
+  if (!in_consensus && from_cache &&
+      router->cache_info.published_on < time(NULL) - OLD_ROUTER_DESC_MAX_AGE) {
+    *msg = "Router descriptor was really old.";
+    routerinfo_free(router);
+    return ROUTER_WAS_NOT_NEW;
+  }
+
+  /* We haven't seen a router with this identity before. Add it to the end of
+   * the list. */
+  routerlist_insert(routerlist, router);
+  if (!from_cache) {
+    signed_desc_append_to_journal(&router->cache_info,
+                                  &routerlist->desc_store);
+  }
+  directory_set_dirty();
+  return ROUTER_ADDED_SUCCESSFULLY;
+}
+
+/** Insert <b>ei</b> into the routerlist, or free it. Other arguments are
+ * as for router_add_to_routerlist().  Return ROUTER_ADDED_SUCCESSFULLY iff
+ * we actually inserted it, ROUTER_BAD_EI otherwise.
+ */
+was_router_added_t
+router_add_extrainfo_to_routerlist(extrainfo_t *ei, const char **msg,
+                                   int from_cache, int from_fetch)
+{
+  int inserted;
+  (void)from_fetch;
+  if (msg) *msg = NULL;
+  /*XXXX023 Do something with msg */
+
+  inserted = extrainfo_insert(router_get_routerlist(), ei);
+
+  if (inserted && !from_cache)
+    signed_desc_append_to_journal(&ei->cache_info,
+                                  &routerlist->extrainfo_store);
+
+  if (inserted)
+    return ROUTER_ADDED_SUCCESSFULLY;
+  else
+    return ROUTER_BAD_EI;
+}
+
+/** Sorting helper: return &lt;0, 0, or &gt;0 depending on whether the
+ * signed_descriptor_t* in *<b>a</b> has an identity digest preceding, equal
+ * to, or later than that of *<b>b</b>. */
+static int
+compare_old_routers_by_identity_(const void **_a, const void **_b)
+{
+  int i;
+  const signed_descriptor_t *r1 = *_a, *r2 = *_b;
+  if ((i = fast_memcmp(r1->identity_digest, r2->identity_digest, DIGEST_LEN)))
+    return i;
+  return (int)(r1->published_on - r2->published_on);
+}
+
+/** Internal type used to represent how long an old descriptor was valid,
+ * where it appeared in the list of old descriptors, and whether it's extra
+ * old. Used only by routerlist_remove_old_cached_routers_with_id(). */
+struct duration_idx_t {
+  int duration;
+  int idx;
+  int old;
+};
+
+/** Sorting helper: compare two duration_idx_t by their duration. */
+static int
+compare_duration_idx_(const void *_d1, const void *_d2)
+{
+  const struct duration_idx_t *d1 = _d1;
+  const struct duration_idx_t *d2 = _d2;
+  return d1->duration - d2->duration;
+}
+
+/** The range <b>lo</b> through <b>hi</b> inclusive of routerlist->old_routers
+ * must contain routerinfo_t with the same identity and with publication time
+ * in ascending order.  Remove members from this range until there are no more
+ * than max_descriptors_per_router() remaining.  Start by removing the oldest
+ * members from before <b>cutoff</b>, then remove members which were current
+ * for the lowest amount of time.  The order of members of old_routers at
+ * indices <b>lo</b> or higher may be changed.
+ */
+static void
+routerlist_remove_old_cached_routers_with_id(time_t now,
+                                             time_t cutoff, int lo, int hi,
+                                             digestset_t *retain)
+{
+  int i, n = hi-lo+1;
+  unsigned n_extra, n_rmv = 0;
+  struct duration_idx_t *lifespans;
+  uint8_t *rmv, *must_keep;
+  smartlist_t *lst = routerlist->old_routers;
+#if 1
+  const char *ident;
+  tor_assert(hi < smartlist_len(lst));
+  tor_assert(lo <= hi);
+  ident = ((signed_descriptor_t*)smartlist_get(lst, lo))->identity_digest;
+  for (i = lo+1; i <= hi; ++i) {
+    signed_descriptor_t *r = smartlist_get(lst, i);
+    tor_assert(tor_memeq(ident, r->identity_digest, DIGEST_LEN));
+  }
+#endif
+  /* Check whether we need to do anything at all. */
+  {
+    int mdpr = directory_caches_dir_info(get_options()) ? 2 : 1;
+    if (n <= mdpr)
+      return;
+    n_extra = n - mdpr;
+  }
+
+  lifespans = tor_malloc_zero(sizeof(struct duration_idx_t)*n);
+  rmv = tor_malloc_zero(sizeof(uint8_t)*n);
+  must_keep = tor_malloc_zero(sizeof(uint8_t)*n);
+  /* Set lifespans to contain the lifespan and index of each server. */
+  /* Set rmv[i-lo]=1 if we're going to remove a server for being too old. */
+  for (i = lo; i <= hi; ++i) {
+    signed_descriptor_t *r = smartlist_get(lst, i);
+    signed_descriptor_t *r_next;
+    lifespans[i-lo].idx = i;
+    if (r->last_listed_as_valid_until >= now ||
+        (retain && digestset_contains(retain, r->signed_descriptor_digest))) {
+      must_keep[i-lo] = 1;
+    }
+    if (i < hi) {
+      r_next = smartlist_get(lst, i+1);
+      tor_assert(r->published_on <= r_next->published_on);
+      lifespans[i-lo].duration = (int)(r_next->published_on - r->published_on);
+    } else {
+      r_next = NULL;
+      lifespans[i-lo].duration = INT_MAX;
+    }
+    if (!must_keep[i-lo] && r->published_on < cutoff && n_rmv < n_extra) {
+      ++n_rmv;
+      lifespans[i-lo].old = 1;
+      rmv[i-lo] = 1;
+    }
+  }
+
+  if (n_rmv < n_extra) {
+    /**
+     * We aren't removing enough servers for being old.  Sort lifespans by
+     * the duration of liveness, and remove the ones we're not already going to
+     * remove based on how long they were alive.
+     **/
+    qsort(lifespans, n, sizeof(struct duration_idx_t), compare_duration_idx_);
+    for (i = 0; i < n && n_rmv < n_extra; ++i) {
+      if (!must_keep[lifespans[i].idx-lo] && !lifespans[i].old) {
+        rmv[lifespans[i].idx-lo] = 1;
+        ++n_rmv;
+      }
+    }
+  }
+
+  i = hi;
+  do {
+    if (rmv[i-lo])
+      routerlist_remove_old(routerlist, smartlist_get(lst, i), i);
+  } while (--i >= lo);
+  tor_free(must_keep);
+  tor_free(rmv);
+  tor_free(lifespans);
+}
+
+/** Deactivate any routers from the routerlist that are more than
+ * ROUTER_MAX_AGE seconds old and not recommended by any networkstatus
