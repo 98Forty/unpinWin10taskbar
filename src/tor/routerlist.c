@@ -3642,4 +3642,267 @@ routerlist_remove_old_cached_routers_with_id(time_t now,
 }
 
 /** Deactivate any routers from the routerlist that are more than
- * ROUTER_MAX_AGE seconds old and not recommended by any networkstatus
+ * ROUTER_MAX_AGE seconds old and not recommended by any networkstatuses;
+ * remove old routers from the list of cached routers if we have too many.
+ */
+void
+routerlist_remove_old_routers(void)
+{
+  int i, hi=-1;
+  const char *cur_id = NULL;
+  time_t now = time(NULL);
+  time_t cutoff;
+  routerinfo_t *router;
+  signed_descriptor_t *sd;
+  digestset_t *retain;
+  const networkstatus_t *consensus = networkstatus_get_latest_consensus();
+
+  trusted_dirs_remove_old_certs();
+
+  if (!routerlist || !consensus)
+    return;
+
+  // routerlist_assert_ok(routerlist);
+
+  /* We need to guess how many router descriptors we will wind up wanting to
+     retain, so that we can be sure to allocate a large enough Bloom filter
+     to hold the digest set.  Overestimating is fine; underestimating is bad.
+  */
+  {
+    /* We'll probably retain everything in the consensus. */
+    int n_max_retain = smartlist_len(consensus->routerstatus_list);
+    retain = digestset_new(n_max_retain);
+  }
+
+  cutoff = now - OLD_ROUTER_DESC_MAX_AGE;
+  /* Retain anything listed in the consensus. */
+  if (consensus) {
+    SMARTLIST_FOREACH(consensus->routerstatus_list, routerstatus_t *, rs,
+        if (rs->published_on >= cutoff)
+          digestset_add(retain, rs->descriptor_digest));
+  }
+
+  /* If we have a consensus, we should consider pruning current routers that
+   * are too old and that nobody recommends.  (If we don't have a consensus,
+   * then we should get one before we decide to kill routers.) */
+
+  if (consensus) {
+    cutoff = now - ROUTER_MAX_AGE;
+    /* Remove too-old unrecommended members of routerlist->routers. */
+    for (i = 0; i < smartlist_len(routerlist->routers); ++i) {
+      router = smartlist_get(routerlist->routers, i);
+      if (router->cache_info.published_on <= cutoff &&
+          router->cache_info.last_listed_as_valid_until < now &&
+          !digestset_contains(retain,
+                          router->cache_info.signed_descriptor_digest)) {
+        /* Too old: remove it.  (If we're a cache, just move it into
+         * old_routers.) */
+        log_info(LD_DIR,
+                 "Forgetting obsolete (too old) routerinfo for router %s",
+                 router_describe(router));
+        routerlist_remove(routerlist, router, 1, now);
+        i--;
+      }
+    }
+  }
+
+  //routerlist_assert_ok(routerlist);
+
+  /* Remove far-too-old members of routerlist->old_routers. */
+  cutoff = now - OLD_ROUTER_DESC_MAX_AGE;
+  for (i = 0; i < smartlist_len(routerlist->old_routers); ++i) {
+    sd = smartlist_get(routerlist->old_routers, i);
+    if (sd->published_on <= cutoff &&
+        sd->last_listed_as_valid_until < now &&
+        !digestset_contains(retain, sd->signed_descriptor_digest)) {
+      /* Too old.  Remove it. */
+      routerlist_remove_old(routerlist, sd, i--);
+    }
+  }
+
+  //routerlist_assert_ok(routerlist);
+
+  log_info(LD_DIR, "We have %d live routers and %d old router descriptors.",
+           smartlist_len(routerlist->routers),
+           smartlist_len(routerlist->old_routers));
+
+  /* Now we might have to look at routerlist->old_routers for extraneous
+   * members. (We'd keep all the members if we could, but we need to save
+   * space.) First, check whether we have too many router descriptors, total.
+   * We're okay with having too many for some given router, so long as the
+   * total number doesn't approach max_descriptors_per_router()*len(router).
+   */
+  if (smartlist_len(routerlist->old_routers) <
+      smartlist_len(routerlist->routers))
+    goto done;
+
+  /* Sort by identity, then fix indices. */
+  smartlist_sort(routerlist->old_routers, compare_old_routers_by_identity_);
+  /* Fix indices. */
+  for (i = 0; i < smartlist_len(routerlist->old_routers); ++i) {
+    signed_descriptor_t *r = smartlist_get(routerlist->old_routers, i);
+    r->routerlist_index = i;
+  }
+
+  /* Iterate through the list from back to front, so when we remove descriptors
+   * we don't mess up groups we haven't gotten to. */
+  for (i = smartlist_len(routerlist->old_routers)-1; i >= 0; --i) {
+    signed_descriptor_t *r = smartlist_get(routerlist->old_routers, i);
+    if (!cur_id) {
+      cur_id = r->identity_digest;
+      hi = i;
+    }
+    if (tor_memneq(cur_id, r->identity_digest, DIGEST_LEN)) {
+      routerlist_remove_old_cached_routers_with_id(now,
+                                                   cutoff, i+1, hi, retain);
+      cur_id = r->identity_digest;
+      hi = i;
+    }
+  }
+  if (hi>=0)
+    routerlist_remove_old_cached_routers_with_id(now, cutoff, 0, hi, retain);
+  //routerlist_assert_ok(routerlist);
+
+ done:
+  digestset_free(retain);
+  router_rebuild_store(RRS_DONT_REMOVE_OLD, &routerlist->desc_store);
+  router_rebuild_store(RRS_DONT_REMOVE_OLD,&routerlist->extrainfo_store);
+}
+
+/** We just added a new set of descriptors. Take whatever extra steps
+ * we need. */
+void
+routerlist_descriptors_added(smartlist_t *sl, int from_cache)
+{
+  tor_assert(sl);
+  control_event_descriptors_changed(sl);
+  SMARTLIST_FOREACH_BEGIN(sl, routerinfo_t *, ri) {
+    if (ri->purpose == ROUTER_PURPOSE_BRIDGE)
+      learned_bridge_descriptor(ri, from_cache);
+    if (ri->needs_retest_if_added) {
+      ri->needs_retest_if_added = 0;
+      dirserv_single_reachability_test(approx_time(), ri);
+    }
+  } SMARTLIST_FOREACH_END(ri);
+}
+
+/**
+ * Code to parse a single router descriptor and insert it into the
+ * routerlist.  Return -1 if the descriptor was ill-formed; 0 if the
+ * descriptor was well-formed but could not be added; and 1 if the
+ * descriptor was added.
+ *
+ * If we don't add it and <b>msg</b> is not NULL, then assign to
+ * *<b>msg</b> a static string describing the reason for refusing the
+ * descriptor.
+ *
+ * This is used only by the controller.
+ */
+int
+router_load_single_router(const char *s, uint8_t purpose, int cache,
+                          const char **msg)
+{
+  routerinfo_t *ri;
+  was_router_added_t r;
+  smartlist_t *lst;
+  char annotation_buf[ROUTER_ANNOTATION_BUF_LEN];
+  tor_assert(msg);
+  *msg = NULL;
+
+  tor_snprintf(annotation_buf, sizeof(annotation_buf),
+               "@source controller\n"
+               "@purpose %s\n", router_purpose_to_string(purpose));
+
+  if (!(ri = router_parse_entry_from_string(s, NULL, 1, 0, annotation_buf))) {
+    log_warn(LD_DIR, "Error parsing router descriptor; dropping.");
+    *msg = "Couldn't parse router descriptor.";
+    return -1;
+  }
+  tor_assert(ri->purpose == purpose);
+  if (router_is_me(ri)) {
+    log_warn(LD_DIR, "Router's identity key matches mine; dropping.");
+    *msg = "Router's identity key matches mine.";
+    routerinfo_free(ri);
+    return 0;
+  }
+
+  if (!cache) /* obey the preference of the controller */
+    ri->cache_info.do_not_cache = 1;
+
+  lst = smartlist_new();
+  smartlist_add(lst, ri);
+  routers_update_status_from_consensus_networkstatus(lst, 0);
+
+  r = router_add_to_routerlist(ri, msg, 0, 0);
+  if (!WRA_WAS_ADDED(r)) {
+    /* we've already assigned to *msg now, and ri is already freed */
+    tor_assert(*msg);
+    if (r == ROUTER_AUTHDIR_REJECTS)
+      log_warn(LD_DIR, "Couldn't add router to list: %s Dropping.", *msg);
+    smartlist_free(lst);
+    return 0;
+  } else {
+    routerlist_descriptors_added(lst, 0);
+    smartlist_free(lst);
+    log_debug(LD_DIR, "Added router to list");
+    return 1;
+  }
+}
+
+/** Given a string <b>s</b> containing some routerdescs, parse it and put the
+ * routers into our directory.  If saved_location is SAVED_NOWHERE, the routers
+ * are in response to a query to the network: cache them by adding them to
+ * the journal.
+ *
+ * Return the number of routers actually added.
+ *
+ * If <b>requested_fingerprints</b> is provided, it must contain a list of
+ * uppercased fingerprints.  Do not update any router whose
+ * fingerprint is not on the list; after updating a router, remove its
+ * fingerprint from the list.
+ *
+ * If <b>descriptor_digests</b> is non-zero, then the requested_fingerprints
+ * are descriptor digests. Otherwise they are identity digests.
+ */
+int
+router_load_routers_from_string(const char *s, const char *eos,
+                                saved_location_t saved_location,
+                                smartlist_t *requested_fingerprints,
+                                int descriptor_digests,
+                                const char *prepend_annotations)
+{
+  smartlist_t *routers = smartlist_new(), *changed = smartlist_new();
+  char fp[HEX_DIGEST_LEN+1];
+  const char *msg;
+  int from_cache = (saved_location != SAVED_NOWHERE);
+  int allow_annotations = (saved_location != SAVED_NOWHERE);
+  int any_changed = 0;
+
+  router_parse_list_from_string(&s, eos, routers, saved_location, 0,
+                                allow_annotations, prepend_annotations);
+
+  routers_update_status_from_consensus_networkstatus(routers, !from_cache);
+
+  log_info(LD_DIR, "%d elements to add", smartlist_len(routers));
+
+  SMARTLIST_FOREACH_BEGIN(routers, routerinfo_t *, ri) {
+    was_router_added_t r;
+    char d[DIGEST_LEN];
+    if (requested_fingerprints) {
+      base16_encode(fp, sizeof(fp), descriptor_digests ?
+                      ri->cache_info.signed_descriptor_digest :
+                      ri->cache_info.identity_digest,
+                    DIGEST_LEN);
+      if (smartlist_contains_string(requested_fingerprints, fp)) {
+        smartlist_string_remove(requested_fingerprints, fp);
+      } else {
+        char *requested =
+          smartlist_join_strings(requested_fingerprints," ",0,NULL);
+        log_warn(LD_DIR,
+                 "We received a router descriptor with a fingerprint (%s) "
+                 "that we never requested. (We asked for: %s.) Dropping.",
+                 fp, requested);
+        tor_free(requested);
+        routerinfo_free(ri);
+        continue;
+  
