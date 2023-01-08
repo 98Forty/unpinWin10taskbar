@@ -4212,4 +4212,269 @@ clear_dir_servers(void)
 
 /** For every current directory connection whose purpose is <b>purpose</b>,
  * and where the resource being downloaded begins with <b>prefix</b>, split
- * rest of the resource into
+ * rest of the resource into base16 fingerprints (or base64 fingerprints if
+ * purpose==DIR_PURPPOSE_FETCH_MICRODESC), decode them, and set the
+ * corresponding elements of <b>result</b> to a nonzero value.
+ */
+static void
+list_pending_downloads(digestmap_t *result,
+                       int purpose, const char *prefix)
+{
+  const size_t p_len = strlen(prefix);
+  smartlist_t *tmp = smartlist_new();
+  smartlist_t *conns = get_connection_array();
+  int flags = DSR_HEX;
+  if (purpose == DIR_PURPOSE_FETCH_MICRODESC)
+    flags = DSR_DIGEST256|DSR_BASE64;
+
+  tor_assert(result);
+
+  SMARTLIST_FOREACH_BEGIN(conns, connection_t *, conn) {
+    if (conn->type == CONN_TYPE_DIR &&
+        conn->purpose == purpose &&
+        !conn->marked_for_close) {
+      const char *resource = TO_DIR_CONN(conn)->requested_resource;
+      if (!strcmpstart(resource, prefix))
+        dir_split_resource_into_fingerprints(resource + p_len,
+                                             tmp, NULL, flags);
+    }
+  } SMARTLIST_FOREACH_END(conn);
+
+  SMARTLIST_FOREACH(tmp, char *, d,
+                    {
+                      digestmap_set(result, d, (void*)1);
+                      tor_free(d);
+                    });
+  smartlist_free(tmp);
+}
+
+/** For every router descriptor (or extra-info document if <b>extrainfo</b> is
+ * true) we are currently downloading by descriptor digest, set result[d] to
+ * (void*)1. */
+static void
+list_pending_descriptor_downloads(digestmap_t *result, int extrainfo)
+{
+  int purpose =
+    extrainfo ? DIR_PURPOSE_FETCH_EXTRAINFO : DIR_PURPOSE_FETCH_SERVERDESC;
+  list_pending_downloads(result, purpose, "d/");
+}
+
+/** For every microdescriptor we are currently downloading by descriptor
+ * digest, set result[d] to (void*)1.   (Note that microdescriptor digests
+ * are 256-bit, and digestmap_t only holds 160-bit digests, so we're only
+ * getting the first 20 bytes of each digest here.)
+ *
+ * XXXX Let there be a digestmap256_t, and use that instead.
+ */
+void
+list_pending_microdesc_downloads(digestmap_t *result)
+{
+  list_pending_downloads(result, DIR_PURPOSE_FETCH_MICRODESC, "d/");
+}
+
+/** For every certificate we are currently downloading by (identity digest,
+ * signing key digest) pair, set result[fp_pair] to (void *1).
+ */
+static void
+list_pending_fpsk_downloads(fp_pair_map_t *result)
+{
+  const char *pfx = "fp-sk/";
+  smartlist_t *tmp;
+  smartlist_t *conns;
+  const char *resource;
+
+  tor_assert(result);
+
+  tmp = smartlist_new();
+  conns = get_connection_array();
+
+  SMARTLIST_FOREACH_BEGIN(conns, connection_t *, conn) {
+    if (conn->type == CONN_TYPE_DIR &&
+        conn->purpose == DIR_PURPOSE_FETCH_CERTIFICATE &&
+        !conn->marked_for_close) {
+      resource = TO_DIR_CONN(conn)->requested_resource;
+      if (!strcmpstart(resource, pfx))
+        dir_split_resource_into_fingerprint_pairs(resource + strlen(pfx),
+                                                  tmp);
+    }
+  } SMARTLIST_FOREACH_END(conn);
+
+  SMARTLIST_FOREACH_BEGIN(tmp, fp_pair_t *, fp) {
+    fp_pair_map_set(result, fp, (void*)1);
+    tor_free(fp);
+  } SMARTLIST_FOREACH_END(fp);
+
+  smartlist_free(tmp);
+}
+
+/** Launch downloads for all the descriptors whose digests or digests256
+ * are listed as digests[i] for lo <= i < hi.  (Lo and hi may be out of
+ * range.)  If <b>source</b> is given, download from <b>source</b>;
+ * otherwise, download from an appropriate random directory server.
+ */
+static void
+initiate_descriptor_downloads(const routerstatus_t *source,
+                              int purpose,
+                              smartlist_t *digests,
+                              int lo, int hi, int pds_flags)
+{
+  int i, n = hi-lo;
+  char *resource, *cp;
+  size_t r_len;
+
+  int digest_len = DIGEST_LEN, enc_digest_len = HEX_DIGEST_LEN;
+  char sep = '+';
+  int b64_256 = 0;
+
+  if (purpose == DIR_PURPOSE_FETCH_MICRODESC) {
+    /* Microdescriptors are downloaded by "-"-separated base64-encoded
+     * 256-bit digests. */
+    digest_len = DIGEST256_LEN;
+    enc_digest_len = BASE64_DIGEST256_LEN;
+    sep = '-';
+    b64_256 = 1;
+  }
+
+  if (n <= 0)
+    return;
+  if (lo < 0)
+    lo = 0;
+  if (hi > smartlist_len(digests))
+    hi = smartlist_len(digests);
+
+  r_len = 8 + (enc_digest_len+1)*n;
+  cp = resource = tor_malloc(r_len);
+  memcpy(cp, "d/", 2);
+  cp += 2;
+  for (i = lo; i < hi; ++i) {
+    if (b64_256) {
+      digest256_to_base64(cp, smartlist_get(digests, i));
+    } else {
+      base16_encode(cp, r_len-(cp-resource),
+                    smartlist_get(digests,i), digest_len);
+    }
+    cp += enc_digest_len;
+    *cp++ = sep;
+  }
+  memcpy(cp-1, ".z", 3);
+
+  if (source) {
+    /* We know which authority we want. */
+    directory_initiate_command_routerstatus(source, purpose,
+                                            ROUTER_PURPOSE_GENERAL,
+                                            DIRIND_ONEHOP,
+                                            resource, NULL, 0, 0);
+  } else {
+    directory_get_from_dirserver(purpose, ROUTER_PURPOSE_GENERAL, resource,
+                                 pds_flags);
+  }
+  tor_free(resource);
+}
+
+/** Max amount of hashes to download per request.
+ * Since squid does not like URLs >= 4096 bytes we limit it to 96.
+ *   4096 - strlen(http://255.255.255.255/tor/server/d/.z) == 4058
+ *   4058/41 (40 for the hash and 1 for the + that separates them) => 98
+ *   So use 96 because it's a nice number.
+ */
+#define MAX_DL_PER_REQUEST 96
+#define MAX_MICRODESC_DL_PER_REQUEST 92
+/** Don't split our requests so finely that we are requesting fewer than
+ * this number per server. */
+#define MIN_DL_PER_REQUEST 4
+/** To prevent a single screwy cache from confusing us by selective reply,
+ * try to split our requests into at least this many requests. */
+#define MIN_REQUESTS 3
+/** If we want fewer than this many descriptors, wait until we
+ * want more, or until TestingClientMaxIntervalWithoutRequest has passed. */
+#define MAX_DL_TO_DELAY 16
+
+/** Given a <b>purpose</b> (FETCH_MICRODESC or FETCH_SERVERDESC) and a list of
+ * router descriptor digests or microdescriptor digest256s in
+ * <b>downloadable</b>, decide whether to delay fetching until we have more.
+ * If we don't want to delay, launch one or more requests to the appropriate
+ * directory authorities.
+ */
+void
+launch_descriptor_downloads(int purpose,
+                            smartlist_t *downloadable,
+                            const routerstatus_t *source, time_t now)
+{
+  int should_delay = 0, n_downloadable;
+  const or_options_t *options = get_options();
+  const char *descname;
+
+  tor_assert(purpose == DIR_PURPOSE_FETCH_SERVERDESC ||
+             purpose == DIR_PURPOSE_FETCH_MICRODESC);
+
+  descname = (purpose == DIR_PURPOSE_FETCH_SERVERDESC) ?
+    "routerdesc" : "microdesc";
+
+  n_downloadable = smartlist_len(downloadable);
+  if (!directory_fetches_dir_info_early(options)) {
+    if (n_downloadable >= MAX_DL_TO_DELAY) {
+      log_debug(LD_DIR,
+                "There are enough downloadable %ss to launch requests.",
+                descname);
+      should_delay = 0;
+    } else {
+      should_delay = (last_descriptor_download_attempted +
+                      options->TestingClientMaxIntervalWithoutRequest) > now;
+      if (!should_delay && n_downloadable) {
+        if (last_descriptor_download_attempted) {
+          log_info(LD_DIR,
+                   "There are not many downloadable %ss, but we've "
+                   "been waiting long enough (%d seconds). Downloading.",
+                   descname,
+                   (int)(now-last_descriptor_download_attempted));
+        } else {
+          log_info(LD_DIR,
+                   "There are not many downloadable %ss, but we haven't "
+                   "tried downloading descriptors recently. Downloading.",
+                   descname);
+        }
+      }
+    }
+  }
+
+  if (! should_delay && n_downloadable) {
+    int i, n_per_request;
+    const char *req_plural = "", *rtr_plural = "";
+    int pds_flags = PDS_RETRY_IF_NO_SERVERS;
+    if (! authdir_mode_any_nonhidserv(options)) {
+      /* If we wind up going to the authorities, we want to only open one
+       * connection to each authority at a time, so that we don't overload
+       * them.  We do this by setting PDS_NO_EXISTING_SERVERDESC_FETCH
+       * regardless of whether we're a cache or not; it gets ignored if we're
+       * not calling router_pick_trusteddirserver.
+       *
+       * Setting this flag can make initiate_descriptor_downloads() ignore
+       * requests.  We need to make sure that we do in fact call
+       * update_router_descriptor_downloads() later on, once the connections
+       * have succeeded or failed.
+       */
+      pds_flags |= (purpose == DIR_PURPOSE_FETCH_MICRODESC) ?
+        PDS_NO_EXISTING_MICRODESC_FETCH :
+        PDS_NO_EXISTING_SERVERDESC_FETCH;
+    }
+
+    n_per_request = CEIL_DIV(n_downloadable, MIN_REQUESTS);
+    if (purpose == DIR_PURPOSE_FETCH_MICRODESC) {
+      if (n_per_request > MAX_MICRODESC_DL_PER_REQUEST)
+        n_per_request = MAX_MICRODESC_DL_PER_REQUEST;
+    } else {
+      if (n_per_request > MAX_DL_PER_REQUEST)
+        n_per_request = MAX_DL_PER_REQUEST;
+    }
+    if (n_per_request < MIN_DL_PER_REQUEST)
+      n_per_request = MIN_DL_PER_REQUEST;
+
+    if (n_downloadable > n_per_request)
+      req_plural = rtr_plural = "s";
+    else if (n_downloadable > 1)
+      rtr_plural = "s";
+
+    log_info(LD_DIR,
+             "Launching %d request%s for %d %s%s, %d at a time",
+             CEIL_DIV(n_downloadable, n_per_request), req_plural,
+             n_downloadable, descname, rtr_plural, 
