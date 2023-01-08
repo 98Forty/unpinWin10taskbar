@@ -3905,4 +3905,311 @@ router_load_routers_from_string(const char *s, const char *eos,
         tor_free(requested);
         routerinfo_free(ri);
         continue;
-  
+      }
+    }
+
+    memcpy(d, ri->cache_info.signed_descriptor_digest, DIGEST_LEN);
+    r = router_add_to_routerlist(ri, &msg, from_cache, !from_cache);
+    if (WRA_WAS_ADDED(r)) {
+      any_changed++;
+      smartlist_add(changed, ri);
+      routerlist_descriptors_added(changed, from_cache);
+      smartlist_clear(changed);
+    } else if (WRA_WAS_REJECTED(r)) {
+      download_status_t *dl_status;
+      dl_status = router_get_dl_status_by_descriptor_digest(d);
+      if (dl_status) {
+        log_info(LD_GENERAL, "Marking router %s as never downloadable",
+                 hex_str(d, DIGEST_LEN));
+        download_status_mark_impossible(dl_status);
+      }
+    }
+  } SMARTLIST_FOREACH_END(ri);
+
+  routerlist_assert_ok(routerlist);
+
+  if (any_changed)
+    router_rebuild_store(0, &routerlist->desc_store);
+
+  smartlist_free(routers);
+  smartlist_free(changed);
+
+  return any_changed;
+}
+
+/** Parse one or more extrainfos from <b>s</b> (ending immediately before
+ * <b>eos</b> if <b>eos</b> is present).  Other arguments are as for
+ * router_load_routers_from_string(). */
+void
+router_load_extrainfo_from_string(const char *s, const char *eos,
+                                  saved_location_t saved_location,
+                                  smartlist_t *requested_fingerprints,
+                                  int descriptor_digests)
+{
+  smartlist_t *extrainfo_list = smartlist_new();
+  const char *msg;
+  int from_cache = (saved_location != SAVED_NOWHERE);
+
+  router_parse_list_from_string(&s, eos, extrainfo_list, saved_location, 1, 0,
+                                NULL);
+
+  log_info(LD_DIR, "%d elements to add", smartlist_len(extrainfo_list));
+
+  SMARTLIST_FOREACH_BEGIN(extrainfo_list, extrainfo_t *, ei) {
+      was_router_added_t added =
+        router_add_extrainfo_to_routerlist(ei, &msg, from_cache, !from_cache);
+      if (WRA_WAS_ADDED(added) && requested_fingerprints) {
+        char fp[HEX_DIGEST_LEN+1];
+        base16_encode(fp, sizeof(fp), descriptor_digests ?
+                        ei->cache_info.signed_descriptor_digest :
+                        ei->cache_info.identity_digest,
+                      DIGEST_LEN);
+        smartlist_string_remove(requested_fingerprints, fp);
+        /* We silently let people stuff us with extrainfos we didn't ask for,
+         * so long as we would have wanted them anyway.  Since we always fetch
+         * all the extrainfos we want, and we never actually act on them
+         * inside Tor, this should be harmless. */
+      }
+  } SMARTLIST_FOREACH_END(ei);
+
+  routerlist_assert_ok(routerlist);
+  router_rebuild_store(0, &router_get_routerlist()->extrainfo_store);
+
+  smartlist_free(extrainfo_list);
+}
+
+/** Return true iff any networkstatus includes a descriptor whose digest
+ * is that of <b>desc</b>. */
+static int
+signed_desc_digest_is_recognized(signed_descriptor_t *desc)
+{
+  const routerstatus_t *rs;
+  networkstatus_t *consensus = networkstatus_get_latest_consensus();
+
+  if (consensus) {
+    rs = networkstatus_vote_find_entry(consensus, desc->identity_digest);
+    if (rs && tor_memeq(rs->descriptor_digest,
+                      desc->signed_descriptor_digest, DIGEST_LEN))
+      return 1;
+  }
+  return 0;
+}
+
+/** Update downloads for router descriptors and/or microdescriptors as
+ * appropriate. */
+void
+update_all_descriptor_downloads(time_t now)
+{
+  if (get_options()->DisableNetwork)
+    return;
+  update_router_descriptor_downloads(now);
+  update_microdesc_downloads(now);
+  launch_dummy_descriptor_download_as_needed(now, get_options());
+}
+
+/** Clear all our timeouts for fetching v3 directory stuff, and then
+ * give it all a try again. */
+void
+routerlist_retry_directory_downloads(time_t now)
+{
+  router_reset_status_download_failures();
+  router_reset_descriptor_download_failures();
+  if (get_options()->DisableNetwork)
+    return;
+  update_networkstatus_downloads(now);
+  update_all_descriptor_downloads(now);
+}
+
+/** Return true iff <b>router</b> does not permit exit streams.
+ */
+int
+router_exit_policy_rejects_all(const routerinfo_t *router)
+{
+  return router->policy_is_reject_star;
+}
+
+/** Create an directory server at <b>address</b>:<b>port</b>, with OR identity
+ * key <b>digest</b>.  If <b>address</b> is NULL, add ourself.  If
+ * <b>is_authority</b>, this is a directory authority.  Return the new
+ * directory server entry on success or NULL on failure. */
+static dir_server_t *
+dir_server_new(int is_authority,
+               const char *nickname,
+               const tor_addr_t *addr,
+               const char *hostname,
+               uint16_t dir_port, uint16_t or_port,
+               const char *digest, const char *v3_auth_digest,
+               dirinfo_type_t type,
+               double weight)
+{
+  dir_server_t *ent;
+  uint32_t a;
+  char *hostname_ = NULL;
+
+  if (weight < 0)
+    return NULL;
+
+  if (tor_addr_family(addr) == AF_INET)
+    a = tor_addr_to_ipv4h(addr);
+  else
+    return NULL; /*XXXX Support IPv6 */
+
+  if (!hostname)
+    hostname_ = tor_dup_addr(addr);
+  else
+    hostname_ = tor_strdup(hostname);
+
+  ent = tor_malloc_zero(sizeof(dir_server_t));
+  ent->nickname = nickname ? tor_strdup(nickname) : NULL;
+  ent->address = hostname_;
+  ent->addr = a;
+  ent->dir_port = dir_port;
+  ent->or_port = or_port;
+  ent->is_running = 1;
+  ent->is_authority = is_authority;
+  ent->type = type;
+  ent->weight = weight;
+  memcpy(ent->digest, digest, DIGEST_LEN);
+  if (v3_auth_digest && (type & V3_DIRINFO))
+    memcpy(ent->v3_identity_digest, v3_auth_digest, DIGEST_LEN);
+
+  if (nickname)
+    tor_asprintf(&ent->description, "directory server \"%s\" at %s:%d",
+                 nickname, hostname, (int)dir_port);
+  else
+    tor_asprintf(&ent->description, "directory server at %s:%d",
+                 hostname, (int)dir_port);
+
+  ent->fake_status.addr = ent->addr;
+  memcpy(ent->fake_status.identity_digest, digest, DIGEST_LEN);
+  if (nickname)
+    strlcpy(ent->fake_status.nickname, nickname,
+            sizeof(ent->fake_status.nickname));
+  else
+    ent->fake_status.nickname[0] = '\0';
+  ent->fake_status.dir_port = ent->dir_port;
+  ent->fake_status.or_port = ent->or_port;
+
+  return ent;
+}
+
+/** Create an authoritative directory server at
+ * <b>address</b>:<b>port</b>, with identity key <b>digest</b>.  If
+ * <b>address</b> is NULL, add ourself.  Return the new trusted directory
+ * server entry on success or NULL if we couldn't add it. */
+dir_server_t *
+trusted_dir_server_new(const char *nickname, const char *address,
+                       uint16_t dir_port, uint16_t or_port,
+                       const char *digest, const char *v3_auth_digest,
+                       dirinfo_type_t type, double weight)
+{
+  uint32_t a;
+  tor_addr_t addr;
+  char *hostname=NULL;
+  dir_server_t *result;
+
+  if (!address) { /* The address is us; we should guess. */
+    if (resolve_my_address(LOG_WARN, get_options(),
+                           &a, NULL, &hostname) < 0) {
+      log_warn(LD_CONFIG,
+               "Couldn't find a suitable address when adding ourself as a "
+               "trusted directory server.");
+      return NULL;
+    }
+    if (!hostname)
+      hostname = tor_dup_ip(a);
+  } else {
+    if (tor_lookup_hostname(address, &a)) {
+      log_warn(LD_CONFIG,
+               "Unable to lookup address for directory server at '%s'",
+               address);
+      return NULL;
+    }
+    hostname = tor_strdup(address);
+  }
+  tor_addr_from_ipv4h(&addr, a);
+
+  result = dir_server_new(1, nickname, &addr, hostname,
+                          dir_port, or_port, digest,
+                          v3_auth_digest, type, weight);
+  tor_free(hostname);
+  return result;
+}
+
+/** Return a new dir_server_t for a fallback directory server at
+ * <b>addr</b>:<b>or_port</b>/<b>dir_port</b>, with identity key digest
+ * <b>id_digest</b> */
+dir_server_t *
+fallback_dir_server_new(const tor_addr_t *addr,
+                        uint16_t dir_port, uint16_t or_port,
+                        const char *id_digest, double weight)
+{
+  return dir_server_new(0, NULL, addr, NULL, dir_port, or_port, id_digest,
+                        NULL, ALL_DIRINFO, weight);
+}
+
+/** Add a directory server to the global list(s). */
+void
+dir_server_add(dir_server_t *ent)
+{
+  if (!trusted_dir_servers)
+    trusted_dir_servers = smartlist_new();
+  if (!fallback_dir_servers)
+    fallback_dir_servers = smartlist_new();
+
+  if (ent->is_authority)
+    smartlist_add(trusted_dir_servers, ent);
+
+  smartlist_add(fallback_dir_servers, ent);
+  router_dir_info_changed();
+}
+
+/** Free storage held in <b>cert</b>. */
+void
+authority_cert_free(authority_cert_t *cert)
+{
+  if (!cert)
+    return;
+
+  tor_free(cert->cache_info.signed_descriptor_body);
+  crypto_pk_free(cert->signing_key);
+  crypto_pk_free(cert->identity_key);
+
+  tor_free(cert);
+}
+
+/** Free storage held in <b>ds</b>. */
+static void
+dir_server_free(dir_server_t *ds)
+{
+  if (!ds)
+    return;
+
+  tor_free(ds->nickname);
+  tor_free(ds->description);
+  tor_free(ds->address);
+  tor_free(ds);
+}
+
+/** Remove all members from the list of dir servers. */
+void
+clear_dir_servers(void)
+{
+  if (fallback_dir_servers) {
+    SMARTLIST_FOREACH(fallback_dir_servers, dir_server_t *, ent,
+                      dir_server_free(ent));
+    smartlist_clear(fallback_dir_servers);
+  } else {
+    fallback_dir_servers = smartlist_new();
+  }
+  if (trusted_dir_servers) {
+    smartlist_clear(trusted_dir_servers);
+  } else {
+    trusted_dir_servers = smartlist_new();
+  }
+  router_dir_info_changed();
+}
+
+/** For every current directory connection whose purpose is <b>purpose</b>,
+ * and where the resource being downloaded begins with <b>prefix</b>, split
+ * rest of the resource into
