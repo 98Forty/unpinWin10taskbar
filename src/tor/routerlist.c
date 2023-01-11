@@ -4477,4 +4477,267 @@ launch_descriptor_downloads(int purpose,
     log_info(LD_DIR,
              "Launching %d request%s for %d %s%s, %d at a time",
              CEIL_DIV(n_downloadable, n_per_request), req_plural,
-             n_downloadable, descname, rtr_plural, 
+             n_downloadable, descname, rtr_plural, n_per_request);
+    smartlist_sort_digests(downloadable);
+    for (i=0; i < n_downloadable; i += n_per_request) {
+      initiate_descriptor_downloads(source, purpose,
+                                    downloadable, i, i+n_per_request,
+                                    pds_flags);
+    }
+    last_descriptor_download_attempted = now;
+  }
+}
+
+/** For any descriptor that we want that's currently listed in
+ * <b>consensus</b>, download it as appropriate. */
+void
+update_consensus_router_descriptor_downloads(time_t now, int is_vote,
+                                             networkstatus_t *consensus)
+{
+  const or_options_t *options = get_options();
+  digestmap_t *map = NULL;
+  smartlist_t *no_longer_old = smartlist_new();
+  smartlist_t *downloadable = smartlist_new();
+  routerstatus_t *source = NULL;
+  int authdir = authdir_mode(options);
+  int n_delayed=0, n_have=0, n_would_reject=0, n_wouldnt_use=0,
+    n_inprogress=0, n_in_oldrouters=0;
+
+  if (directory_too_idle_to_fetch_descriptors(options, now))
+    goto done;
+  if (!consensus)
+    goto done;
+
+  if (is_vote) {
+    /* where's it from, so we know whom to ask for descriptors */
+    dir_server_t *ds;
+    networkstatus_voter_info_t *voter = smartlist_get(consensus->voters, 0);
+    tor_assert(voter);
+    ds = trusteddirserver_get_by_v3_auth_digest(voter->identity_digest);
+    if (ds)
+      source = &(ds->fake_status);
+    else
+      log_warn(LD_DIR, "couldn't lookup source from vote?");
+  }
+
+  map = digestmap_new();
+  list_pending_descriptor_downloads(map, 0);
+  SMARTLIST_FOREACH_BEGIN(consensus->routerstatus_list, void *, rsp) {
+      routerstatus_t *rs =
+        is_vote ? &(((vote_routerstatus_t *)rsp)->status) : rsp;
+      signed_descriptor_t *sd;
+      if ((sd = router_get_by_descriptor_digest(rs->descriptor_digest))) {
+        const routerinfo_t *ri;
+        ++n_have;
+        if (!(ri = router_get_by_id_digest(rs->identity_digest)) ||
+            tor_memneq(ri->cache_info.signed_descriptor_digest,
+                   sd->signed_descriptor_digest, DIGEST_LEN)) {
+          /* We have a descriptor with this digest, but either there is no
+           * entry in routerlist with the same ID (!ri), or there is one,
+           * but the identity digest differs (memneq).
+           */
+          smartlist_add(no_longer_old, sd);
+          ++n_in_oldrouters; /* We have it in old_routers. */
+        }
+        continue; /* We have it already. */
+      }
+      if (digestmap_get(map, rs->descriptor_digest)) {
+        ++n_inprogress;
+        continue; /* We have an in-progress download. */
+      }
+      if (!download_status_is_ready(&rs->dl_status, now,
+                          options->TestingDescriptorMaxDownloadTries)) {
+        ++n_delayed; /* Not ready for retry. */
+        continue;
+      }
+      if (authdir && dirserv_would_reject_router(rs)) {
+        ++n_would_reject;
+        continue; /* We would throw it out immediately. */
+      }
+      if (!directory_caches_dir_info(options) &&
+          !client_would_use_router(rs, now, options)) {
+        ++n_wouldnt_use;
+        continue; /* We would never use it ourself. */
+      }
+      if (is_vote && source) {
+        char time_bufnew[ISO_TIME_LEN+1];
+        char time_bufold[ISO_TIME_LEN+1];
+        const routerinfo_t *oldrouter;
+        oldrouter = router_get_by_id_digest(rs->identity_digest);
+        format_iso_time(time_bufnew, rs->published_on);
+        if (oldrouter)
+          format_iso_time(time_bufold, oldrouter->cache_info.published_on);
+        log_info(LD_DIR, "Learned about %s (%s vs %s) from %s's vote (%s)",
+                 routerstatus_describe(rs),
+                 time_bufnew,
+                 oldrouter ? time_bufold : "none",
+                 source->nickname, oldrouter ? "known" : "unknown");
+      }
+      smartlist_add(downloadable, rs->descriptor_digest);
+  } SMARTLIST_FOREACH_END(rsp);
+
+  if (!authdir_mode_handles_descs(options, ROUTER_PURPOSE_GENERAL)
+      && smartlist_len(no_longer_old)) {
+    routerlist_t *rl = router_get_routerlist();
+    log_info(LD_DIR, "%d router descriptors listed in consensus are "
+             "currently in old_routers; making them current.",
+             smartlist_len(no_longer_old));
+    SMARTLIST_FOREACH_BEGIN(no_longer_old, signed_descriptor_t *, sd) {
+        const char *msg;
+        was_router_added_t r;
+        routerinfo_t *ri = routerlist_reparse_old(rl, sd);
+        if (!ri) {
+          log_warn(LD_BUG, "Failed to re-parse a router.");
+          continue;
+        }
+        r = router_add_to_routerlist(ri, &msg, 1, 0);
+        if (WRA_WAS_OUTDATED(r)) {
+          log_warn(LD_DIR, "Couldn't add re-parsed router: %s",
+                   msg?msg:"???");
+        }
+    } SMARTLIST_FOREACH_END(sd);
+    routerlist_assert_ok(rl);
+  }
+
+  log_info(LD_DIR,
+           "%d router descriptors downloadable. %d delayed; %d present "
+           "(%d of those were in old_routers); %d would_reject; "
+           "%d wouldnt_use; %d in progress.",
+           smartlist_len(downloadable), n_delayed, n_have, n_in_oldrouters,
+           n_would_reject, n_wouldnt_use, n_inprogress);
+
+  launch_descriptor_downloads(DIR_PURPOSE_FETCH_SERVERDESC,
+                              downloadable, source, now);
+
+  digestmap_free(map, NULL);
+ done:
+  smartlist_free(downloadable);
+  smartlist_free(no_longer_old);
+}
+
+/** How often should we launch a server/authority request to be sure of getting
+ * a guess for our IP? */
+/*XXXX024 this info should come from netinfo cells or something, or we should
+ * do this only when we aren't seeing incoming data. see bug 652. */
+#define DUMMY_DOWNLOAD_INTERVAL (20*60)
+
+/** As needed, launch a dummy router descriptor fetch to see if our
+ * address has changed. */
+static void
+launch_dummy_descriptor_download_as_needed(time_t now,
+                                           const or_options_t *options)
+{
+  static time_t last_dummy_download = 0;
+  /* XXXX024 we could be smarter here; see notes on bug 652. */
+  /* If we're a server that doesn't have a configured address, we rely on
+   * directory fetches to learn when our address changes.  So if we haven't
+   * tried to get any routerdescs in a long time, try a dummy fetch now. */
+  if (!options->Address &&
+      server_mode(options) &&
+      last_descriptor_download_attempted + DUMMY_DOWNLOAD_INTERVAL < now &&
+      last_dummy_download + DUMMY_DOWNLOAD_INTERVAL < now) {
+    last_dummy_download = now;
+    directory_get_from_dirserver(DIR_PURPOSE_FETCH_SERVERDESC,
+                                 ROUTER_PURPOSE_GENERAL, "authority.z",
+                                 PDS_RETRY_IF_NO_SERVERS);
+  }
+}
+
+/** Launch downloads for router status as needed. */
+void
+update_router_descriptor_downloads(time_t now)
+{
+  const or_options_t *options = get_options();
+  if (should_delay_dir_fetches(options))
+    return;
+  if (!we_fetch_router_descriptors(options))
+    return;
+
+  update_consensus_router_descriptor_downloads(now, 0,
+                  networkstatus_get_reasonably_live_consensus(now, FLAV_NS));
+}
+
+/** Launch extrainfo downloads as needed. */
+void
+update_extrainfo_downloads(time_t now)
+{
+  const or_options_t *options = get_options();
+  routerlist_t *rl;
+  smartlist_t *wanted;
+  digestmap_t *pending;
+  int old_routers, i;
+  int n_no_ei = 0, n_pending = 0, n_have = 0, n_delay = 0;
+  if (! options->DownloadExtraInfo)
+    return;
+  if (should_delay_dir_fetches(options))
+    return;
+  if (!router_have_minimum_dir_info())
+    return;
+
+  pending = digestmap_new();
+  list_pending_descriptor_downloads(pending, 1);
+  rl = router_get_routerlist();
+  wanted = smartlist_new();
+  for (old_routers = 0; old_routers < 2; ++old_routers) {
+    smartlist_t *lst = old_routers ? rl->old_routers : rl->routers;
+    for (i = 0; i < smartlist_len(lst); ++i) {
+      signed_descriptor_t *sd;
+      char *d;
+      if (old_routers)
+        sd = smartlist_get(lst, i);
+      else
+        sd = &((routerinfo_t*)smartlist_get(lst, i))->cache_info;
+      if (sd->is_extrainfo)
+        continue; /* This should never happen. */
+      if (old_routers && !router_get_by_id_digest(sd->identity_digest))
+        continue; /* Couldn't check the signature if we got it. */
+      if (sd->extrainfo_is_bogus)
+        continue;
+      d = sd->extra_info_digest;
+      if (tor_digest_is_zero(d)) {
+        ++n_no_ei;
+        continue;
+      }
+      if (eimap_get(rl->extra_info_map, d)) {
+        ++n_have;
+        continue;
+      }
+      if (!download_status_is_ready(&sd->ei_dl_status, now,
+                          options->TestingDescriptorMaxDownloadTries)) {
+        ++n_delay;
+        continue;
+      }
+      if (digestmap_get(pending, d)) {
+        ++n_pending;
+        continue;
+      }
+      smartlist_add(wanted, d);
+    }
+  }
+  digestmap_free(pending, NULL);
+
+  log_info(LD_DIR, "Extrainfo download status: %d router with no ei, %d "
+           "with present ei, %d delaying, %d pending, %d downloadable.",
+           n_no_ei, n_have, n_delay, n_pending, smartlist_len(wanted));
+
+  smartlist_shuffle(wanted);
+  for (i = 0; i < smartlist_len(wanted); i += MAX_DL_PER_REQUEST) {
+    initiate_descriptor_downloads(NULL, DIR_PURPOSE_FETCH_EXTRAINFO,
+                                  wanted, i, i + MAX_DL_PER_REQUEST,
+                PDS_RETRY_IF_NO_SERVERS|PDS_NO_EXISTING_SERVERDESC_FETCH);
+  }
+
+  smartlist_free(wanted);
+}
+
+/** Reset the descriptor download failure count on all routers, so that we
+ * can retry any long-failed routers immediately.
+ */
+void
+router_reset_descriptor_download_failures(void)
+{
+  networkstatus_reset_download_failures();
+  last_descriptor_download_attempted = 0;
+  if (!routerlist)
+    return;
+  SMARTLIST_FOREACH
