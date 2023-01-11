@@ -4740,4 +4740,260 @@ router_reset_descriptor_download_failures(void)
   last_descriptor_download_attempted = 0;
   if (!routerlist)
     return;
-  SMARTLIST_FOREACH
+  SMARTLIST_FOREACH(routerlist->routers, routerinfo_t *, ri,
+  {
+    download_status_reset(&ri->cache_info.ei_dl_status);
+  });
+  SMARTLIST_FOREACH(routerlist->old_routers, signed_descriptor_t *, sd,
+  {
+    download_status_reset(&sd->ei_dl_status);
+  });
+}
+
+/** Any changes in a router descriptor's publication time larger than this are
+ * automatically non-cosmetic. */
+#define ROUTER_MAX_COSMETIC_TIME_DIFFERENCE (2*60*60)
+
+/** We allow uptime to vary from how much it ought to be by this much. */
+#define ROUTER_ALLOW_UPTIME_DRIFT (6*60*60)
+
+/** Return true iff the only differences between r1 and r2 are such that
+ * would not cause a recent (post 0.1.1.6) dirserver to republish.
+ */
+int
+router_differences_are_cosmetic(const routerinfo_t *r1, const routerinfo_t *r2)
+{
+  time_t r1pub, r2pub;
+  long time_difference;
+  tor_assert(r1 && r2);
+
+  /* r1 should be the one that was published first. */
+  if (r1->cache_info.published_on > r2->cache_info.published_on) {
+    const routerinfo_t *ri_tmp = r2;
+    r2 = r1;
+    r1 = ri_tmp;
+  }
+
+  /* If any key fields differ, they're different. */
+  if (strcasecmp(r1->address, r2->address) ||
+      strcasecmp(r1->nickname, r2->nickname) ||
+      r1->or_port != r2->or_port ||
+      !tor_addr_eq(&r1->ipv6_addr, &r2->ipv6_addr) ||
+      r1->ipv6_orport != r2->ipv6_orport ||
+      r1->dir_port != r2->dir_port ||
+      r1->purpose != r2->purpose ||
+      !crypto_pk_eq_keys(r1->onion_pkey, r2->onion_pkey) ||
+      !crypto_pk_eq_keys(r1->identity_pkey, r2->identity_pkey) ||
+      strcasecmp(r1->platform, r2->platform) ||
+      (r1->contact_info && !r2->contact_info) || /* contact_info is optional */
+      (!r1->contact_info && r2->contact_info) ||
+      (r1->contact_info && r2->contact_info &&
+       strcasecmp(r1->contact_info, r2->contact_info)) ||
+      r1->is_hibernating != r2->is_hibernating ||
+      cmp_addr_policies(r1->exit_policy, r2->exit_policy))
+    return 0;
+  if ((r1->declared_family == NULL) != (r2->declared_family == NULL))
+    return 0;
+  if (r1->declared_family && r2->declared_family) {
+    int i, n;
+    if (smartlist_len(r1->declared_family)!=smartlist_len(r2->declared_family))
+      return 0;
+    n = smartlist_len(r1->declared_family);
+    for (i=0; i < n; ++i) {
+      if (strcasecmp(smartlist_get(r1->declared_family, i),
+                     smartlist_get(r2->declared_family, i)))
+        return 0;
+    }
+  }
+
+  /* Did bandwidth change a lot? */
+  if ((r1->bandwidthcapacity < r2->bandwidthcapacity/2) ||
+      (r2->bandwidthcapacity < r1->bandwidthcapacity/2))
+    return 0;
+
+  /* Did the bandwidthrate or bandwidthburst change? */
+  if ((r1->bandwidthrate != r2->bandwidthrate) ||
+      (r1->bandwidthburst != r2->bandwidthburst))
+    return 0;
+
+  /* Did more than 12 hours pass? */
+  if (r1->cache_info.published_on + ROUTER_MAX_COSMETIC_TIME_DIFFERENCE
+      < r2->cache_info.published_on)
+    return 0;
+
+  /* Did uptime fail to increase by approximately the amount we would think,
+   * give or take some slop? */
+  r1pub = r1->cache_info.published_on;
+  r2pub = r2->cache_info.published_on;
+  time_difference = labs(r2->uptime - (r1->uptime + (r2pub - r1pub)));
+  if (time_difference > ROUTER_ALLOW_UPTIME_DRIFT &&
+      time_difference > r1->uptime * .05 &&
+      time_difference > r2->uptime * .05)
+    return 0;
+
+  /* Otherwise, the difference is cosmetic. */
+  return 1;
+}
+
+/** Check whether <b>ri</b> (a.k.a. sd) is a router compatible with the
+ * extrainfo document
+ * <b>ei</b>.  If no router is compatible with <b>ei</b>, <b>ei</b> should be
+ * dropped.  Return 0 for "compatible", return 1 for "reject, and inform
+ * whoever uploaded <b>ei</b>, and return -1 for "reject silently.".  If
+ * <b>msg</b> is present, set *<b>msg</b> to a description of the
+ * incompatibility (if any).
+ **/
+int
+routerinfo_incompatible_with_extrainfo(const routerinfo_t *ri,
+                                       extrainfo_t *ei,
+                                       signed_descriptor_t *sd,
+                                       const char **msg)
+{
+  int digest_matches, r=1;
+  tor_assert(ri);
+  tor_assert(ei);
+  if (!sd)
+    sd = (signed_descriptor_t*)&ri->cache_info;
+
+  if (ei->bad_sig) {
+    if (msg) *msg = "Extrainfo signature was bad, or signed with wrong key.";
+    return 1;
+  }
+
+  digest_matches = tor_memeq(ei->cache_info.signed_descriptor_digest,
+                           sd->extra_info_digest, DIGEST_LEN);
+
+  /* The identity must match exactly to have been generated at the same time
+   * by the same router. */
+  if (tor_memneq(ri->cache_info.identity_digest,
+                 ei->cache_info.identity_digest,
+                 DIGEST_LEN)) {
+    if (msg) *msg = "Extrainfo nickname or identity did not match routerinfo";
+    goto err; /* different servers */
+  }
+
+  if (ei->pending_sig) {
+    char signed_digest[128];
+    if (crypto_pk_public_checksig(ri->identity_pkey,
+                       signed_digest, sizeof(signed_digest),
+                       ei->pending_sig, ei->pending_sig_len) != DIGEST_LEN ||
+        tor_memneq(signed_digest, ei->cache_info.signed_descriptor_digest,
+               DIGEST_LEN)) {
+      ei->bad_sig = 1;
+      tor_free(ei->pending_sig);
+      if (msg) *msg = "Extrainfo signature bad, or signed with wrong key";
+      goto err; /* Bad signature, or no match. */
+    }
+
+    ei->cache_info.send_unencrypted = ri->cache_info.send_unencrypted;
+    tor_free(ei->pending_sig);
+  }
+
+  if (ei->cache_info.published_on < sd->published_on) {
+    if (msg) *msg = "Extrainfo published time did not match routerdesc";
+    goto err;
+  } else if (ei->cache_info.published_on > sd->published_on) {
+    if (msg) *msg = "Extrainfo published time did not match routerdesc";
+    r = -1;
+    goto err;
+  }
+
+  if (!digest_matches) {
+    if (msg) *msg = "Extrainfo digest did not match value from routerdesc";
+    goto err; /* Digest doesn't match declared value. */
+  }
+
+  return 0;
+ err:
+  if (digest_matches) {
+    /* This signature was okay, and the digest was right: This is indeed the
+     * corresponding extrainfo.  But insanely, it doesn't match the routerinfo
+     * that lists it.  Don't try to fetch this one again. */
+    sd->extrainfo_is_bogus = 1;
+  }
+
+  return r;
+}
+
+/** Assert that the internal representation of <b>rl</b> is
+ * self-consistent. */
+void
+routerlist_assert_ok(const routerlist_t *rl)
+{
+  routerinfo_t *r2;
+  signed_descriptor_t *sd2;
+  if (!rl)
+    return;
+  SMARTLIST_FOREACH_BEGIN(rl->routers, routerinfo_t *, r) {
+    r2 = rimap_get(rl->identity_map, r->cache_info.identity_digest);
+    tor_assert(r == r2);
+    sd2 = sdmap_get(rl->desc_digest_map,
+                    r->cache_info.signed_descriptor_digest);
+    tor_assert(&(r->cache_info) == sd2);
+    tor_assert(r->cache_info.routerlist_index == r_sl_idx);
+    /* XXXX
+     *
+     *   Hoo boy.  We need to fix this one, and the fix is a bit tricky, so
+     * commenting this out is just a band-aid.
+     *
+     *   The problem is that, although well-behaved router descriptors
+     * should never have the same value for their extra_info_digest, it's
+     * possible for ill-behaved routers to claim whatever they like there.
+     *
+     *   The real answer is to trash desc_by_eid_map and instead have
+     * something that indicates for a given extra-info digest we want,
+     * what its download status is.  We'll do that as a part of routerlist
+     * refactoring once consensus directories are in.  For now,
+     * this rep violation is probably harmless: an adversary can make us
+     * reset our retry count for an extrainfo, but that's not the end
+     * of the world.  Changing the representation in 0.2.0.x would just
+     * destabilize the codebase.
+    if (!tor_digest_is_zero(r->cache_info.extra_info_digest)) {
+      signed_descriptor_t *sd3 =
+        sdmap_get(rl->desc_by_eid_map, r->cache_info.extra_info_digest);
+      tor_assert(sd3 == &(r->cache_info));
+    }
+    */
+  } SMARTLIST_FOREACH_END(r);
+  SMARTLIST_FOREACH_BEGIN(rl->old_routers, signed_descriptor_t *, sd) {
+    r2 = rimap_get(rl->identity_map, sd->identity_digest);
+    tor_assert(sd != &(r2->cache_info));
+    sd2 = sdmap_get(rl->desc_digest_map, sd->signed_descriptor_digest);
+    tor_assert(sd == sd2);
+    tor_assert(sd->routerlist_index == sd_sl_idx);
+    /* XXXX see above.
+    if (!tor_digest_is_zero(sd->extra_info_digest)) {
+      signed_descriptor_t *sd3 =
+        sdmap_get(rl->desc_by_eid_map, sd->extra_info_digest);
+      tor_assert(sd3 == sd);
+    }
+    */
+  } SMARTLIST_FOREACH_END(sd);
+
+  RIMAP_FOREACH(rl->identity_map, d, r) {
+    tor_assert(tor_memeq(r->cache_info.identity_digest, d, DIGEST_LEN));
+  } DIGESTMAP_FOREACH_END;
+  SDMAP_FOREACH(rl->desc_digest_map, d, sd) {
+    tor_assert(tor_memeq(sd->signed_descriptor_digest, d, DIGEST_LEN));
+  } DIGESTMAP_FOREACH_END;
+  SDMAP_FOREACH(rl->desc_by_eid_map, d, sd) {
+    tor_assert(!tor_digest_is_zero(d));
+    tor_assert(sd);
+    tor_assert(tor_memeq(sd->extra_info_digest, d, DIGEST_LEN));
+  } DIGESTMAP_FOREACH_END;
+  EIMAP_FOREACH(rl->extra_info_map, d, ei) {
+    signed_descriptor_t *sd;
+    tor_assert(tor_memeq(ei->cache_info.signed_descriptor_digest,
+                       d, DIGEST_LEN));
+    sd = sdmap_get(rl->desc_by_eid_map,
+                   ei->cache_info.signed_descriptor_digest);
+    // tor_assert(sd); // XXXX see above
+    if (sd) {
+      tor_assert(tor_memeq(ei->cache_info.signed_descriptor_digest,
+                         sd->extra_info_digest, DIGEST_LEN));
+    }
+  } DIGESTMAP_FOREACH_END;
+}
+
+/** Allocate and return a new string representing the contact info
+ * and platform string 
