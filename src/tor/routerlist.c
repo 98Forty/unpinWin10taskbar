@@ -4996,4 +4996,150 @@ routerlist_assert_ok(const routerlist_t *rl)
 }
 
 /** Allocate and return a new string representing the contact info
- * and platform string 
+ * and platform string for <b>router</b>,
+ * surrounded by quotes and using standard C escapes.
+ *
+ * THIS FUNCTION IS NOT REENTRANT.  Don't call it from outside the main
+ * thread.  Also, each call invalidates the last-returned value, so don't
+ * try log_warn(LD_GENERAL, "%s %s", esc_router_info(a), esc_router_info(b));
+ *
+ * If <b>router</b> is NULL, it just frees its internal memory and returns.
+ */
+const char *
+esc_router_info(const routerinfo_t *router)
+{
+  static char *info=NULL;
+  char *esc_contact, *esc_platform;
+  tor_free(info);
+
+  if (!router)
+    return NULL; /* we're exiting; just free the memory we use */
+
+  esc_contact = esc_for_log(router->contact_info);
+  esc_platform = esc_for_log(router->platform);
+
+  tor_asprintf(&info, "Contact %s, Platform %s", esc_contact, esc_platform);
+  tor_free(esc_contact);
+  tor_free(esc_platform);
+
+  return info;
+}
+
+/** Helper for sorting: compare two routerinfos by their identity
+ * digest. */
+static int
+compare_routerinfo_by_id_digest_(const void **a, const void **b)
+{
+  routerinfo_t *first = *(routerinfo_t **)a, *second = *(routerinfo_t **)b;
+  return fast_memcmp(first->cache_info.identity_digest,
+                second->cache_info.identity_digest,
+                DIGEST_LEN);
+}
+
+/** Sort a list of routerinfo_t in ascending order of identity digest. */
+void
+routers_sort_by_identity(smartlist_t *routers)
+{
+  smartlist_sort(routers, compare_routerinfo_by_id_digest_);
+}
+
+/** Called when we change a node set, or when we reload the geoip IPv4 list:
+ * recompute all country info in all configuration node sets and in the
+ * routerlist. */
+void
+refresh_all_country_info(void)
+{
+  const or_options_t *options = get_options();
+
+  if (options->EntryNodes)
+    routerset_refresh_countries(options->EntryNodes);
+  if (options->ExitNodes)
+    routerset_refresh_countries(options->ExitNodes);
+  if (options->ExcludeNodes)
+    routerset_refresh_countries(options->ExcludeNodes);
+  if (options->ExcludeExitNodes)
+    routerset_refresh_countries(options->ExcludeExitNodes);
+  if (options->ExcludeExitNodesUnion_)
+    routerset_refresh_countries(options->ExcludeExitNodesUnion_);
+
+  nodelist_refresh_countries();
+}
+
+/** Determine the routers that are responsible for <b>id</b> (binary) and
+ * add pointers to those routers' routerstatus_t to <b>responsible_dirs</b>.
+ * Return -1 if we're returning an empty smartlist, else return 0.
+ */
+int
+hid_serv_get_responsible_directories(smartlist_t *responsible_dirs,
+                                     const char *id)
+{
+  int start, found, n_added = 0, i;
+  networkstatus_t *c = networkstatus_get_latest_consensus();
+  if (!c || !smartlist_len(c->routerstatus_list)) {
+    log_warn(LD_REND, "We don't have a consensus, so we can't perform v2 "
+             "rendezvous operations.");
+    return -1;
+  }
+  tor_assert(id);
+  start = networkstatus_vote_find_entry_idx(c, id, &found);
+  if (start == smartlist_len(c->routerstatus_list)) start = 0;
+  i = start;
+  do {
+    routerstatus_t *r = smartlist_get(c->routerstatus_list, i);
+    if (r->is_hs_dir) {
+      smartlist_add(responsible_dirs, r);
+      if (++n_added == REND_NUMBER_OF_CONSECUTIVE_REPLICAS)
+        return 0;
+    }
+    if (++i == smartlist_len(c->routerstatus_list))
+      i = 0;
+  } while (i != start);
+
+  /* Even though we don't have the desired number of hidden service
+   * directories, be happy if we got any. */
+  return smartlist_len(responsible_dirs) ? 0 : -1;
+}
+
+/** Return true if this node is currently acting as hidden service
+ * directory, false otherwise. */
+int
+hid_serv_acting_as_directory(void)
+{
+  const routerinfo_t *me = router_get_my_routerinfo();
+  if (!me)
+    return 0;
+  if (!get_options()->HidServDirectoryV2) {
+    log_info(LD_REND, "We are not acting as hidden service directory, "
+                      "because we have not been configured as such.");
+    return 0;
+  }
+  return 1;
+}
+
+/** Return true if this node is responsible for storing the descriptor ID
+ * in <b>query</b> and false otherwise. */
+int
+hid_serv_responsible_for_desc_id(const char *query)
+{
+  const routerinfo_t *me;
+  routerstatus_t *last_rs;
+  const char *my_id, *last_id;
+  int result;
+  smartlist_t *responsible;
+  if (!hid_serv_acting_as_directory())
+    return 0;
+  if (!(me = router_get_my_routerinfo()))
+    return 0; /* This is redundant, but let's be paranoid. */
+  my_id = me->cache_info.identity_digest;
+  responsible = smartlist_new();
+  if (hid_serv_get_responsible_directories(responsible, query) < 0) {
+    smartlist_free(responsible);
+    return 0;
+  }
+  last_rs = smartlist_get(responsible, smartlist_len(responsible)-1);
+  last_id = last_rs->identity_digest;
+  result = rend_id_is_in_interval(my_id, query, last_id);
+  smartlist_free(responsible);
+  return result;
+}
+
