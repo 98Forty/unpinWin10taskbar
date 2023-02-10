@@ -450,4 +450,17 @@ routerset_free(routerset_t *routerset)
   if (!routerset)
     return;
 
-  SMARTLIST_FOREACH(routerset->list, char *, cp, tor_
+  SMARTLIST_FOREACH(routerset->list, char *, cp, tor_free(cp));
+  smartlist_free(routerset->list);
+  SMARTLIST_FOREACH(routerset->policies, addr_policy_t *, p,
+                    addr_policy_free(p));
+  smartlist_free(routerset->policies);
+  SMARTLIST_FOREACH(routerset->country_names, char *, cp, tor_free(cp));
+  smartlist_free(routerset->country_names);
+
+  strmap_free(routerset->names, NULL);
+  digestmap_free(routerset->digests, NULL);
+  bitarray_free(routerset->countries);
+  tor_free(routerset);
+}
+
