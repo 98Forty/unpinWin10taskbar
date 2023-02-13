@@ -454,4 +454,289 @@ typedef int socklen_t;
 int tor_close_socket_simple(tor_socket_t s);
 int tor_close_socket(tor_socket_t s);
 tor_socket_t tor_open_socket_with_extensions(
-                        
+                                           int domain, int type, int protocol,
+                                           int cloexec, int nonblock);
+tor_socket_t tor_open_socket(int domain, int type, int protocol);
+tor_socket_t tor_open_socket_nonblocking(int domain, int type, int protocol);
+tor_socket_t tor_accept_socket(tor_socket_t sockfd, struct sockaddr *addr,
+                                  socklen_t *len);
+tor_socket_t tor_accept_socket_nonblocking(tor_socket_t sockfd,
+                                           struct sockaddr *addr,
+                                           socklen_t *len);
+tor_socket_t tor_accept_socket_with_extensions(tor_socket_t sockfd,
+                                               struct sockaddr *addr,
+                                               socklen_t *len,
+                                               int cloexec, int nonblock);
+int get_n_open_sockets(void);
+
+#define tor_socket_send(s, buf, len, flags) send(s, buf, len, flags)
+#define tor_socket_recv(s, buf, len, flags) recv(s, buf, len, flags)
+
+/** Implementation of struct in6_addr for platforms that do not have it.
+ * Generally, these platforms are ones without IPv6 support, but we want to
+ * have a working in6_addr there anyway, so we can use it to parse IPv6
+ * addresses. */
+#if !defined(HAVE_STRUCT_IN6_ADDR)
+struct in6_addr
+{
+  union {
+    uint8_t u6_addr8[16];
+    uint16_t u6_addr16[8];
+    uint32_t u6_addr32[4];
+  } in6_u;
+#define s6_addr   in6_u.u6_addr8
+#define s6_addr16 in6_u.u6_addr16
+#define s6_addr32 in6_u.u6_addr32
+};
+#endif
+
+/** @{ */
+/** Many BSD variants seem not to define these. */
+#if defined(__APPLE__) || defined(__darwin__) || defined(__FreeBSD__) \
+    || defined(__NetBSD__) || defined(__OpenBSD__)
+#ifndef s6_addr16
+#define s6_addr16 __u6_addr.__u6_addr16
+#endif
+#ifndef s6_addr32
+#define s6_addr32 __u6_addr.__u6_addr32
+#endif
+#endif
+/** @} */
+
+#ifndef HAVE_SA_FAMILY_T
+typedef uint16_t sa_family_t;
+#endif
+
+/** @{ */
+/** Apparently, MS and Solaris don't define s6_addr16 or s6_addr32; these
+ * macros get you a pointer to s6_addr32 or local equivalent. */
+#ifdef HAVE_STRUCT_IN6_ADDR_S6_ADDR32
+#define S6_ADDR32(x) ((uint32_t*)(x).s6_addr32)
+#else
+#define S6_ADDR32(x) ((uint32_t*)((char*)&(x).s6_addr))
+#endif
+#ifdef HAVE_STRUCT_IN6_ADDR_S6_ADDR16
+#define S6_ADDR16(x) ((uint16_t*)(x).s6_addr16)
+#else
+#define S6_ADDR16(x) ((uint16_t*)((char*)&(x).s6_addr))
+#endif
+/** @} */
+
+/** Implementation of struct sockaddr_in6 on platforms that do not have
+ * it. See notes on struct in6_addr. */
+#if !defined(HAVE_STRUCT_SOCKADDR_IN6)
+struct sockaddr_in6 {
+  sa_family_t sin6_family;
+  uint16_t sin6_port;
+  // uint32_t sin6_flowinfo;
+  struct in6_addr sin6_addr;
+  // uint32_t sin6_scope_id;
+};
+#endif
+
+int tor_inet_aton(const char *cp, struct in_addr *addr) ATTR_NONNULL((1,2));
+const char *tor_inet_ntop(int af, const void *src, char *dst, size_t len);
+int tor_inet_pton(int af, const char *src, void *dst);
+int tor_lookup_hostname(const char *name, uint32_t *addr) ATTR_NONNULL((1,2));
+int set_socket_nonblocking(tor_socket_t socket);
+int tor_socketpair(int family, int type, int protocol, tor_socket_t fd[2]);
+int network_init(void);
+
+/* For stupid historical reasons, windows sockets have an independent
+ * set of errnos, and an independent way to get them.  Also, you can't
+ * always believe WSAEWOULDBLOCK.  Use the macros below to compare
+ * errnos against expected values, and use tor_socket_errno to find
+ * the actual errno after a socket operation fails.
+ */
+#if defined(_WIN32)
+/** Expands to WSA<b>e</b> on Windows, and to <b>e</b> elsewhere. */
+#define SOCK_ERRNO(e) WSA##e
+/** Return true if e is EAGAIN or the local equivalent. */
+#define ERRNO_IS_EAGAIN(e)           ((e) == EAGAIN || (e) == WSAEWOULDBLOCK)
+/** Return true if e is EINPROGRESS or the local equivalent. */
+#define ERRNO_IS_EINPROGRESS(e)      ((e) == WSAEINPROGRESS)
+/** Return true if e is EINPROGRESS or the local equivalent as returned by
+ * a call to connect(). */
+#define ERRNO_IS_CONN_EINPROGRESS(e) \
+  ((e) == WSAEINPROGRESS || (e)== WSAEINVAL || (e) == WSAEWOULDBLOCK)
+/** Return true if e is EAGAIN or another error indicating that a call to
+ * accept() has no pending connections to return. */
+#define ERRNO_IS_ACCEPT_EAGAIN(e)    ERRNO_IS_EAGAIN(e)
+/** Return true if e is EMFILE or another error indicating that a call to
+ * accept() has failed because we're out of fds or something. */
+#define ERRNO_IS_ACCEPT_RESOURCE_LIMIT(e) \
+  ((e) == WSAEMFILE || (e) == WSAENOBUFS)
+/** Return true if e is EADDRINUSE or the local equivalent. */
+#define ERRNO_IS_EADDRINUSE(e)      ((e) == WSAEADDRINUSE)
+int tor_socket_errno(tor_socket_t sock);
+const char *tor_socket_strerror(int e);
+#else
+#define SOCK_ERRNO(e) e
+#if EAGAIN == EWOULDBLOCK
+#define ERRNO_IS_EAGAIN(e)           ((e) == EAGAIN)
+#else
+#define ERRNO_IS_EAGAIN(e)           ((e) == EAGAIN || (e) == EWOULDBLOCK)
+#endif
+#define ERRNO_IS_EINPROGRESS(e)      ((e) == EINPROGRESS)
+#define ERRNO_IS_CONN_EINPROGRESS(e) ((e) == EINPROGRESS)
+#define ERRNO_IS_ACCEPT_EAGAIN(e) \
+  (ERRNO_IS_EAGAIN(e) || (e) == ECONNABORTED)
+#define ERRNO_IS_ACCEPT_RESOURCE_LIMIT(e) \
+  ((e) == EMFILE || (e) == ENFILE || (e) == ENOBUFS || (e) == ENOMEM)
+#define ERRNO_IS_EADDRINUSE(e)       ((e) == EADDRINUSE)
+#define tor_socket_errno(sock)       (errno)
+#define tor_socket_strerror(e)       strerror(e)
+#endif
+
+/** Specified SOCKS5 status codes. */
+typedef enum {
+  SOCKS5_SUCCEEDED                  = 0x00,
+  SOCKS5_GENERAL_ERROR              = 0x01,
+  SOCKS5_NOT_ALLOWED                = 0x02,
+  SOCKS5_NET_UNREACHABLE            = 0x03,
+  SOCKS5_HOST_UNREACHABLE           = 0x04,
+  SOCKS5_CONNECTION_REFUSED         = 0x05,
+  SOCKS5_TTL_EXPIRED                = 0x06,
+  SOCKS5_COMMAND_NOT_SUPPORTED      = 0x07,
+  SOCKS5_ADDRESS_TYPE_NOT_SUPPORTED = 0x08,
+} socks5_reply_status_t;
+
+/* ===== OS compatibility */
+const char *get_uname(void);
+
+uint16_t get_uint16(const void *cp) ATTR_NONNULL((1));
+uint32_t get_uint32(const void *cp) ATTR_NONNULL((1));
+uint64_t get_uint64(const void *cp) ATTR_NONNULL((1));
+void set_uint16(void *cp, uint16_t v) ATTR_NONNULL((1));
+void set_uint32(void *cp, uint32_t v) ATTR_NONNULL((1));
+void set_uint64(void *cp, uint64_t v) ATTR_NONNULL((1));
+
+/* These uint8 variants are defined to make the code more uniform. */
+#define get_uint8(cp) (*(const uint8_t*)(cp))
+static void set_uint8(void *cp, uint8_t v);
+static INLINE void
+set_uint8(void *cp, uint8_t v)
+{
+  *(uint8_t*)cp = v;
+}
+
+#if !defined(HAVE_RLIM_T)
+typedef unsigned long rlim_t;
+#endif
+int set_max_file_descriptors(rlim_t limit, int *max);
+int tor_disable_debugger_attach(void);
+int switch_id(const char *user);
+#ifdef HAVE_PWD_H
+char *get_user_homedir(const char *username);
+#endif
+
+int get_parent_directory(char *fname);
+char *make_path_absolute(char *fname);
+
+char **get_environment(void);
+
+int spawn_func(void (*func)(void *), void *data);
+void spawn_exit(void) ATTR_NORETURN;
+
+#if defined(ENABLE_THREADS) && defined(_WIN32)
+#define USE_WIN32_THREADS
+#define TOR_IS_MULTITHREADED 1
+#elif (defined(ENABLE_THREADS) && defined(HAVE_PTHREAD_H) && \
+       defined(HAVE_PTHREAD_CREATE))
+#define USE_PTHREADS
+#define TOR_IS_MULTITHREADED 1
+#else
+#undef TOR_IS_MULTITHREADED
+#endif
+
+int compute_num_cpus(void);
+
+/* Because we use threads instead of processes on most platforms (Windows,
+ * Linux, etc), we need locking for them.  On platforms with poor thread
+ * support or broken gethostbyname_r, these functions are no-ops. */
+
+/** A generic lock structure for multithreaded builds. */
+typedef struct tor_mutex_t {
+#if defined(USE_WIN32_THREADS)
+  /** Windows-only: on windows, we implement locks with CRITICAL_SECTIONS. */
+  CRITICAL_SECTION mutex;
+#elif defined(USE_PTHREADS)
+  /** Pthreads-only: with pthreads, we implement locks with
+   * pthread_mutex_t. */
+  pthread_mutex_t mutex;
+#else
+  /** No-threads only: Dummy variable so that tor_mutex_t takes up space. */
+  int _unused;
+#endif
+} tor_mutex_t;
+
+int tor_mlockall(void);
+
+#ifdef TOR_IS_MULTITHREADED
+tor_mutex_t *tor_mutex_new(void);
+void tor_mutex_init(tor_mutex_t *m);
+void tor_mutex_acquire(tor_mutex_t *m);
+void tor_mutex_release(tor_mutex_t *m);
+void tor_mutex_free(tor_mutex_t *m);
+void tor_mutex_uninit(tor_mutex_t *m);
+unsigned long tor_get_thread_id(void);
+void tor_threads_init(void);
+#else
+#define tor_mutex_new() ((tor_mutex_t*)tor_malloc(sizeof(int)))
+#define tor_mutex_init(m) STMT_NIL
+#define tor_mutex_acquire(m) STMT_VOID(m)
+#define tor_mutex_release(m) STMT_NIL
+#define tor_mutex_free(m) STMT_BEGIN tor_free(m); STMT_END
+#define tor_mutex_uninit(m) STMT_NIL
+#define tor_get_thread_id() (1UL)
+#define tor_threads_init() STMT_NIL
+#endif
+
+void set_main_thread(void);
+int in_main_thread(void);
+
+#ifdef TOR_IS_MULTITHREADED
+#if 0
+typedef struct tor_cond_t tor_cond_t;
+tor_cond_t *tor_cond_new(void);
+void tor_cond_free(tor_cond_t *cond);
+int tor_cond_wait(tor_cond_t *cond, tor_mutex_t *mutex);
+void tor_cond_signal_one(tor_cond_t *cond);
+void tor_cond_signal_all(tor_cond_t *cond);
+#endif
+#endif
+
+/** Macros for MIN/MAX.  Never use these when the arguments could have
+ * side-effects.
+ * {With GCC extensions we could probably define a safer MIN/MAX.  But
+ * depending on that safety would be dangerous, since not every platform
+ * has it.}
+ **/
+#ifndef MAX
+#define MAX(a,b) ( ((a)<(b)) ? (b) : (a) )
+#endif
+#ifndef MIN
+#define MIN(a,b) ( ((a)>(b)) ? (b) : (a) )
+#endif
+
+/* Platform-specific helpers. */
+#ifdef _WIN32
+char *format_win32_error(DWORD err);
+#endif
+
+/*for some reason my compiler doesn't have these version flags defined
+  a nice homework assignment for someone one day is to define the rest*/
+//these are the values as given on MSDN
+#ifdef _WIN32
+
+#ifndef VER_SUITE_EMBEDDEDNT
+#define VER_SUITE_EMBEDDEDNT 0x00000040
+#endif
+
+#ifndef VER_SUITE_SINGLEUSERTS
+#define VER_SUITE_SINGLEUSERTS 0x00000100
+#endif
+
+#endif
+
+#ifdef COMPAT_PR
