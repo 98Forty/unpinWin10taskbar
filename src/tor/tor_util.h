@@ -348,4 +348,203 @@ int check_private_dir(const char *dirname, cpd_check_t check,
 #define OPEN_FLAGS_APPEND (O_WRONLY|O_CREAT|O_APPEND)
 #define OPEN_FLAGS_DONT_REPLACE (O_CREAT|O_EXCL|O_APPEND|O_WRONLY)
 typedef struct open_file_t open_file_t;
-int start_writing_to_file(const char *fname, int open_flags
+int start_writing_to_file(const char *fname, int open_flags, int mode,
+                          open_file_t **data_out);
+FILE *start_writing_to_stdio_file(const char *fname, int open_flags, int mode,
+                                  open_file_t **data_out);
+FILE *fdopen_file(open_file_t *file_data);
+int finish_writing_to_file(open_file_t *file_data);
+int abort_writing_to_file(open_file_t *file_data);
+int write_str_to_file(const char *fname, const char *str, int bin);
+MOCK_DECL(int,
+write_bytes_to_file,(const char *fname, const char *str, size_t len,
+                     int bin));
+/** An ad-hoc type to hold a string of characters and a count; used by
+ * write_chunks_to_file. */
+typedef struct sized_chunk_t {
+  const char *bytes;
+  size_t len;
+} sized_chunk_t;
+int write_chunks_to_file(const char *fname, const struct smartlist_t *chunks,
+                         int bin, int no_tempfile);
+int append_bytes_to_file(const char *fname, const char *str, size_t len,
+                         int bin);
+int write_bytes_to_new_file(const char *fname, const char *str, size_t len,
+                            int bin);
+
+/** Flag for read_file_to_str: open the file in binary mode. */
+#define RFTS_BIN            1
+/** Flag for read_file_to_str: it's okay if the file doesn't exist. */
+#define RFTS_IGNORE_MISSING 2
+
+#ifndef _WIN32
+struct stat;
+#endif
+char *read_file_to_str(const char *filename, int flags, struct stat *stat_out)
+  ATTR_MALLOC;
+char *read_file_to_str_until_eof(int fd, size_t max_bytes_to_read,
+                                 size_t *sz_out)
+  ATTR_MALLOC;
+const char *parse_config_line_from_str_verbose(const char *line,
+                                       char **key_out, char **value_out,
+                                       const char **err_out);
+#define parse_config_line_from_str(line,key_out,value_out) \
+  parse_config_line_from_str_verbose((line),(key_out),(value_out),NULL)
+char *expand_filename(const char *filename);
+struct smartlist_t *tor_listdir(const char *dirname);
+int path_is_relative(const char *filename);
+
+/* Process helpers */
+void start_daemon(void);
+void finish_daemon(const char *desired_cwd);
+void write_pidfile(char *filename);
+
+/* Port forwarding */
+void tor_check_port_forwarding(const char *filename,
+                               struct smartlist_t *ports_to_forward,
+                               time_t now);
+
+typedef struct process_handle_t process_handle_t;
+typedef struct process_environment_t process_environment_t;
+int tor_spawn_background(const char *const filename, const char **argv,
+                         process_environment_t *env,
+                         process_handle_t **process_handle_out);
+
+#define SPAWN_ERROR_MESSAGE "ERR: Failed to spawn background process - code "
+
+#ifdef _WIN32
+HANDLE load_windows_system_library(const TCHAR *library_name);
+#endif
+
+int environment_variable_names_equal(const char *s1, const char *s2);
+
+/* DOCDOC process_environment_t */
+struct process_environment_t {
+  /** A pointer to a sorted empty-string-terminated sequence of
+   * NUL-terminated strings of the form "NAME=VALUE". */
+  char *windows_environment_block;
+  /** A pointer to a NULL-terminated array of pointers to
+   * NUL-terminated strings of the form "NAME=VALUE". */
+  char **unixoid_environment_block;
+};
+
+process_environment_t *process_environment_make(struct smartlist_t *env_vars);
+void process_environment_free(process_environment_t *env);
+
+struct smartlist_t *get_current_process_environment_variables(void);
+
+void set_environment_variable_in_smartlist(struct smartlist_t *env_vars,
+                                           const char *new_var,
+                                           void (*free_old)(void*),
+                                           int free_p);
+
+/* Values of process_handle_t.status. PROCESS_STATUS_NOTRUNNING must be
+ * 0 because tor_check_port_forwarding depends on this being the initial
+ * statue of the static instance of process_handle_t */
+#define PROCESS_STATUS_NOTRUNNING 0
+#define PROCESS_STATUS_RUNNING 1
+#define PROCESS_STATUS_ERROR -1
+
+#ifdef UTIL_PRIVATE
+/** Structure to represent the state of a process with which Tor is
+ * communicating. The contents of this structure are private to util.c */
+struct process_handle_t {
+  /** One of the PROCESS_STATUS_* values */
+  int status;
+#ifdef _WIN32
+  HANDLE stdout_pipe;
+  HANDLE stderr_pipe;
+  PROCESS_INFORMATION pid;
+#else
+  int stdout_pipe;
+  int stderr_pipe;
+  FILE *stdout_handle;
+  FILE *stderr_handle;
+  pid_t pid;
+#endif // _WIN32
+};
+#endif
+
+/* Return values of tor_get_exit_code() */
+#define PROCESS_EXIT_RUNNING 1
+#define PROCESS_EXIT_EXITED 0
+#define PROCESS_EXIT_ERROR -1
+int tor_get_exit_code(const process_handle_t *process_handle,
+                      int block, int *exit_code);
+int tor_split_lines(struct smartlist_t *sl, char *buf, int len);
+#ifdef _WIN32
+ssize_t tor_read_all_handle(HANDLE h, char *buf, size_t count,
+                            const process_handle_t *process);
+#else
+ssize_t tor_read_all_handle(FILE *h, char *buf, size_t count,
+                            const process_handle_t *process,
+                            int *eof);
+#endif
+ssize_t tor_read_all_from_process_stdout(
+    const process_handle_t *process_handle, char *buf, size_t count);
+ssize_t tor_read_all_from_process_stderr(
+    const process_handle_t *process_handle, char *buf, size_t count);
+char *tor_join_win_cmdline(const char *argv[]);
+
+int tor_process_get_pid(process_handle_t *process_handle);
+#ifdef _WIN32
+HANDLE tor_process_get_stdout_pipe(process_handle_t *process_handle);
+#else
+FILE *tor_process_get_stdout_pipe(process_handle_t *process_handle);
+#endif
+
+#ifdef _WIN32
+MOCK_DECL(struct smartlist_t *,
+tor_get_lines_from_handle,(HANDLE *handle,
+                           enum stream_status *stream_status));
+#else
+MOCK_DECL(struct smartlist_t *,
+tor_get_lines_from_handle,(FILE *handle,
+                           enum stream_status *stream_status));
+#endif
+
+int
+tor_terminate_process(process_handle_t *process_handle);
+
+MOCK_DECL(void,
+tor_process_handle_destroy,(process_handle_t *process_handle,
+                            int also_terminate_process));
+
+/* ===== Insecure rng */
+typedef struct tor_weak_rng_t {
+  uint32_t state;
+} tor_weak_rng_t;
+
+#define TOR_WEAK_RNG_INIT {383745623}
+#define TOR_WEAK_RANDOM_MAX (INT_MAX)
+void tor_init_weak_random(tor_weak_rng_t *weak_rng, unsigned seed);
+int32_t tor_weak_random(tor_weak_rng_t *weak_rng);
+int32_t tor_weak_random_range(tor_weak_rng_t *rng, int32_t top);
+/** Randomly return true according to <b>rng</b> with probability 1 in
+ * <b>n</b> */
+#define tor_weak_random_one_in_n(rng, n) (0==tor_weak_random_range((rng),(n)))
+
+int format_hex_number_sigsafe(unsigned long x, char *buf, int max_len);
+int format_dec_number_sigsafe(unsigned long x, char *buf, int max_len);
+
+#ifdef UTIL_PRIVATE
+/* Prototypes for private functions only used by util.c (and unit tests) */
+
+#ifndef _WIN32
+STATIC int format_helper_exit_status(unsigned char child_state,
+                              int saved_errno, char *hex_errno);
+
+/* Space for hex values of child state, a slash, saved_errno (with
+   leading minus) and newline (no null) */
+#define HEX_ERRNO_SIZE (sizeof(char) * 2 + 1 + \
+                        1 + sizeof(int) * 2 + 1)
+#endif
+
+#endif
+
+const char *libor_get_digests(void);
+
+#define ARRAY_LENGTH(x) (sizeof(x)) / sizeof(x[0])
+
+#endif
+
