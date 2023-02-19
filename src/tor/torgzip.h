@@ -52,4 +52,8 @@ tor_zlib_state_t *tor_zlib_new(int compress, compress_method_t method);
 tor_zlib_output_t tor_zlib_process(tor_zlib_state_t *state,
                                    char **out, size_t *out_len,
                                    const char **in, size_t *in_len,
-                            
+                                   int finish);
+void tor_zlib_free(tor_zlib_state_t *state);
+
+#endif
+
