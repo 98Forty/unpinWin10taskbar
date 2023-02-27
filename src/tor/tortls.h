@@ -117,3 +117,26 @@ int tor_tls_start_renegotiating(tor_tls_t *tls);
 struct bufferevent *tor_tls_init_bufferevent(tor_tls_t *tls,
                                      struct bufferevent *bufev_in,
                                       evutil_socket_t socket, int receiving,
+                                     int filter);
+#endif
+
+void tor_cert_free(tor_cert_t *cert);
+tor_cert_t *tor_cert_decode(const uint8_t *certificate,
+                            size_t certificate_len);
+void tor_cert_get_der(const tor_cert_t *cert,
+                      const uint8_t **encoded_out, size_t *size_out);
+const digests_t *tor_cert_get_id_digests(const tor_cert_t *cert);
+const digests_t *tor_cert_get_cert_digests(const tor_cert_t *cert);
+int tor_tls_get_my_certs(int server,
+                         const tor_cert_t **link_cert_out,
+                         const tor_cert_t **id_cert_out);
+crypto_pk_t *tor_tls_get_my_client_auth_key(void);
+crypto_pk_t *tor_tls_cert_get_key(tor_cert_t *cert);
+int tor_tls_cert_matches_key(const tor_tls_t *tls, const tor_cert_t *cert);
+int tor_tls_cert_is_valid(int severity,
+                          const tor_cert_t *cert,
+                          const tor_cert_t *signing_cert,
+                          int check_rsa_1024);
+const char *tor_tls_get_ciphersuite_name(tor_tls_t *tls);
+
+#endif
