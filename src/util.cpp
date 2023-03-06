@@ -830,4 +830,342 @@ vector<unsigned char> DecodeBase32(const char* p, bool* pfInvalid)
          switch (mode)
          {
              case 0: // we have no bits and get 5
-                 left = d
+                 left = dec;
+                 mode = 1;
+                 break;
+
+              case 1: // we have 5 bits and keep 2
+                  vchRet.push_back((left<<3) | (dec>>2));
+                  left = dec & 3;
+                  mode = 2;
+                  break;
+
+             case 2: // we have 2 bits and keep 7
+                 left = left << 5 | dec;
+                 mode = 3;
+                 break;
+
+             case 3: // we have 7 bits and keep 4
+                 vchRet.push_back((left<<1) | (dec>>4));
+                 left = dec & 15;
+                 mode = 4;
+                 break;
+
+             case 4: // we have 4 bits, and keep 1
+                 vchRet.push_back((left<<4) | (dec>>1));
+                 left = dec & 1;
+                 mode = 5;
+                 break;
+
+             case 5: // we have 1 bit, and keep 6
+                 left = left << 5 | dec;
+                 mode = 6;
+                 break;
+
+             case 6: // we have 6 bits, and keep 3
+                 vchRet.push_back((left<<2) | (dec>>3));
+                 left = dec & 7;
+                 mode = 7;
+                 break;
+
+             case 7: // we have 3 bits, and keep 0
+                 vchRet.push_back((left<<5) | dec);
+                 mode = 0;
+                 break;
+         }
+    }
+
+    if (pfInvalid)
+        switch (mode)
+        {
+            case 0: // 8n base32 characters processed: ok
+                break;
+
+            case 1: // 8n+1 base32 characters processed: impossible
+            case 3: //   +3
+            case 6: //   +6
+                *pfInvalid = true;
+                break;
+
+            case 2: // 8n+2 base32 characters processed: require '======'
+                if (left || p[0] != '=' || p[1] != '=' || p[2] != '=' || p[3] != '=' || p[4] != '=' || p[5] != '=' || decode32_table[(unsigned char)p[6]] != -1)
+                    *pfInvalid = true;
+                break;
+
+            case 4: // 8n+4 base32 characters processed: require '===='
+                if (left || p[0] != '=' || p[1] != '=' || p[2] != '=' || p[3] != '=' || decode32_table[(unsigned char)p[4]] != -1)
+                    *pfInvalid = true;
+                break;
+
+            case 5: // 8n+5 base32 characters processed: require '==='
+                if (left || p[0] != '=' || p[1] != '=' || p[2] != '=' || decode32_table[(unsigned char)p[3]] != -1)
+                    *pfInvalid = true;
+                break;
+
+            case 7: // 8n+7 base32 characters processed: require '='
+                if (left || p[0] != '=' || decode32_table[(unsigned char)p[1]] != -1)
+                    *pfInvalid = true;
+                break;
+        }
+
+    return vchRet;
+}
+
+string DecodeBase32(const string& str)
+{
+    vector<unsigned char> vchRet = DecodeBase32(str.c_str());
+    return string((const char*)&vchRet[0], vchRet.size());
+}
+
+
+bool WildcardMatch(const char* psz, const char* mask)
+{
+    while (true)
+    {
+        switch (*mask)
+        {
+        case '\0':
+            return (*psz == '\0');
+        case '*':
+            return WildcardMatch(psz, mask+1) || (*psz && WildcardMatch(psz+1, mask));
+        case '?':
+            if (*psz == '\0')
+                return false;
+            break;
+        default:
+            if (*psz != *mask)
+                return false;
+            break;
+        }
+        psz++;
+        mask++;
+    }
+}
+
+bool WildcardMatch(const string& str, const string& mask)
+{
+    return WildcardMatch(str.c_str(), mask.c_str());
+}
+
+
+
+
+
+
+
+
+static std::string FormatException(std::exception* pex, const char* pszThread)
+{
+#ifdef WIN32
+    char pszModule[MAX_PATH] = "";
+    GetModuleFileNameA(NULL, pszModule, sizeof(pszModule));
+#else
+    const char* pszModule = "XDECoin";
+#endif
+    if (pex)
+        return strprintf(
+            "EXCEPTION: %s       \n%s       \n%s in %s       \n", typeid(*pex).name(), pex->what(), pszModule, pszThread);
+    else
+        return strprintf(
+            "UNKNOWN EXCEPTION       \n%s in %s       \n", pszModule, pszThread);
+}
+
+void LogException(std::exception* pex, const char* pszThread)
+{
+    std::string message = FormatException(pex, pszThread);
+    printf("\n%s", message.c_str());
+}
+
+void PrintException(std::exception* pex, const char* pszThread)
+{
+    std::string message = FormatException(pex, pszThread);
+    printf("\n\n************************\n%s\n", message.c_str());
+    fprintf(stderr, "\n\n************************\n%s\n", message.c_str());
+    strMiscWarning = message;
+    throw;
+}
+
+void LogStackTrace() {
+    printf("\n\n******* exception encountered *******\n");
+    if (fileout)
+    {
+#ifndef WIN32
+        void* pszBuffer[32];
+        size_t size;
+        size = backtrace(pszBuffer, 32);
+        backtrace_symbols_fd(pszBuffer, size, fileno(fileout));
+#endif
+    }
+}
+
+void PrintExceptionContinue(std::exception* pex, const char* pszThread)
+{
+    std::string message = FormatException(pex, pszThread);
+    printf("\n\n************************\n%s\n", message.c_str());
+    fprintf(stderr, "\n\n************************\n%s\n", message.c_str());
+    strMiscWarning = message;
+}
+
+boost::filesystem::path GetDefaultDataDir()
+{
+    namespace fs = boost::filesystem;
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\XDECoin
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\XDECoin
+    // Mac: ~/Library/Application Support/XDECoin
+    // Unix: ~/.XDECoin
+#ifdef WIN32
+    // Windows
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "XDECoin";
+#else
+    fs::path pathRet;
+    char* pszHome = getenv("HOME");
+    if (pszHome == NULL || strlen(pszHome) == 0)
+        pathRet = fs::path("/");
+    else
+        pathRet = fs::path(pszHome);
+#ifdef MAC_OSX
+    // Mac
+    pathRet /= "Library/Application Support";
+    fs::create_directory(pathRet);
+    return pathRet / "XDECoin";
+#else
+    // Unix
+    return pathRet / ".XDECoin";
+#endif
+#endif
+}
+
+const boost::filesystem::path &GetDataDir(bool fNetSpecific)
+{
+    namespace fs = boost::filesystem;
+
+    static fs::path pathCached[2];
+    static CCriticalSection csPathCached;
+    static bool cachedPath[2] = {false, false};
+
+    fs::path &path = pathCached[fNetSpecific];
+
+    // This can be called during exceptions by printf, so we cache the
+    // value so we don't have to do memory allocations after that.
+    if (cachedPath[fNetSpecific])
+        return path;
+
+    LOCK(csPathCached);
+
+    if (mapArgs.count("-datadir")) {
+        path = fs::system_complete(mapArgs["-datadir"]);
+        if (!fs::is_directory(path)) {
+            path = "";
+            return path;
+        }
+    } else {
+        path = GetDefaultDataDir();
+    }
+    if (fNetSpecific && fTestNet)
+        path /= "testnet";
+
+    fs::create_directory(path);
+
+    cachedPath[fNetSpecific]=true;
+    return path;
+}
+
+boost::filesystem::path GetConfigFile()
+{
+    boost::filesystem::path pathConfigFile(GetArg("-conf", "xdecoin.conf"));
+    if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir(false) / pathConfigFile;
+    return pathConfigFile;
+}
+
+void ReadConfigFile(map<string, string>& mapSettingsRet,
+                    map<string, vector<string> >& mapMultiSettingsRet)
+{
+    boost::filesystem::ifstream streamConfig(GetConfigFile());
+    if (!streamConfig.good())
+        return; // No bitcoin.conf file is OK
+
+    set<string> setOptions;
+    setOptions.insert("*");
+
+    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
+    {
+        // Don't overwrite existing settings so command line settings override bitcoin.conf
+        string strKey = string("-") + it->string_key;
+        if (mapSettingsRet.count(strKey) == 0)
+        {
+            mapSettingsRet[strKey] = it->value[0];
+            // interpret nofoo=1 as foo=0 (and nofoo=0 as foo=1) as long as foo not set)
+            InterpretNegativeSetting(strKey, mapSettingsRet);
+        }
+        mapMultiSettingsRet[strKey].push_back(it->value[0]);
+    }
+}
+
+boost::filesystem::path GetPidFile()
+{
+    boost::filesystem::path pathPidFile(GetArg("-pid", "xdecoind.pid"));
+    if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
+    return pathPidFile;
+}
+
+#ifndef WIN32
+void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
+{
+    FILE* file = fopen(path.string().c_str(), "w");
+    if (file)
+    {
+        fprintf(file, "%d\n", pid);
+        fclose(file);
+    }
+}
+#endif
+
+bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
+{
+#ifdef WIN32
+    return MoveFileExA(src.string().c_str(), dest.string().c_str(),
+                      MOVEFILE_REPLACE_EXISTING);
+#else
+    int rc = std::rename(src.string().c_str(), dest.string().c_str());
+    return (rc == 0);
+#endif /* WIN32 */
+}
+
+void FileCommit(FILE *fileout)
+{
+    fflush(fileout);                // harmless if redundantly called
+#ifdef WIN32
+    _commit(_fileno(fileout));
+#else
+    fsync(fileno(fileout));
+#endif
+}
+
+void ShrinkDebugFile()
+{
+    // Scroll debug.log if it's getting too big
+    boost::filesystem::path pathLog = GetDataDir() / "debug.log";
+    FILE* file = fopen(pathLog.string().c_str(), "r");
+    if (file && boost::filesystem::file_size(pathLog) > 10 * 1000000)
+    {
+        // Restart the file with some of the end
+        char pch[200000];
+        fseek(file, -sizeof(pch), SEEK_END);
+        int nBytes = fread(pch, 1, sizeof(pch), file);
+        fclose(file);
+
+        file = fopen(pathLog.string().c_str(), "w");
+        if (file)
+        {
+            fwrite(pch, 1, nBytes, file);
+            fclose(file);
+        }
+    }
+}
+
+//
+// "Never go to sea with two chronometers; take one or three."
+// Our three time sources are:
+//  - System clock
+//  - Median of other nodes clocks
+//  - The user (asking the 
