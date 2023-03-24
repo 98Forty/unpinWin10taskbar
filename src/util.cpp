@@ -1168,4 +1168,172 @@ void ShrinkDebugFile()
 // Our three time sources are:
 //  - System clock
 //  - Median of other nodes clocks
-//  - The user (asking the 
+//  - The user (asking the user to fix the system clock if the first two disagree)
+//
+static int64_t nMockTime = 0;  // For unit testing
+
+int64_t GetTime()
+{
+    if (nMockTime) return nMockTime;
+
+    return time(NULL);
+}
+
+void SetMockTime(int64_t nMockTimeIn)
+{
+    nMockTime = nMockTimeIn;
+}
+
+static int64_t nTimeOffset = 0;
+
+int64_t GetTimeOffset()
+{
+    return nTimeOffset;
+}
+
+int64_t GetAdjustedTime()
+{
+    return GetTime() + GetTimeOffset();
+}
+
+void AddTimeData(const CNetAddr& ip, int64_t nTime)
+{
+    int64_t nOffsetSample = nTime - GetTime();
+
+    // Ignore duplicates
+    static set<CNetAddr> setKnown;
+    if (!setKnown.insert(ip).second)
+        return;
+
+    // Add data
+    vTimeOffsets.input(nOffsetSample);
+    printf("Added time data, samples %d, offset %+"PRId64" (%+"PRId64" minutes)\n", vTimeOffsets.size(), nOffsetSample, nOffsetSample/60);
+    if (vTimeOffsets.size() >= 5 && vTimeOffsets.size() % 2 == 1)
+    {
+        int64_t nMedian = vTimeOffsets.median();
+        std::vector<int64_t> vSorted = vTimeOffsets.sorted();
+        // Only let other nodes change our time by so much
+        if (abs64(nMedian) < 70 * 60)
+        {
+            nTimeOffset = nMedian;
+        }
+        else
+        {
+            nTimeOffset = 0;
+
+            static bool fDone;
+            if (!fDone)
+            {
+                // If nobody has a time different than ours but within 5 minutes of ours, give a warning
+                bool fMatch = false;
+                BOOST_FOREACH(int64_t nOffset, vSorted)
+                    if (nOffset != 0 && abs64(nOffset) < 5 * 60)
+                        fMatch = true;
+
+                if (!fMatch)
+                {
+                    fDone = true;
+                    string strMessage = _("Warning: Please check that your computer's date and time are correct! If your clock is wrong XDECoin will not work properly.");
+                    strMiscWarning = strMessage;
+                    printf("*** %s\n", strMessage.c_str());
+                    uiInterface.ThreadSafeMessageBox(strMessage+" ", string("XDECoin"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION);
+                }
+            }
+        }
+        if (fDebug) {
+            BOOST_FOREACH(int64_t n, vSorted)
+                printf("%+"PRId64"  ", n);
+            printf("|  ");
+        }
+        printf("nTimeOffset = %+"PRId64"  (%+"PRId64" minutes)\n", nTimeOffset, nTimeOffset/60);
+    }
+}
+
+
+
+
+
+
+
+
+string FormatVersion(int nVersion)
+{
+    if (nVersion%100 == 0)
+        return strprintf("%d.%d.%d", nVersion/1000000, (nVersion/10000)%100, (nVersion/100)%100);
+    else
+        return strprintf("%d.%d.%d.%d", nVersion/1000000, (nVersion/10000)%100, (nVersion/100)%100, nVersion%100);
+}
+
+string FormatFullVersion()
+{
+    return CLIENT_BUILD;
+}
+
+// Format the subversion field according to BIP 14 spec (https://en.bitcoin.it/wiki/BIP_0014)
+std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments)
+{
+    std::ostringstream ss;
+    ss << "/";
+    ss << name << ":" << FormatVersion(nClientVersion);
+    if (!comments.empty())
+        ss << "(" << boost::algorithm::join(comments, "; ") << ")";
+    ss << "/";
+    return ss.str();
+}
+
+#ifdef WIN32
+boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
+{
+    namespace fs = boost::filesystem;
+
+    char pszPath[MAX_PATH] = "";
+
+    if(SHGetSpecialFolderPathA(NULL, pszPath, nFolder, fCreate))
+    {
+        return fs::path(pszPath);
+    }
+
+    printf("SHGetSpecialFolderPathA() failed, could not obtain requested path.\n");
+    return fs::path("");
+}
+#endif
+
+void runCommand(std::string strCommand)
+{
+    int nErr = ::system(strCommand.c_str());
+    if (nErr)
+        printf("runCommand error: system(%s) returned %d\n", strCommand.c_str(), nErr);
+}
+
+void RenameThread(const char* name)
+{
+#if defined(PR_SET_NAME)
+    // Only the first 15 characters are used (16 - NUL terminator)
+    ::prctl(PR_SET_NAME, name, 0, 0, 0);
+#elif 0 && (defined(__FreeBSD__) || defined(__OpenBSD__))
+    // TODO: This is currently disabled because it needs to be verified to work
+    //       on FreeBSD or OpenBSD first. When verified the '0 &&' part can be
+    //       removed.
+    pthread_set_name_np(pthread_self(), name);
+
+// This is XCode 10.6-and-later; bring back if we drop 10.5 support:
+// #elif defined(MAC_OSX)
+//    pthread_setname_np(name);
+
+#else
+    // Prevent warnings for unused parameters...
+    (void)name;
+#endif
+}
+
+bool NewThread(void(*pfn)(void*), void* parg)
+{
+    try
+    {
+        boost::thread(pfn, parg); // thread detaches when out of scope
+    } catch(boost::thread_resource_error &e) {
+        printf("Error creating thread: %s\n", e.what());
+        return false;
+    }
+    return true;
+}
